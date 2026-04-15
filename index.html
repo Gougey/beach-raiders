@@ -1,0 +1,2551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rescue Raiders - Beach Assault</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+canvas {
+    border: 3px solid #16213e;
+    border-radius: 8px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+}
+#ui-overlay {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-size: 14px;
+    pointer-events: none;
+    text-align: center;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+}
+#start-screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0,0,0,0.7);
+    z-index: 10;
+}
+#start-screen h1 {
+    font-size: 52px;
+    color: #f5a623;
+    text-shadow: 3px 3px 0 #c0392b, 5px 5px 10px rgba(0,0,0,0.5);
+    margin-bottom: 10px;
+    letter-spacing: 3px;
+}
+#start-screen h2 {
+    font-size: 22px;
+    color: #ecf0f1;
+    margin-bottom: 30px;
+    font-weight: normal;
+}
+#start-screen .controls {
+    color: #bdc3c7;
+    font-size: 15px;
+    line-height: 2;
+    margin-bottom: 30px;
+}
+#start-screen .controls span {
+    color: #f5a623;
+    font-weight: bold;
+}
+#start-btn {
+    padding: 15px 50px;
+    font-size: 22px;
+    background: linear-gradient(180deg, #27ae60, #1e8449);
+    color: white;
+    border: 3px solid #1a6b37;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    transition: transform 0.1s;
+    pointer-events: all;
+}
+#start-btn:hover { transform: scale(1.05); }
+#start-btn:active { transform: scale(0.95); }
+#game-over-screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0,0,0,0.75);
+    z-index: 10;
+}
+#game-over-screen h1 {
+    font-size: 48px;
+    margin-bottom: 20px;
+    text-shadow: 3px 3px 10px rgba(0,0,0,0.5);
+}
+#restart-btn {
+    padding: 15px 50px;
+    font-size: 22px;
+    background: linear-gradient(180deg, #e67e22, #d35400);
+    color: white;
+    border: 3px solid #a04000;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    transition: transform 0.1s;
+}
+#restart-btn:hover { transform: scale(1.05); }
+</style>
+</head>
+<body>
+
+<canvas id="game" width="1200" height="700"></canvas>
+
+<div id="start-screen">
+    <h1>BEACH RAIDERS</h1>
+    <h2>Rescue Raiders Reimagined</h2>
+    <div class="controls">
+        <span>WASD / Arrow Keys</span> — Fly Helicopter<br>
+        <span>SPACE</span> — Shoot<br>
+        <span>E</span> — Pick up / Drop soldiers<br>
+        <span>1</span> — Spawn Infantry ($10)<br>
+        <span>2</span> — Spawn Tank ($40)<br>
+        <span>3</span> — Spawn Bazooka ($25)<br>
+    </div>
+    <button id="start-btn">START MISSION</button>
+</div>
+
+<div id="game-over-screen">
+    <h1 id="game-over-text">VICTORY!</h1>
+    <button id="restart-btn">PLAY AGAIN</button>
+</div>
+
+<script>
+// ============================================================
+// BEACH RAIDERS — Rescue Raiders clone with Boom Beach aesthetics
+// ============================================================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+
+// ---- GAME CONFIG ----
+const WORLD_WIDTH = 4000;
+const GROUND_Y = 560;
+const WATER_Y = 590;
+const GRAVITY = 0.15;
+const HELI_SPEED = 4;
+const BULLET_SPEED = 10;
+const SCROLL_MARGIN = 350;
+const INCOME_RATE = 0.15; // money per frame
+
+// ---- COLORS (Boom Beach palette) ----
+const C = {
+    sky1: '#4fc3f7',
+    sky2: '#81d4fa',
+    sky3: '#b3e5fc',
+    ocean1: '#0288d1',
+    ocean2: '#0277bd',
+    ocean3: '#01579b',
+    sand1: '#ffe0b2',
+    sand2: '#ffcc80',
+    sand3: '#ffb74d',
+    grass1: '#66bb6a',
+    grass2: '#43a047',
+    grass3: '#2e7d32',
+    palm1: '#33691e',
+    palm2: '#558b2f',
+    wood: '#5d4037',
+    heliBody: '#1565c0',
+    heliLight: '#42a5f5',
+    heliDark: '#0d47a1',
+    enemyBody: '#c62828',
+    enemyLight: '#ef5350',
+    enemyDark: '#8e0000',
+    infantry: '#1b5e20',
+    infantryEnemy: '#b71c1c',
+    tank: '#37474f',
+    tankEnemy: '#4e342e',
+    bazooka: '#004d40',
+    bazookaEnemy: '#bf360c',
+    building: '#78909c',
+    buildingLight: '#b0bec5',
+    buildingDark: '#546e7a',
+    gold: '#ffc107',
+    hud: 'rgba(0,0,0,0.6)',
+    explosion1: '#ff9800',
+    explosion2: '#ff5722',
+    explosion3: '#ffeb3b',
+    white: '#ffffff',
+    healthGreen: '#4caf50',
+    healthRed: '#f44336',
+};
+
+// ---- GAME STATE ----
+let gameState = 'menu'; // menu, playing, gameover
+let cameraX = 0;
+let money = 50;
+let enemyMoney = 50;
+let enemySpawnTimer = 0;
+let frameCount = 0;
+let particles = [];
+let bullets = [];
+let units = [];
+let keys = {};
+let gameOverResult = '';
+let screenShakeX = 0;
+let screenShakeY = 0;
+let screenShakeTimer = 0;
+let ambientParticles = [];
+
+// ---- INPUT ----
+document.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (gameState === 'playing') {
+        if (e.key === '1') spawnPlayerUnit('infantry');
+        if (e.key === '2') spawnPlayerUnit('tank');
+        if (e.key === '3') spawnPlayerUnit('bazooka');
+        if (e.key === 'e' || e.key === 'E') helicopterPickupDrop();
+    }
+    if (e.key === ' ') e.preventDefault();
+});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('start-screen').style.display = 'none';
+    gameState = 'playing';
+    initGame();
+});
+document.getElementById('restart-btn').addEventListener('click', () => {
+    document.getElementById('game-over-screen').style.display = 'none';
+    gameState = 'playing';
+    initGame();
+});
+
+// ---- HELICOPTER ----
+let heli = {};
+function resetHeli() {
+    heli = {
+        x: 200, y: 300,
+        vx: 0, vy: 0,
+        hp: 100, maxHp: 100,
+        facing: 1, // 1=right, -1=left
+        bladeAngle: 0,
+        shootCooldown: 0,
+        carrying: [], // soldiers being carried
+        maxCarry: 4,
+        bobTimer: 0,
+    };
+}
+
+// ---- BASES ----
+let playerBase = {};
+let enemyBase = {};
+function resetBases() {
+    playerBase = { x: 100, hp: 500, maxHp: 500, team: 'player' };
+    enemyBase = { x: WORLD_WIDTH - 200, hp: 500, maxHp: 500, team: 'enemy' };
+}
+
+// ---- INIT ----
+// Pre-generate terrain features
+let palmTrees = [];
+let clouds = [];
+let flowers = [];
+let rocks = [];
+let bgMountains = [];
+let bgTrees = [];
+let birds = [];
+
+function initGame() {
+    resetHeli();
+    resetBases();
+    money = 50;
+    enemyMoney = 50;
+    enemySpawnTimer = 0;
+    frameCount = 0;
+    particles = [];
+    bullets = [];
+    units = [];
+    cameraX = 0;
+    screenShakeX = 0;
+    screenShakeY = 0;
+    screenShakeTimer = 0;
+    ambientParticles = [];
+
+    // Generate palm trees
+    palmTrees = [];
+    for (let i = 0; i < 30; i++) {
+        palmTrees.push({
+            x: 300 + Math.random() * (WORLD_WIDTH - 600),
+            height: 60 + Math.random() * 40,
+            lean: (Math.random() - 0.5) * 0.3,
+            fronds: 5 + Math.floor(Math.random() * 3),
+            swayOffset: Math.random() * Math.PI * 2,
+            trunkWidth: 6 + Math.random() * 4,
+        });
+    }
+
+    // Generate clouds
+    clouds = [];
+    for (let i = 0; i < 15; i++) {
+        clouds.push({
+            x: Math.random() * WORLD_WIDTH,
+            y: 30 + Math.random() * 120,
+            w: 80 + Math.random() * 120,
+            speed: 0.1 + Math.random() * 0.3,
+        });
+    }
+
+    // Generate flowers/bushes
+    flowers = [];
+    for (let i = 0; i < 50; i++) {
+        flowers.push({
+            x: Math.random() * WORLD_WIDTH,
+            type: Math.floor(Math.random() * 5),
+            size: 3 + Math.random() * 5,
+            color: ['#e91e63', '#ff9800', '#ffeb3b', '#ab47bc', '#ff5252', '#69f0ae'][Math.floor(Math.random() * 6)],
+            petalCount: 4 + Math.floor(Math.random() * 4),
+        });
+    }
+
+    // Generate rocks
+    rocks = [];
+    for (let i = 0; i < 40; i++) {
+        rocks.push({
+            x: Math.random() * WORLD_WIDTH,
+            size: 2 + Math.random() * 6,
+            shade: 0.3 + Math.random() * 0.3,
+            yOff: Math.random() * 3,
+        });
+    }
+
+    // Generate background mountains/islands
+    bgMountains = [];
+    for (let i = 0; i < 8; i++) {
+        bgMountains.push({
+            x: i * (WORLD_WIDTH / 7) + Math.random() * 200,
+            w: 200 + Math.random() * 300,
+            h: 80 + Math.random() * 120,
+            color1: `hsl(${200 + Math.random() * 30}, ${30 + Math.random() * 20}%, ${60 + Math.random() * 15}%)`,
+            color2: `hsl(${200 + Math.random() * 30}, ${30 + Math.random() * 20}%, ${75 + Math.random() * 10}%)`,
+        });
+    }
+
+    // Generate mid-ground trees
+    bgTrees = [];
+    for (let i = 0; i < 25; i++) {
+        bgTrees.push({
+            x: Math.random() * WORLD_WIDTH,
+            h: 30 + Math.random() * 40,
+            w: 20 + Math.random() * 25,
+            shade: Math.random(),
+        });
+    }
+
+    // Generate ambient birds
+    birds = [];
+    for (let i = 0; i < 6; i++) {
+        birds.push({
+            x: Math.random() * WORLD_WIDTH,
+            y: 40 + Math.random() * 100,
+            speed: 0.3 + Math.random() * 0.6,
+            wingPhase: Math.random() * Math.PI * 2,
+            size: 2 + Math.random() * 2,
+        });
+    }
+
+    // Spawn initial enemy units
+    for (let i = 0; i < 3; i++) {
+        spawnEnemyUnit('infantry');
+    }
+}
+
+// ---- UNIT DEFINITIONS ----
+const UNIT_DEFS = {
+    infantry: { hp: 30, speed: 0.8, damage: 5, range: 80, attackRate: 40, cost: 10, w: 14, h: 22 },
+    tank:     { hp: 120, speed: 0.5, damage: 15, range: 150, attackRate: 60, cost: 40, w: 36, h: 20 },
+    bazooka:  { hp: 25, speed: 0.7, damage: 25, range: 130, attackRate: 70, cost: 25, w: 14, h: 22 },
+};
+
+function spawnPlayerUnit(type) {
+    const def = UNIT_DEFS[type];
+    if (money < def.cost) return;
+    money -= def.cost;
+    units.push({
+        type, team: 'player',
+        x: playerBase.x + 80, y: GROUND_Y - def.h / 2,
+        hp: def.hp, maxHp: def.hp,
+        speed: def.speed, damage: def.damage,
+        range: def.range, attackRate: def.attackRate,
+        attackCooldown: 0,
+        w: def.w, h: def.h,
+        state: 'march', // march, fight, dead
+        walkFrame: Math.random() * Math.PI * 2,
+    });
+}
+
+function spawnEnemyUnit(type) {
+    const def = UNIT_DEFS[type];
+    units.push({
+        type, team: 'enemy',
+        x: enemyBase.x - 80, y: GROUND_Y - def.h / 2,
+        hp: def.hp, maxHp: def.hp,
+        speed: def.speed, damage: def.damage,
+        range: def.range, attackRate: def.attackRate,
+        attackCooldown: 0,
+        w: def.w, h: def.h,
+        state: 'march',
+        walkFrame: Math.random() * Math.PI * 2,
+    });
+}
+
+// ---- HELICOPTER PICKUP/DROP ----
+function helicopterPickupDrop() {
+    if (heli.carrying.length > 0) {
+        // Drop soldiers at current position
+        for (let i = 0; i < heli.carrying.length; i++) {
+            const s = heli.carrying[i];
+            s.x = heli.x + (i - 1.5) * 20;
+            s.y = GROUND_Y - s.h / 2;
+            s.state = 'march';
+            units.push(s);
+        }
+        heli.carrying = [];
+    } else {
+        // Pick up nearby friendly infantry
+        for (let i = units.length - 1; i >= 0; i--) {
+            const u = units[i];
+            if (u.team === 'player' && u.type === 'infantry' && heli.carrying.length < heli.maxCarry) {
+                const dx = u.x - heli.x;
+                const dy = u.y - heli.y;
+                if (Math.abs(dx) < 60 && Math.abs(dy) < 80) {
+                    u.state = 'carried';
+                    heli.carrying.push(u);
+                    units.splice(i, 1);
+                }
+            }
+        }
+    }
+}
+
+// ---- SHOOTING ----
+function heliShoot() {
+    if (heli.shootCooldown > 0) return;
+    heli.shootCooldown = 8;
+    bullets.push({
+        x: heli.x + heli.facing * 25,
+        y: heli.y + 12,
+        vx: BULLET_SPEED * heli.facing,
+        vy: 0,
+        team: 'player',
+        damage: 10,
+        life: 80,
+        type: 'heli',
+    });
+    // Muzzle flash
+    spawnParticles(heli.x + heli.facing * 25, heli.y + 12, C.explosion3, 3, 2, 8);
+    // Shell casing
+    particles.push({
+        x: heli.x + heli.facing * 15, y: heli.y + 14,
+        vx: -heli.facing * (1 + Math.random() * 2), vy: -2 - Math.random() * 2,
+        life: 30, maxLife: 30,
+        color: '#d4a017', size: 2, isCasing: true,
+    });
+}
+
+function unitShoot(unit, target) {
+    if (unit.attackCooldown > 0) return;
+    unit.attackCooldown = unit.attackRate;
+
+    if (unit.type === 'tank' || unit.type === 'bazooka') {
+        const dx = target.x - unit.x;
+        const dy = (target.y || GROUND_Y) - unit.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        bullets.push({
+            x: unit.x + (unit.team === 'player' ? unit.w / 2 : -unit.w / 2),
+            y: unit.y,
+            vx: (dx / dist) * 6,
+            vy: (dy / dist) * 6 - (unit.type === 'bazooka' ? 1 : 0),
+            team: unit.team,
+            damage: unit.damage,
+            life: 60,
+            type: unit.type === 'tank' ? 'shell' : 'rocket',
+        });
+        // Muzzle flash for tank/bazooka
+        const dir = unit.team === 'player' ? 1 : -1;
+        spawnParticles(unit.x + dir * unit.w / 2, unit.y, C.explosion3, 4, 2, 6);
+    } else {
+        // Infantry — instant hit
+        target.hp -= unit.damage;
+        spawnParticles(target.x, target.y, C.explosion1, 2, 1, 5);
+        // Muzzle flash for infantry
+        const dir = unit.team === 'player' ? 1 : -1;
+        spawnParticles(unit.x + dir * 14, unit.y - 3, '#ffeb3b', 2, 1, 4);
+    }
+}
+
+// ---- PARTICLES ----
+function spawnParticles(x, y, color, count, minSpeed, maxLife) {
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = minSpeed + Math.random() * 3;
+        particles.push({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 1,
+            life: maxLife + Math.random() * maxLife,
+            maxLife: maxLife * 2,
+            color,
+            size: 2 + Math.random() * 4,
+        });
+    }
+}
+
+function spawnExplosion(x, y, size) {
+    spawnParticles(x, y, C.explosion1, size * 3, 1, 15);
+    spawnParticles(x, y, C.explosion2, size * 2, 2, 12);
+    spawnParticles(x, y, C.explosion3, size, 1, 10);
+    spawnParticles(x, y, '#444', size * 2, 1, 20);
+    // Debris chunks
+    for (let i = 0; i < size * 2; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 4;
+        particles.push({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 3,
+            life: 20 + Math.random() * 20,
+            maxLife: 40,
+            color: ['#5d4037', '#795548', '#8d6e63', '#333'][Math.floor(Math.random() * 4)],
+            size: 3 + Math.random() * 4,
+            isDebris: true,
+        });
+    }
+    // Shockwave ring
+    particles.push({
+        x, y,
+        vx: 0, vy: 0,
+        life: 12, maxLife: 12,
+        color: 'rgba(255,255,255,0.5)',
+        size: 5,
+        isShockwave: true,
+        radius: 5,
+    });
+    // Screen shake
+    if (size >= 3) {
+        screenShakeTimer = 10;
+    }
+}
+
+function spawnDustCloud(x, y) {
+    for (let i = 0; i < 2; i++) {
+        particles.push({
+            x: x + (Math.random() - 0.5) * 8, y: y + 5,
+            vx: (Math.random() - 0.5) * 0.5, vy: -0.3 - Math.random() * 0.5,
+            life: 15 + Math.random() * 10,
+            maxLife: 25,
+            color: '#c8b08a',
+            size: 3 + Math.random() * 3,
+            isDust: true,
+        });
+    }
+}
+
+// ---- UPDATE ----
+function update() {
+    if (gameState !== 'playing') return;
+    frameCount++;
+
+    // Income
+    money += INCOME_RATE;
+    enemyMoney += INCOME_RATE * 1.1;
+
+    // Helicopter controls
+    let ax = 0, ay = 0;
+    if (keys['a'] || keys['arrowleft'])  { ax = -0.4; heli.facing = -1; }
+    if (keys['d'] || keys['arrowright']) { ax = 0.4; heli.facing = 1; }
+    if (keys['w'] || keys['arrowup'])    ay = -0.5;
+    if (keys['s'] || keys['arrowdown'])  ay = 0.3;
+    if (keys[' ']) heliShoot();
+
+    heli.vx += ax;
+    heli.vy += ay;
+    heli.vx *= 0.92;
+    heli.vy *= 0.92;
+    heli.vy += GRAVITY * 0.3; // slight gravity pull
+
+    heli.x += heli.vx;
+    heli.y += heli.vy;
+
+    // Clamp helicopter
+    heli.x = Math.max(30, Math.min(WORLD_WIDTH - 30, heli.x));
+    heli.y = Math.max(30, Math.min(GROUND_Y - 40, heli.y));
+    heli.bladeAngle += 0.4;
+    heli.bobTimer += 0.05;
+    heli.shootCooldown = Math.max(0, heli.shootCooldown - 1);
+
+    // Camera follow
+    const screenX = heli.x - cameraX;
+    if (screenX > W - SCROLL_MARGIN) cameraX = heli.x - (W - SCROLL_MARGIN);
+    if (screenX < SCROLL_MARGIN) cameraX = heli.x - SCROLL_MARGIN;
+    cameraX = Math.max(0, Math.min(WORLD_WIDTH - W, cameraX));
+
+    // Screen shake
+    if (screenShakeTimer > 0) {
+        screenShakeTimer--;
+        screenShakeX = (Math.random() - 0.5) * screenShakeTimer * 0.8;
+        screenShakeY = (Math.random() - 0.5) * screenShakeTimer * 0.8;
+    } else {
+        screenShakeX = 0;
+        screenShakeY = 0;
+    }
+
+    // Update units
+    for (let i = units.length - 1; i >= 0; i--) {
+        const u = units[i];
+        if (u.hp <= 0) {
+            spawnExplosion(u.x, u.y, u.type === 'tank' ? 4 : 2);
+            units.splice(i, 1);
+            continue;
+        }
+        u.attackCooldown = Math.max(0, u.attackCooldown - 1);
+        if (u.walkFrame !== undefined) u.walkFrame += 0.12;
+
+        // Dust when walking
+        if (u.state === 'march' && frameCount % 12 === 0) {
+            spawnDustCloud(u.x, u.y + u.h / 2);
+        }
+
+        // Find nearest enemy
+        let nearestEnemy = null;
+        let nearestDist = Infinity;
+
+        // Check enemy units
+        for (const other of units) {
+            if (other.team === u.team || other.hp <= 0) continue;
+            const d = Math.abs(other.x - u.x);
+            if (d < nearestDist) { nearestDist = d; nearestEnemy = other; }
+        }
+
+        // Check enemy base
+        const targetBase = u.team === 'player' ? enemyBase : playerBase;
+        const baseDist = Math.abs(targetBase.x - u.x);
+        if (baseDist < nearestDist) {
+            nearestDist = baseDist;
+            nearestEnemy = targetBase;
+        }
+
+        // Check helicopter (for enemy units)
+        if (u.team === 'enemy') {
+            const heliDist = Math.sqrt((heli.x - u.x) ** 2 + (heli.y - u.y) ** 2);
+            if (heliDist < nearestDist && u.type === 'bazooka') {
+                nearestDist = heliDist;
+                nearestEnemy = heli;
+            }
+        }
+
+        if (nearestEnemy && nearestDist <= u.range) {
+            u.state = 'fight';
+            unitShoot(u, nearestEnemy);
+        } else {
+            u.state = 'march';
+            const dir = u.team === 'player' ? 1 : -1;
+            u.x += u.speed * dir;
+        }
+    }
+
+    // Update bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+        if (b.type === 'shell') b.vy += 0.05;
+        if (b.type === 'rocket') b.vy += 0.03;
+        b.life--;
+
+        if (b.life <= 0) { bullets.splice(i, 1); continue; }
+
+        // Hit detection — units
+        let hit = false;
+        for (const u of units) {
+            if (u.team === b.team) continue;
+            if (Math.abs(b.x - u.x) < u.w / 2 + 5 && Math.abs(b.y - u.y) < u.h / 2 + 5) {
+                u.hp -= b.damage;
+                spawnParticles(b.x, b.y, C.explosion1, 3, 1, 8);
+                hit = true;
+                break;
+            }
+        }
+
+        // Hit detection — helicopter (enemy bullets)
+        if (!hit && b.team === 'enemy') {
+            if (Math.abs(b.x - heli.x) < 25 && Math.abs(b.y - heli.y) < 15) {
+                heli.hp -= b.damage;
+                spawnParticles(b.x, b.y, C.explosion2, 4, 1, 8);
+                hit = true;
+            }
+        }
+
+        // Hit detection — bases
+        if (!hit) {
+            if (b.team === 'player' && Math.abs(b.x - enemyBase.x) < 50 && b.y > GROUND_Y - 80) {
+                enemyBase.hp -= b.damage;
+                spawnParticles(b.x, b.y, C.explosion1, 3, 1, 6);
+                hit = true;
+            }
+            if (b.team === 'enemy' && Math.abs(b.x - playerBase.x) < 50 && b.y > GROUND_Y - 80) {
+                playerBase.hp -= b.damage;
+                spawnParticles(b.x, b.y, C.explosion1, 3, 1, 6);
+                hit = true;
+            }
+        }
+
+        if (hit) { bullets.splice(i, 1); continue; }
+
+        // Off-screen
+        if (b.y > GROUND_Y + 20) {
+            spawnParticles(b.x, GROUND_Y, C.sand2, 4, 1, 10);
+            bullets.splice(i, 1);
+        }
+    }
+
+    // Update particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.isShockwave) {
+            p.radius += 4;
+        } else if (p.isCasing) {
+            p.vy += 0.15;
+            p.vx *= 0.97;
+        } else if (p.isDebris) {
+            p.vy += 0.12;
+            p.vx *= 0.98;
+        } else if (p.isDust) {
+            p.vx *= 0.95;
+        } else {
+            p.vy += 0.05;
+            p.vx *= 0.98;
+        }
+        p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Clouds drift
+    for (const c of clouds) {
+        c.x += c.speed;
+        if (c.x > WORLD_WIDTH + 100) c.x = -c.w;
+    }
+
+    // Birds drift
+    for (const bird of birds) {
+        bird.x += bird.speed;
+        bird.wingPhase += 0.08;
+        if (bird.x > WORLD_WIDTH + 50) bird.x = -50;
+    }
+
+    // Ambient leaf particles
+    if (frameCount % 60 === 0 && ambientParticles.length < 15) {
+        ambientParticles.push({
+            x: cameraX + Math.random() * W,
+            y: -10,
+            vx: 0.3 + Math.random() * 0.5,
+            vy: 0.5 + Math.random() * 0.8,
+            rot: Math.random() * Math.PI * 2,
+            rotSpeed: 0.02 + Math.random() * 0.04,
+            size: 3 + Math.random() * 3,
+            color: ['#66bb6a', '#81c784', '#a5d6a7', '#c8e6c9'][Math.floor(Math.random() * 4)],
+        });
+    }
+    for (let i = ambientParticles.length - 1; i >= 0; i--) {
+        const l = ambientParticles[i];
+        l.x += l.vx + Math.sin(frameCount * 0.02 + l.rot) * 0.3;
+        l.y += l.vy;
+        l.rot += l.rotSpeed;
+        if (l.y > GROUND_Y) ambientParticles.splice(i, 1);
+    }
+
+    // Enemy AI spawning
+    enemySpawnTimer++;
+    if (enemySpawnTimer > 120) {
+        enemySpawnTimer = 0;
+        const roll = Math.random();
+        if (roll < 0.5 && enemyMoney >= 10) { spawnEnemyUnit('infantry'); enemyMoney -= 10; }
+        else if (roll < 0.8 && enemyMoney >= 25) { spawnEnemyUnit('bazooka'); enemyMoney -= 25; }
+        else if (enemyMoney >= 40) { spawnEnemyUnit('tank'); enemyMoney -= 40; }
+    }
+
+    // Win/Lose conditions
+    if (enemyBase.hp <= 0) {
+        gameState = 'gameover';
+        gameOverResult = 'win';
+        document.getElementById('game-over-text').textContent = 'VICTORY!';
+        document.getElementById('game-over-text').style.color = '#4caf50';
+        document.getElementById('game-over-screen').style.display = 'flex';
+    }
+    if (playerBase.hp <= 0 || heli.hp <= 0) {
+        gameState = 'gameover';
+        gameOverResult = 'lose';
+        document.getElementById('game-over-text').textContent = 'DEFEATED!';
+        document.getElementById('game-over-text').style.color = '#f44336';
+        document.getElementById('game-over-screen').style.display = 'flex';
+    }
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+
+// Helper: rounded rect
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+}
+
+function drawSky() {
+    const grad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+    grad.addColorStop(0, '#1e88e5');
+    grad.addColorStop(0.3, '#42a5f5');
+    grad.addColorStop(0.6, '#81d4fa');
+    grad.addColorStop(1, '#e1f5fe');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Sun glow
+    const sunX = W * 0.8;
+    const sunY = 60;
+    const sunGrad = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 150);
+    sunGrad.addColorStop(0, 'rgba(255,245,157,0.9)');
+    sunGrad.addColorStop(0.2, 'rgba(255,238,88,0.4)');
+    sunGrad.addColorStop(0.5, 'rgba(255,183,77,0.1)');
+    sunGrad.addColorStop(1, 'rgba(255,183,77,0)');
+    ctx.fillStyle = sunGrad;
+    ctx.fillRect(0, 0, W, 300);
+
+    // Sun disc
+    ctx.fillStyle = '#fff9c4';
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = '#ffee58';
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
+function drawBackgroundMountains() {
+    for (const m of bgMountains) {
+        const sx = m.x - cameraX * 0.15;
+        if (sx < -m.w || sx > W + m.w) continue;
+        const grad = ctx.createLinearGradient(sx, GROUND_Y - m.h - 100, sx, GROUND_Y - 100);
+        grad.addColorStop(0, m.color2);
+        grad.addColorStop(1, m.color1);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(sx - m.w / 2, GROUND_Y - 100);
+        ctx.quadraticCurveTo(sx - m.w * 0.2, GROUND_Y - m.h - 100, sx, GROUND_Y - m.h - 80);
+        ctx.quadraticCurveTo(sx + m.w * 0.3, GROUND_Y - m.h - 90, sx + m.w / 2, GROUND_Y - 100);
+        ctx.closePath();
+        ctx.fill();
+    }
+}
+
+function drawBackgroundTrees() {
+    for (const t of bgTrees) {
+        const sx = t.x - cameraX * 0.3;
+        if (sx < -t.w - 20 || sx > W + 20) continue;
+        // Simplified distant tree
+        const green = t.shade > 0.5 ? '#388e3c' : '#2e7d32';
+        ctx.fillStyle = green;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.ellipse(sx, GROUND_Y - 40 - t.h * 0.4, t.w * 0.6, t.h * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#4e342e';
+        ctx.fillRect(sx - 2, GROUND_Y - 40 - t.h * 0.1, 4, t.h * 0.3);
+        ctx.globalAlpha = 1;
+    }
+}
+
+function drawClouds() {
+    for (const c of clouds) {
+        const sx = c.x - cameraX * 0.3; // parallax
+        if (sx < -c.w - 50 || sx > W + 50) continue;
+        drawCloud(sx, c.y, c.w);
+    }
+}
+
+function drawCloud(x, y, w) {
+    const h = w * 0.4;
+    ctx.save();
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(0,0,0,0.05)';
+    ctx.shadowOffsetY = 4;
+    // Cloud body with gradient
+    const cGrad = ctx.createRadialGradient(x, y - h * 0.1, w * 0.1, x, y + h * 0.1, w * 0.6);
+    cGrad.addColorStop(0, 'rgba(255,255,255,0.95)');
+    cGrad.addColorStop(1, 'rgba(230,240,255,0.6)');
+    ctx.fillStyle = cGrad;
+    ctx.beginPath();
+    ctx.ellipse(x, y, w * 0.5, h * 0.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - w * 0.25, y + h * 0.1, w * 0.3, h * 0.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + w * 0.25, y + h * 0.05, w * 0.35, h * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawBirds() {
+    ctx.strokeStyle = '#37474f';
+    ctx.lineWidth = 1.5;
+    for (const bird of birds) {
+        const sx = bird.x - cameraX * 0.2;
+        if (sx < -20 || sx > W + 20) continue;
+        const wing = Math.sin(bird.wingPhase) * bird.size;
+        ctx.beginPath();
+        ctx.moveTo(sx - bird.size * 2, bird.y + wing);
+        ctx.quadraticCurveTo(sx - bird.size * 0.5, bird.y - wing * 0.5, sx, bird.y);
+        ctx.quadraticCurveTo(sx + bird.size * 0.5, bird.y - wing * 0.5, sx + bird.size * 2, bird.y + wing);
+        ctx.stroke();
+    }
+}
+
+function drawOcean() {
+    // Beach/sand area with texture
+    const sandGrad = ctx.createLinearGradient(0, GROUND_Y - 20, 0, GROUND_Y + 15);
+    sandGrad.addColorStop(0, '#ffe0b2');
+    sandGrad.addColorStop(0.5, '#ffcc80');
+    sandGrad.addColorStop(1, '#ffb74d');
+    ctx.fillStyle = sandGrad;
+    ctx.fillRect(0, GROUND_Y - 5, W, 30);
+
+    // Sand texture dots
+    ctx.fillStyle = 'rgba(210,170,110,0.4)';
+    for (let i = 0; i < 80; i++) {
+        const sx = ((i * 37 + Math.floor(cameraX * 0.5)) % W);
+        const sy = GROUND_Y - 2 + (i * 7 % 25);
+        ctx.fillRect(sx, sy, 1, 1);
+    }
+
+    // Water with multi-layer gradient
+    const waterGrad = ctx.createLinearGradient(0, WATER_Y, 0, H);
+    waterGrad.addColorStop(0, '#00acc1');
+    waterGrad.addColorStop(0.3, '#0288d1');
+    waterGrad.addColorStop(0.6, '#0277bd');
+    waterGrad.addColorStop(1, '#01579b');
+    ctx.fillStyle = waterGrad;
+    ctx.fillRect(0, WATER_Y, W, H - WATER_Y);
+
+    // Multiple wave layers
+    for (let layer = 0; layer < 3; layer++) {
+        const wAlpha = [0.3, 0.25, 0.2][layer];
+        const wOffset = [0, 15, 30][layer];
+        const wSpeed = [2, 1.5, 1][layer];
+        const wAmp = [4, 3, 2][layer];
+        ctx.strokeStyle = `rgba(255,255,255,${wAlpha})`;
+        ctx.lineWidth = 2 - layer * 0.5;
+        ctx.beginPath();
+        for (let x = 0; x < W; x += 3) {
+            const wy = WATER_Y + wOffset + Math.sin((x + frameCount * wSpeed + cameraX) * 0.02) * wAmp;
+            if (x === 0) ctx.moveTo(x, wy); else ctx.lineTo(x, wy);
+        }
+        ctx.stroke();
+    }
+
+    // Foam near shore
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    for (let x = 0; x < W; x += 8) {
+        const foamY = WATER_Y - 2 + Math.sin((x + frameCount * 1.5 + cameraX * 0.8) * 0.04) * 2;
+        ctx.beginPath();
+        ctx.ellipse(x, foamY, 4 + Math.sin(x * 0.1) * 2, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function drawGround() {
+    // Main ground with richer gradient
+    const groundGrad = ctx.createLinearGradient(0, GROUND_Y - 25, 0, WATER_Y);
+    groundGrad.addColorStop(0, '#7cb342');
+    groundGrad.addColorStop(0.15, '#66bb6a');
+    groundGrad.addColorStop(0.4, '#4caf50');
+    groundGrad.addColorStop(0.7, '#43a047');
+    groundGrad.addColorStop(1, '#d4a056');
+    ctx.fillStyle = groundGrad;
+    ctx.fillRect(0, GROUND_Y - 5, W, WATER_Y - GROUND_Y + 5);
+
+    // Grass tufts with varied height
+    for (let x = 0; x < W; x += 8) {
+        const wx = x + cameraX;
+        const h = 3 + Math.sin(wx * 0.5) * 3 + Math.sin(wx * 0.17) * 2;
+        const sway = Math.sin(frameCount * 0.03 + wx * 0.1) * 1.5;
+        const shade = Math.sin(wx * 0.3) > 0 ? '#4caf50' : '#388e3c';
+        ctx.strokeStyle = shade;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, GROUND_Y - 5);
+        ctx.quadraticCurveTo(x + sway * 0.5, GROUND_Y - 5 - h * 0.6, x + sway, GROUND_Y - 5 - h);
+        ctx.stroke();
+    }
+
+    // Rocks scattered
+    for (const r of rocks) {
+        const sx = r.x - cameraX;
+        if (sx < -10 || sx > W + 10) continue;
+        const rGrad = ctx.createRadialGradient(sx - 1, GROUND_Y - 2 - r.yOff - r.size * 0.3, 1, sx, GROUND_Y - r.yOff, r.size * 1.2);
+        rGrad.addColorStop(0, `rgba(180,170,160,${r.shade + 0.2})`);
+        rGrad.addColorStop(1, `rgba(120,110,100,${r.shade})`);
+        ctx.fillStyle = rGrad;
+        ctx.beginPath();
+        ctx.ellipse(sx, GROUND_Y - 2 - r.yOff, r.size * 1.2, r.size * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Rock outline
+        ctx.strokeStyle = `rgba(80,70,60,${r.shade * 0.5})`;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    }
+}
+
+function drawFlowers() {
+    for (const f of flowers) {
+        const sx = f.x - cameraX;
+        if (sx < -10 || sx > W + 10) continue;
+        const fy = GROUND_Y - 5 - f.size;
+
+        // Stem
+        ctx.strokeStyle = '#388e3c';
+        ctx.lineWidth = 1.5;
+        const sway = Math.sin(frameCount * 0.03 + f.x * 0.1) * 1;
+        ctx.beginPath();
+        ctx.moveTo(sx, GROUND_Y - 5);
+        ctx.quadraticCurveTo(sx + sway * 0.5, fy + f.size * 0.5, sx + sway, fy);
+        ctx.stroke();
+
+        if (f.type < 2) {
+            // Multi-petal flower
+            ctx.fillStyle = f.color;
+            for (let p = 0; p < f.petalCount; p++) {
+                const angle = (p / f.petalCount) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.ellipse(
+                    sx + sway + Math.cos(angle) * f.size * 0.4,
+                    fy + Math.sin(angle) * f.size * 0.4,
+                    f.size * 0.4, f.size * 0.25,
+                    angle, 0, Math.PI * 2
+                );
+                ctx.fill();
+            }
+            // Center
+            ctx.fillStyle = '#ffeb3b';
+            ctx.beginPath();
+            ctx.arc(sx + sway, fy, f.size * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (f.type < 4) {
+            // Bush
+            const bGrad = ctx.createRadialGradient(sx + sway, fy, 1, sx + sway, fy + 2, f.size * 1.5);
+            bGrad.addColorStop(0, '#66bb6a');
+            bGrad.addColorStop(0.5, '#43a047');
+            bGrad.addColorStop(1, '#2e7d32');
+            ctx.fillStyle = bGrad;
+            ctx.beginPath();
+            ctx.ellipse(sx + sway, fy + f.size * 0.3, f.size * 1.2, f.size * 0.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Bush highlight
+            ctx.fillStyle = 'rgba(129,199,132,0.4)';
+            ctx.beginPath();
+            ctx.ellipse(sx + sway - f.size * 0.3, fy, f.size * 0.5, f.size * 0.4, 0, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // Tropical flower with bigger petals
+            ctx.fillStyle = f.color;
+            ctx.beginPath();
+            ctx.arc(sx + sway, fy, f.size * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.arc(sx + sway - f.size * 0.15, fy - f.size * 0.15, f.size * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+    }
+}
+
+function drawPalmTree(tree) {
+    const sx = tree.x - cameraX;
+    if (sx < -80 || sx > W + 80) return;
+
+    const sway = Math.sin(frameCount * 0.01 + tree.swayOffset) * 3;
+    const topX = sx + tree.lean * 20 + sway;
+    const topY = GROUND_Y - tree.height;
+    const tw = tree.trunkWidth;
+
+    // Trunk with cross-hatch bark
+    ctx.save();
+    // Trunk gradient
+    const trunkGrad = ctx.createLinearGradient(sx - tw, GROUND_Y, topX - tw / 2, topY);
+    trunkGrad.addColorStop(0, '#5d4037');
+    trunkGrad.addColorStop(0.3, '#795548');
+    trunkGrad.addColorStop(0.7, '#6d4c41');
+    trunkGrad.addColorStop(1, '#8d6e63');
+
+    // Draw trunk as thick path
+    ctx.strokeStyle = trunkGrad;
+    ctx.lineWidth = tw;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sx, GROUND_Y - 5);
+    ctx.quadraticCurveTo(sx + tree.lean * 40 + sway * 0.5, GROUND_Y - tree.height * 0.5,
+                         topX, topY);
+    ctx.stroke();
+
+    // Cross-hatch bark pattern
+    ctx.strokeStyle = 'rgba(62,39,25,0.4)';
+    ctx.lineWidth = 1;
+    const segments = Math.floor(tree.height / 8);
+    for (let s = 0; s < segments; s++) {
+        const t = s / segments;
+        const bx = sx + (topX - sx) * t + (tree.lean * 40 + sway * 0.5) * t * (1 - t) * 2 * (1 - t);
+        const by = GROUND_Y - 5 - tree.height * t;
+        const bw = tw * (1 - t * 0.3) * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(bx - bw, by);
+        ctx.lineTo(bx + bw, by);
+        ctx.stroke();
+    }
+    ctx.restore();
+
+    // Coconuts
+    ctx.fillStyle = '#5d4037';
+    ctx.strokeStyle = '#4e342e';
+    ctx.lineWidth = 1;
+    for (let ci = 0; ci < 3; ci++) {
+        const cx = topX - 5 + ci * 5;
+        const cy = topY + 3 + (ci === 1 ? -2 : 0);
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // Fronds with individual leaf shapes
+    for (let j = 0; j < tree.fronds; j++) {
+        const angle = (j / tree.fronds) * Math.PI * 2 + sway * 0.02;
+        const fLen = 35 + Math.random() * 5;
+
+        // Main frond stem
+        const fColor = j % 2 === 0 ? '#33691e' : '#558b2f';
+        const fLight = j % 2 === 0 ? '#4caf50' : '#66bb6a';
+
+        ctx.strokeStyle = fColor;
+        ctx.lineWidth = 2.5;
+
+        const endX = topX + Math.cos(angle) * fLen;
+        const endY = topY + Math.sin(angle) * fLen * 0.5 - 8;
+        const ctrlX = topX + Math.cos(angle) * fLen * 0.6;
+        const ctrlY = topY - 18 + Math.sin(angle) * fLen * 0.2;
+
+        ctx.beginPath();
+        ctx.moveTo(topX, topY - 3);
+        ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+        ctx.stroke();
+
+        // Individual leaves along the frond
+        const leafCount = 7;
+        for (let l = 0; l < leafCount; l++) {
+            const lt = (l + 1) / (leafCount + 1);
+            const lx = topX + (ctrlX - topX) * lt * 2 * (1 - lt) + (endX - topX) * lt * lt + (topX - topX) * (1 - lt) * (1 - lt);
+            const ly = (topY - 3) + (ctrlY - topY + 3) * lt * 2 * (1 - lt) + (endY - topY + 3) * lt * lt;
+            const leafAngle = angle + (l % 2 === 0 ? 0.5 : -0.5);
+            const leafLen = 6 + (1 - lt) * 6;
+
+            ctx.fillStyle = l % 2 === 0 ? fColor : fLight;
+            ctx.beginPath();
+            ctx.ellipse(
+                lx + Math.cos(leafAngle) * leafLen * 0.5,
+                ly + Math.sin(leafAngle) * leafLen * 0.3,
+                leafLen * 0.5, 2.5,
+                leafAngle, 0, Math.PI * 2
+            );
+            ctx.fill();
+        }
+    }
+}
+
+function drawBase(base, team) {
+    const sx = base.x - cameraX;
+    if (sx < -120 || sx > W + 120) return;
+    const by = GROUND_Y - 5;
+
+    ctx.save();
+    if (team === 'player') {
+        // === PLAYER BASE — Boom Beach HQ: Tropical military building ===
+
+        // Sandbag wall
+        ctx.fillStyle = '#c8b08a';
+        for (let i = 0; i < 8; i++) {
+            const sbx = sx - 55 + i * 14;
+            const sby = by - 10;
+            ctx.beginPath();
+            ctx.ellipse(sbx, sby, 7, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#a0896a';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        ctx.fillStyle = '#c8b08a';
+        for (let i = 0; i < 7; i++) {
+            const sbx = sx - 48 + i * 14;
+            const sby = by - 18;
+            ctx.beginPath();
+            ctx.ellipse(sbx, sby, 7, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#a0896a';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // Main building body (wooden/metal)
+        const buildGrad = ctx.createLinearGradient(sx - 40, by - 70, sx + 40, by);
+        buildGrad.addColorStop(0, '#8d6e63');
+        buildGrad.addColorStop(0.3, '#795548');
+        buildGrad.addColorStop(0.7, '#6d4c41');
+        buildGrad.addColorStop(1, '#5d4037');
+        ctx.fillStyle = buildGrad;
+        ctx.fillRect(sx - 40, by - 60, 80, 42);
+
+        // Building outline
+        ctx.strokeStyle = '#4e342e';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(sx - 40, by - 60, 80, 42);
+
+        // Wood plank lines
+        ctx.strokeStyle = 'rgba(78,52,46,0.3)';
+        ctx.lineWidth = 1;
+        for (let py = by - 55; py < by - 20; py += 8) {
+            ctx.beginPath();
+            ctx.moveTo(sx - 38, py);
+            ctx.lineTo(sx + 38, py);
+            ctx.stroke();
+        }
+
+        // Metal reinforcement strips
+        ctx.fillStyle = '#78909c';
+        ctx.fillRect(sx - 42, by - 62, 84, 4);
+        ctx.fillRect(sx - 42, by - 20, 84, 4);
+        // Metal sheen
+        ctx.fillStyle = 'rgba(176,190,197,0.3)';
+        ctx.fillRect(sx - 42, by - 62, 84, 2);
+        ctx.fillRect(sx - 42, by - 20, 84, 2);
+
+        // Roof - tropical metal roof
+        ctx.fillStyle = '#546e7a';
+        ctx.beginPath();
+        ctx.moveTo(sx - 52, by - 60);
+        ctx.lineTo(sx, by - 90);
+        ctx.lineTo(sx + 52, by - 60);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#37474f';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Roof highlight
+        ctx.fillStyle = 'rgba(176,190,197,0.2)';
+        ctx.beginPath();
+        ctx.moveTo(sx - 48, by - 62);
+        ctx.lineTo(sx - 5, by - 86);
+        ctx.lineTo(sx, by - 85);
+        ctx.lineTo(sx - 40, by - 62);
+        ctx.closePath();
+        ctx.fill();
+
+        // Door
+        const doorGrad = ctx.createLinearGradient(sx - 8, by - 36, sx + 8, by - 36);
+        doorGrad.addColorStop(0, '#4e342e');
+        doorGrad.addColorStop(0.5, '#3e2723');
+        doorGrad.addColorStop(1, '#4e342e');
+        ctx.fillStyle = doorGrad;
+        roundRect(sx - 8, by - 36, 16, 18, 2);
+        ctx.fill();
+        // Door handle
+        ctx.fillStyle = '#d4a017';
+        ctx.beginPath();
+        ctx.arc(sx + 4, by - 27, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Windows with glow
+        for (const wx of [-25, 20]) {
+            ctx.fillStyle = '#bbdefb';
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#bbdefb';
+            roundRect(sx + wx - 6, by - 52, 12, 10, 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            // Window cross
+            ctx.strokeStyle = '#795548';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(sx + wx, by - 52);
+            ctx.lineTo(sx + wx, by - 42);
+            ctx.moveTo(sx + wx - 6, by - 47);
+            ctx.lineTo(sx + wx + 6, by - 47);
+            ctx.stroke();
+        }
+
+        // Antenna
+        ctx.strokeStyle = '#78909c';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx + 25, by - 60);
+        ctx.lineTo(sx + 30, by - 100);
+        ctx.stroke();
+        // Antenna tip blink
+        ctx.fillStyle = frameCount % 40 < 20 ? '#f44336' : '#b71c1c';
+        ctx.beginPath();
+        ctx.arc(sx + 30, by - 100, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Antenna cross pieces
+        ctx.strokeStyle = '#90a4ae';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sx + 26, by - 80);
+        ctx.lineTo(sx + 34, by - 85);
+        ctx.moveTo(sx + 26, by - 90);
+        ctx.lineTo(sx + 34, by - 93);
+        ctx.stroke();
+
+        // Blue flag
+        ctx.strokeStyle = '#546e7a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx - 5, by - 90);
+        ctx.lineTo(sx - 5, by - 115);
+        ctx.stroke();
+        // Flag cloth with wave
+        const flagWave = Math.sin(frameCount * 0.08) * 3;
+        ctx.fillStyle = '#1e88e5';
+        ctx.beginPath();
+        ctx.moveTo(sx - 5, by - 115);
+        ctx.quadraticCurveTo(sx + 8, by - 112 + flagWave, sx + 18, by - 110 + flagWave * 0.5);
+        ctx.quadraticCurveTo(sx + 8, by - 106 + flagWave * 0.3, sx - 5, by - 103);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#1565c0';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // Star on flag
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        const starX = sx + 6;
+        const starY = by - 109 + flagWave * 0.5;
+        for (let i = 0; i < 5; i++) {
+            const a = (i * 4 * Math.PI / 5) - Math.PI / 2;
+            const r = i === 0 ? 0 : 3;
+            if (i === 0) ctx.moveTo(starX + 3 * Math.cos(a), starY + 3 * Math.sin(a));
+            else {
+                const innerA = a - 2 * Math.PI / 5;
+                ctx.lineTo(starX + 1.5 * Math.cos(innerA), starY + 1.5 * Math.sin(innerA));
+                ctx.lineTo(starX + 3 * Math.cos(a), starY + 3 * Math.sin(a));
+            }
+        }
+        ctx.closePath();
+        ctx.fill();
+
+    } else {
+        // === ENEMY BASE — Dark fortress with red accents ===
+
+        // Base platform
+        ctx.fillStyle = '#37474f';
+        ctx.fillRect(sx - 55, by - 5, 110, 8);
+
+        // Main fortress body
+        const fortGrad = ctx.createLinearGradient(sx - 50, by - 70, sx + 50, by);
+        fortGrad.addColorStop(0, '#424242');
+        fortGrad.addColorStop(0.5, '#37474f');
+        fortGrad.addColorStop(1, '#263238');
+        ctx.fillStyle = fortGrad;
+        ctx.fillRect(sx - 45, by - 65, 90, 60);
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(sx - 45, by - 65, 90, 60);
+
+        // Dark stone texture
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 1;
+        for (let py = by - 60; py < by - 10; py += 10) {
+            ctx.beginPath();
+            ctx.moveTo(sx - 43, py);
+            ctx.lineTo(sx + 43, py);
+            ctx.stroke();
+            for (let px = sx - 40; px < sx + 40; px += 18) {
+                const offset = (py % 20 === 0) ? 9 : 0;
+                ctx.beginPath();
+                ctx.moveTo(px + offset, py);
+                ctx.lineTo(px + offset, py + 10);
+                ctx.stroke();
+            }
+        }
+
+        // Red accent stripe
+        ctx.fillStyle = '#c62828';
+        ctx.fillRect(sx - 47, by - 67, 94, 5);
+        ctx.fillStyle = '#ef5350';
+        ctx.fillRect(sx - 47, by - 67, 94, 2);
+
+        // Guard towers on sides
+        for (const side of [-1, 1]) {
+            const towerX = sx + side * 50;
+            ctx.fillStyle = '#37474f';
+            ctx.fillRect(towerX - 10, by - 80, 20, 75);
+            ctx.strokeStyle = '#1a1a1a';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(towerX - 10, by - 80, 20, 75);
+            // Tower top
+            ctx.fillStyle = '#c62828';
+            ctx.beginPath();
+            ctx.moveTo(towerX - 12, by - 80);
+            ctx.lineTo(towerX, by - 92);
+            ctx.lineTo(towerX + 12, by - 80);
+            ctx.closePath();
+            ctx.fill();
+            // Tower window (slit)
+            ctx.fillStyle = '#ff8a65';
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = '#ff5722';
+            ctx.fillRect(towerX - 2, by - 55, 4, 10);
+            ctx.shadowBlur = 0;
+        }
+
+        // Battlements
+        ctx.fillStyle = '#37474f';
+        for (let i = 0; i < 7; i++) {
+            ctx.fillRect(sx - 45 + i * 14, by - 75, 10, 12);
+        }
+
+        // Skull emblem with glow
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(244,67,54,0.5)';
+        ctx.fillStyle = '#e0e0e0';
+        ctx.beginPath();
+        ctx.arc(sx, by - 42, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // Skull details
+        ctx.fillStyle = '#212121';
+        ctx.beginPath();
+        ctx.arc(sx - 4, by - 44, 3, 0, Math.PI * 2);
+        ctx.arc(sx + 4, by - 44, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e0e0e0';
+        ctx.beginPath();
+        ctx.arc(sx, by - 38, 5, 0, Math.PI, false);
+        ctx.fill();
+        ctx.fillStyle = '#212121';
+        for (let t = -3; t <= 3; t += 2) {
+            ctx.fillRect(sx + t, by - 38, 1, 5);
+        }
+
+        // Barbed wire effect
+        ctx.strokeStyle = '#616161';
+        ctx.lineWidth = 1;
+        const barbY = by - 70;
+        ctx.beginPath();
+        for (let bx = sx - 55; bx < sx + 55; bx += 4) {
+            const barbWave = Math.sin(bx * 0.3) * 2;
+            ctx.lineTo(bx, barbY + barbWave);
+        }
+        ctx.stroke();
+        // Barb points
+        ctx.fillStyle = '#616161';
+        for (let bx = sx - 55; bx < sx + 55; bx += 12) {
+            const barbWave = Math.sin(bx * 0.3) * 2;
+            ctx.beginPath();
+            ctx.moveTo(bx, barbY + barbWave - 3);
+            ctx.lineTo(bx + 2, barbY + barbWave);
+            ctx.lineTo(bx, barbY + barbWave + 3);
+            ctx.lineTo(bx - 2, barbY + barbWave);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Cannons
+        ctx.fillStyle = '#212121';
+        for (const side of [-1, 1]) {
+            const canX = sx + side * 35;
+            ctx.fillRect(canX - 3, by - 25, 6 + side * 12, 6);
+            // Cannon highlight
+            ctx.fillStyle = '#424242';
+            ctx.fillRect(canX - 2, by - 25, 4 + side * 10, 2);
+            ctx.fillStyle = '#212121';
+        }
+
+        // Red flag
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx, by - 75);
+        ctx.lineTo(sx, by - 100);
+        ctx.stroke();
+        const flagWave = Math.sin(frameCount * 0.08) * 3;
+        ctx.fillStyle = '#c62828';
+        ctx.beginPath();
+        ctx.moveTo(sx, by - 100);
+        ctx.quadraticCurveTo(sx + 8, by - 97 + flagWave, sx + 16, by - 95 + flagWave * 0.5);
+        ctx.quadraticCurveTo(sx + 8, by - 91 + flagWave * 0.3, sx, by - 88);
+        ctx.closePath();
+        ctx.fill();
+    }
+    ctx.restore();
+
+    // Health bar with Boom Beach style
+    const hbWidth = 70;
+    const hbX = sx - hbWidth / 2;
+    const hbY = by - (team === 'player' ? 125 : 108);
+    // Background
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    roundRect(hbX - 2, hbY - 2, hbWidth + 4, 10, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    roundRect(hbX - 2, hbY - 2, hbWidth + 4, 10, 3);
+    ctx.stroke();
+    // Bar
+    const hpRatio = Math.max(0, base.hp / base.maxHp);
+    const hpColor = hpRatio > 0.5 ? C.healthGreen : hpRatio > 0.25 ? '#ff9800' : C.healthRed;
+    if (hpRatio > 0) {
+        const barGrad = ctx.createLinearGradient(hbX, hbY, hbX, hbY + 6);
+        barGrad.addColorStop(0, hpColor);
+        barGrad.addColorStop(1, shadeColor(hpColor, -30));
+        ctx.fillStyle = barGrad;
+        roundRect(hbX, hbY, hbWidth * hpRatio, 6, 2);
+        ctx.fill();
+        // Shine
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(hbX + 1, hbY, hbWidth * hpRatio - 2, 2);
+    }
+}
+
+function shadeColor(color, percent) {
+    const num = parseInt(color.replace('#', ''), 16);
+    const r = Math.min(255, Math.max(0, (num >> 16) + percent));
+    const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + percent));
+    const b = Math.min(255, Math.max(0, (num & 0xff) + percent));
+    return `rgb(${r},${g},${b})`;
+}
+
+function drawHelicopter() {
+    const sx = heli.x - cameraX;
+    const sy = heli.y + Math.sin(heli.bobTimer) * 2;
+    const f = heli.facing;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    // Shadow on ground — bigger and softer
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.beginPath();
+    const shadowDist = GROUND_Y - heli.y;
+    const shadowScale = 1 + shadowDist * 0.002;
+    ctx.ellipse(0, GROUND_Y - heli.y - 3, 28 * shadowScale, 7 * shadowScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tail boom with taper
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-f * 20, -5);
+    ctx.lineTo(-f * 52, -3);
+    ctx.lineTo(-f * 52, 1);
+    ctx.lineTo(-f * 20, 4);
+    ctx.closePath();
+    const tailGrad = ctx.createLinearGradient(0, -5, 0, 4);
+    tailGrad.addColorStop(0, '#1565c0');
+    tailGrad.addColorStop(1, '#0d47a1');
+    ctx.fillStyle = tailGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#0a3470';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Tail stripe
+    ctx.fillStyle = '#42a5f5';
+    ctx.fillRect(-f * 35, -2, f * -12, 2);
+    ctx.restore();
+
+    // Tail rotor housing
+    ctx.fillStyle = '#455a64';
+    ctx.beginPath();
+    ctx.arc(-f * 50, -2, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#37474f';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Tail rotor blades (spinning)
+    ctx.save();
+    ctx.translate(-f * 50, -2);
+    ctx.rotate(heli.bladeAngle * 2);
+    ctx.fillStyle = 'rgba(120,144,156,0.7)';
+    ctx.fillRect(-2, -12, 4, 24);
+    ctx.restore();
+
+    // Landing skids with proper thickness
+    ctx.strokeStyle = '#37474f';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    // Left skid
+    ctx.beginPath();
+    ctx.moveTo(-12, 12);
+    ctx.lineTo(-12, 18);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-22, 19);
+    ctx.lineTo(2, 19);
+    ctx.stroke();
+    // Right skid
+    ctx.beginPath();
+    ctx.moveTo(12, 12);
+    ctx.lineTo(12, 18);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-2, 19);
+    ctx.lineTo(22, 19);
+    ctx.stroke();
+    // Skid strut highlights
+    ctx.strokeStyle = '#546e7a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-22, 18);
+    ctx.lineTo(2, 18);
+    ctx.moveTo(-2, 18);
+    ctx.lineTo(22, 18);
+    ctx.stroke();
+
+    // Engine/exhaust housing on top-back
+    ctx.fillStyle = '#455a64';
+    roundRect(-f * 12, -16, 14, 8, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#37474f';
+    ctx.lineWidth = 1;
+    roundRect(-f * 12, -16, 14, 8, 2);
+    ctx.stroke();
+    // Exhaust vent lines
+    ctx.strokeStyle = '#263238';
+    ctx.lineWidth = 0.5;
+    for (let ev = 0; ev < 3; ev++) {
+        ctx.beginPath();
+        ctx.moveTo(-f * 10 + ev * 4, -15);
+        ctx.lineTo(-f * 10 + ev * 4, -10);
+        ctx.stroke();
+    }
+
+    // Main body — chunky cartoon heli with 3D shading
+    const bodyGrad = ctx.createRadialGradient(f * 2, -4, 5, 0, 4, 30);
+    bodyGrad.addColorStop(0, '#42a5f5'); // highlight
+    bodyGrad.addColorStop(0.5, '#1e88e5');
+    bodyGrad.addColorStop(1, '#0d47a1'); // shadow
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 28, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Body outline
+    ctx.strokeStyle = '#0a3470';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 28, 15, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Highlight on top of body
+    ctx.fillStyle = 'rgba(100,181,246,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(f * 3, -5, 18, 6, f * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Shadow on bottom of body
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(0, 10, 20, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cockpit glass with radial gradient for glossy bubble
+    const cockpitGrad = ctx.createRadialGradient(f * 14, -6, 2, f * 11, -1, 14);
+    cockpitGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
+    cockpitGrad.addColorStop(0.3, 'rgba(187,222,251,0.8)');
+    cockpitGrad.addColorStop(0.7, 'rgba(100,181,246,0.5)');
+    cockpitGrad.addColorStop(1, 'rgba(66,165,245,0.3)');
+    ctx.fillStyle = cockpitGrad;
+    ctx.beginPath();
+    ctx.ellipse(f * 11, -1, 13, 10, f * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    // Cockpit outline
+    ctx.strokeStyle = 'rgba(13,71,161,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(f * 11, -1, 13, 10, f * 0.15, 0, Math.PI * 2);
+    ctx.stroke();
+    // Glass reflection highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath();
+    ctx.ellipse(f * 14, -5, 5, 3.5, f * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Accent stripe
+    ctx.fillStyle = '#ffb300';
+    ctx.fillRect(-18, 0, 36, 3);
+    ctx.fillStyle = 'rgba(255,202,40,0.3)';
+    ctx.fillRect(-18, 0, 36, 1);
+
+    // Minigun underneath
+    ctx.fillStyle = '#263238';
+    const gunX = f * 20;
+    ctx.fillRect(gunX, 9, f * 14, 3);
+    ctx.fillRect(gunX + f * 2, 7, f * 4, 2);
+    // Gun barrel detail
+    ctx.fillStyle = '#37474f';
+    ctx.fillRect(gunX + f * 12, 8, f * 4, 5);
+    // Muzzle flash when shooting
+    if (heli.shootCooldown > 5) {
+        ctx.fillStyle = '#ffeb3b';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ff9800';
+        ctx.beginPath();
+        ctx.arc(gunX + f * 16, 11, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(gunX + f * 16, 11, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+
+    // Rotor mast
+    ctx.fillStyle = '#455a64';
+    ctx.fillRect(-3, -14, 6, -8);
+    ctx.fillStyle = '#546e7a';
+    ctx.fillRect(-2, -14, 4, -6);
+
+    // Main rotor — motion blur disc when spinning
+    ctx.save();
+    ctx.translate(0, -22);
+    // Semi-transparent rotor disc
+    const rotorGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, 42);
+    rotorGrad.addColorStop(0, 'rgba(120,144,156,0.25)');
+    rotorGrad.addColorStop(0.5, 'rgba(120,144,156,0.15)');
+    rotorGrad.addColorStop(0.8, 'rgba(120,144,156,0.08)');
+    rotorGrad.addColorStop(1, 'rgba(120,144,156,0)');
+    ctx.fillStyle = rotorGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 42, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Blade tips
+    ctx.save();
+    ctx.rotate(heli.bladeAngle);
+    ctx.strokeStyle = 'rgba(69,90,100,0.7)';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-40, 0);
+    ctx.lineTo(40, 0);
+    ctx.stroke();
+    ctx.rotate(Math.PI / 2);
+    ctx.beginPath();
+    ctx.moveTo(-40, 0);
+    ctx.lineTo(40, 0);
+    ctx.stroke();
+    ctx.restore();
+    // Rotor hub
+    ctx.fillStyle = '#455a64';
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Carried soldiers indicator
+    if (heli.carrying.length > 0) {
+        ctx.fillStyle = C.gold;
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(255,193,7,0.5)';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`\u00d7${heli.carrying.length}`, 0, 32);
+        ctx.shadowBlur = 0;
+    }
+
+    ctx.restore();
+
+    // Heli health bar — Boom Beach style
+    if (heli.hp < heli.maxHp) {
+        const hbWidth = 44;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        roundRect(sx - hbWidth / 2 - 2, sy - 32, hbWidth + 4, 8, 3);
+        ctx.fill();
+        const hpRatio = heli.hp / heli.maxHp;
+        const barColor = hpRatio > 0.5 ? C.healthGreen : C.healthRed;
+        const barGrad = ctx.createLinearGradient(0, sy - 30, 0, sy - 24);
+        barGrad.addColorStop(0, barColor);
+        barGrad.addColorStop(1, shadeColor(barColor, -30));
+        ctx.fillStyle = barGrad;
+        if (hpRatio > 0) {
+            roundRect(sx - hbWidth / 2, sy - 30, hbWidth * hpRatio, 4, 2);
+            ctx.fill();
+        }
+    }
+}
+
+function drawUnit(u) {
+    const sx = u.x - cameraX;
+    if (sx < -30 || sx > W + 30) return;
+    const sy = u.y;
+    const isPlayer = u.team === 'player';
+    const dir = isPlayer ? 1 : -1;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    if (u.type === 'infantry' || u.type === 'bazooka') {
+        const walkPhase = Math.sin((u.walkFrame || 0) + u.x * 0.1) * (u.state === 'march' ? 4 : 0);
+
+        // === BOOM BEACH CHUNKY SOLDIER ===
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(0, u.h / 2, 9, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Boots
+        const bootColor = isPlayer ? '#1b3a1b' : '#3e1a1a';
+        ctx.fillStyle = bootColor;
+        ctx.beginPath();
+        ctx.ellipse(-3 - walkPhase * 0.8, u.h / 2, 4, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(3 + walkPhase * 0.8, u.h / 2, 4, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Legs
+        const pantsColor = isPlayer ? '#2e7d32' : '#8e2424';
+        ctx.strokeStyle = pantsColor;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-3, 4);
+        ctx.lineTo(-3 - walkPhase * 0.8, u.h / 2 - 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(3, 4);
+        ctx.lineTo(3 + walkPhase * 0.8, u.h / 2 - 2);
+        ctx.stroke();
+
+        // Body/vest — chunky torso
+        const vestColor1 = isPlayer ?
+            (u.type === 'infantry' ? '#2e7d32' : '#00695c') :
+            (u.type === 'infantry' ? '#c62828' : '#d84315');
+        const vestColor2 = isPlayer ?
+            (u.type === 'infantry' ? '#1b5e20' : '#004d40') :
+            (u.type === 'infantry' ? '#8e0000' : '#bf360c');
+        const vestGrad = ctx.createLinearGradient(-7, -7, 7, 8);
+        vestGrad.addColorStop(0, vestColor1);
+        vestGrad.addColorStop(1, vestColor2);
+        ctx.fillStyle = vestGrad;
+        roundRect(-7, -7, 14, 14, 2);
+        ctx.fill();
+        // Vest outline
+        ctx.strokeStyle = vestColor2;
+        ctx.lineWidth = 1;
+        roundRect(-7, -7, 14, 14, 2);
+        ctx.stroke();
+        // Vest pocket/detail
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.fillRect(-5, -2, 4, 4);
+        ctx.fillRect(1, -2, 4, 4);
+
+        // Arms
+        ctx.strokeStyle = vestColor1;
+        ctx.lineWidth = 3.5;
+        ctx.lineCap = 'round';
+        // Back arm
+        ctx.beginPath();
+        ctx.moveTo(-dir * 5, -3);
+        ctx.lineTo(-dir * 8, 3);
+        ctx.stroke();
+        // Front arm (holding weapon)
+        ctx.beginPath();
+        ctx.moveTo(dir * 5, -3);
+        ctx.lineTo(dir * 9, -1);
+        ctx.stroke();
+
+        // Skin-colored hands
+        ctx.fillStyle = '#ffcc80';
+        ctx.beginPath();
+        ctx.arc(dir * 9, -1, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Head — big chunky Boom Beach head
+        const headGrad = ctx.createRadialGradient(0, -12, 1, 0, -10, 7);
+        headGrad.addColorStop(0, '#ffe0b2');
+        headGrad.addColorStop(1, '#ffcc80');
+        ctx.fillStyle = headGrad;
+        ctx.beginPath();
+        ctx.arc(0, -11, 6.5, 0, Math.PI * 2);
+        ctx.fill();
+        // Head outline
+        ctx.strokeStyle = '#e6a86e';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, -11, 6.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Simple face
+        // Eyes
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(dir * 2, -12, 1.2, 0, Math.PI * 2);
+        ctx.arc(dir * -2, -12, 1, 0, Math.PI * 2);
+        ctx.fill();
+        // Mouth (small line)
+        ctx.strokeStyle = '#bf8a60';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(-2, -8.5);
+        ctx.lineTo(2, -8.5);
+        ctx.stroke();
+
+        // Helmet
+        const helmetColor1 = isPlayer ? '#2e7d32' : '#5d4037';
+        const helmetColor2 = isPlayer ? '#1b5e20' : '#3e2723';
+        const helmetGrad = ctx.createLinearGradient(-7, -18, 7, -12);
+        helmetGrad.addColorStop(0, helmetColor1);
+        helmetGrad.addColorStop(1, helmetColor2);
+        ctx.fillStyle = helmetGrad;
+        ctx.beginPath();
+        ctx.arc(0, -13, 7.5, Math.PI, 0);
+        ctx.fill();
+        // Helmet brim
+        ctx.fillStyle = helmetColor2;
+        ctx.fillRect(-8, -13, 16, 2);
+        // Helmet shine
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.beginPath();
+        ctx.arc(-2, -16, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Weapon with proper detail
+        if (u.type === 'bazooka') {
+            // Bazooka tube
+            ctx.fillStyle = '#546e7a';
+            ctx.save();
+            ctx.translate(dir * 9, -2);
+            ctx.rotate(dir > 0 ? -0.1 : Math.PI + 0.1);
+            roundRect(0, -3, 22, 6, 2);
+            ctx.fill();
+            ctx.strokeStyle = '#37474f';
+            ctx.lineWidth = 1;
+            roundRect(0, -3, 22, 6, 2);
+            ctx.stroke();
+            // Bazooka opening
+            ctx.fillStyle = '#263238';
+            ctx.beginPath();
+            ctx.arc(22, 0, 3, 0, Math.PI * 2);
+            ctx.fill();
+            // Sight
+            ctx.fillStyle = '#78909c';
+            ctx.fillRect(8, -5, 3, 3);
+            ctx.restore();
+        } else {
+            // Rifle
+            ctx.fillStyle = '#5d4037';
+            ctx.save();
+            ctx.translate(dir * 9, -1);
+            ctx.rotate(dir > 0 ? -0.15 : Math.PI + 0.15);
+            ctx.fillRect(0, -1.5, 14, 3);
+            // Barrel
+            ctx.fillStyle = '#37474f';
+            ctx.fillRect(10, -1, 8, 2);
+            // Stock
+            ctx.fillStyle = '#4e342e';
+            ctx.fillRect(-4, -2, 5, 4);
+            ctx.restore();
+        }
+
+        // Muzzle flash when fighting
+        if (u.state === 'fight' && u.attackCooldown > u.attackRate - 5) {
+            ctx.fillStyle = '#ffeb3b';
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#ff9800';
+            ctx.beginPath();
+            ctx.arc(dir * 24, -3, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+    } else if (u.type === 'tank') {
+        // === BOOM BEACH CHUNKY CARTOON TANK ===
+        const bodyColor1 = isPlayer ? '#546e7a' : '#5d4037';
+        const bodyColor2 = isPlayer ? '#37474f' : '#4e342e';
+        const accentColor = isPlayer ? '#4fc3f7' : '#ef5350';
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(0, u.h / 2 + 3, 24, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Treads with individual track links
+        ctx.fillStyle = '#212121';
+        roundRect(-20, 2, 40, 12, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 1;
+        roundRect(-20, 2, 40, 12, 4);
+        ctx.stroke();
+        // Track links
+        ctx.fillStyle = '#333';
+        for (let t = -17; t < 18; t += 5) {
+            const linkOff = ((frameCount * (u.state === 'march' ? 2 : 0) + t * 10) % 5);
+            ctx.fillRect(t + linkOff * 0.2, 4, 3, 8);
+        }
+        // Track wheels
+        ctx.fillStyle = '#424242';
+        for (let w = -14; w <= 14; w += 7) {
+            ctx.beginPath();
+            ctx.arc(w, 8, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#555';
+            ctx.beginPath();
+            ctx.arc(w, 8, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#424242';
+        }
+
+        // Hull with angled armor
+        const hullGrad = ctx.createLinearGradient(0, -8, 0, 4);
+        hullGrad.addColorStop(0, bodyColor1);
+        hullGrad.addColorStop(1, bodyColor2);
+        ctx.fillStyle = hullGrad;
+        ctx.beginPath();
+        ctx.moveTo(-18, 3);
+        ctx.lineTo(-15, -7);
+        ctx.lineTo(-8, -9);
+        ctx.lineTo(12, -9);
+        ctx.lineTo(16, -7);
+        ctx.lineTo(18, 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = shadeColor(bodyColor2, -20);
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Hull highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.beginPath();
+        ctx.moveTo(-14, -7);
+        ctx.lineTo(-8, -9);
+        ctx.lineTo(12, -9);
+        ctx.lineTo(14, -7);
+        ctx.closePath();
+        ctx.fill();
+        // Armor plate lines
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(-10, -9);
+        ctx.lineTo(-12, 3);
+        ctx.moveTo(5, -9);
+        ctx.lineTo(7, 3);
+        ctx.stroke();
+
+        // Turret — rounded with gradient
+        const turretGrad = ctx.createRadialGradient(0, -10, 2, 0, -8, 10);
+        turretGrad.addColorStop(0, isPlayer ? '#78909c' : '#795548');
+        turretGrad.addColorStop(1, isPlayer ? '#455a64' : '#4e342e');
+        ctx.fillStyle = turretGrad;
+        ctx.beginPath();
+        ctx.arc(0, -9, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = shadeColor(bodyColor2, -20);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, -9, 9, 0, Math.PI * 2);
+        ctx.stroke();
+        // Turret highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.beginPath();
+        ctx.arc(-2, -12, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Barrel with proper shape
+        ctx.fillStyle = '#333';
+        const barrelLen = 24;
+        ctx.beginPath();
+        ctx.moveTo(dir * 7, -11);
+        ctx.lineTo(dir * (7 + barrelLen), -11);
+        ctx.lineTo(dir * (7 + barrelLen), -7);
+        ctx.lineTo(dir * 7, -7);
+        ctx.closePath();
+        ctx.fill();
+        // Barrel muzzle brake
+        ctx.fillStyle = '#444';
+        ctx.fillRect(dir * (7 + barrelLen - 4), -12, dir * 6, 6);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(dir * (7 + barrelLen - 4), -12, dir * 6, 6);
+        // Barrel highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(dir * 7, -11, dir * barrelLen, 1.5);
+
+        // Team emblem on turret
+        ctx.fillStyle = accentColor;
+        ctx.shadowBlur = 3;
+        ctx.shadowColor = accentColor;
+        ctx.beginPath();
+        ctx.arc(0, -9, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // Inner emblem detail
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.arc(0, -9, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Exhaust puff when moving
+        if (u.state === 'march' && frameCount % 8 < 4) {
+            ctx.fillStyle = 'rgba(100,100,100,0.3)';
+            const exDir = isPlayer ? -1 : 1;
+            ctx.beginPath();
+            ctx.arc(exDir * 20, -2, 3 + Math.random() * 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Muzzle flash for tank
+        if (u.state === 'fight' && u.attackCooldown > u.attackRate - 5) {
+            const muzzleX = dir * (7 + barrelLen + 2);
+            ctx.fillStyle = '#ffeb3b';
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = '#ff9800';
+            ctx.beginPath();
+            ctx.arc(muzzleX, -9, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(muzzleX, -9, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    // Health bar — Boom Beach style with rounded corners and outline
+    if (u.hp < u.maxHp) {
+        const hbWidth = u.type === 'tank' ? 34 : 22;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        roundRect(-hbWidth / 2 - 1, -u.h / 2 - 12, hbWidth + 2, 6, 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 0.5;
+        roundRect(-hbWidth / 2 - 1, -u.h / 2 - 12, hbWidth + 2, 6, 2);
+        ctx.stroke();
+        const hpRatio = u.hp / u.maxHp;
+        const barColor = hpRatio > 0.5 ? C.healthGreen : C.healthRed;
+        const barGrad = ctx.createLinearGradient(0, -u.h / 2 - 11, 0, -u.h / 2 - 7);
+        barGrad.addColorStop(0, barColor);
+        barGrad.addColorStop(1, shadeColor(barColor, -25));
+        ctx.fillStyle = barGrad;
+        if (hpRatio > 0) {
+            roundRect(-hbWidth / 2, -u.h / 2 - 11, hbWidth * hpRatio, 4, 1.5);
+            ctx.fill();
+        }
+    }
+
+    ctx.restore();
+}
+
+function drawBullets() {
+    for (const b of bullets) {
+        const sx = b.x - cameraX;
+        if (sx < -10 || sx > W + 10) continue;
+
+        if (b.type === 'heli') {
+            // Tracer bullet
+            ctx.save();
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = '#ffc107';
+            ctx.fillStyle = '#ffd54f';
+            ctx.fillRect(sx - 4, b.y - 1.5, 8, 3);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(sx - 2, b.y - 0.5, 4, 1);
+            ctx.restore();
+        } else if (b.type === 'shell') {
+            // Tank shell with trail
+            ctx.fillStyle = 'rgba(80,80,80,0.3)';
+            ctx.beginPath();
+            ctx.arc(sx - b.vx * 3, b.y - b.vy * 3, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(80,80,80,0.15)';
+            ctx.beginPath();
+            ctx.arc(sx - b.vx * 6, b.y - b.vy * 6, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#444';
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(sx, b.y, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        } else if (b.type === 'rocket') {
+            // Rocket with smoke trail
+            ctx.fillStyle = '#ef5350';
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#ff5722';
+            ctx.beginPath();
+            ctx.arc(sx, b.y, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            // Rocket tip
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(sx + b.vx * 0.3, b.y + b.vy * 0.3, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            // Smoke trail
+            spawnParticles(b.x, b.y, '#aaa', 1, 0.3, 8);
+            spawnParticles(b.x - b.vx, b.y - b.vy, '#ff9800', 1, 0.5, 5);
+        }
+    }
+}
+
+function drawParticles() {
+    for (const p of particles) {
+        const sx = p.x - cameraX;
+        if (sx < -20 || sx > W + 20) continue;
+        const alpha = p.life / p.maxLife;
+
+        if (p.isShockwave) {
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(sx, p.y, p.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            continue;
+        }
+
+        if (p.isCasing) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#d4a017';
+            ctx.fillRect(sx - 1, p.y - 1.5, 2, 3);
+            ctx.globalAlpha = 1;
+            continue;
+        }
+
+        if (p.isDust) {
+            ctx.globalAlpha = alpha * 0.4;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(sx, p.y, p.size * (1.5 - alpha * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            continue;
+        }
+
+        if (p.isDebris) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = p.color;
+            ctx.save();
+            ctx.translate(sx, p.y);
+            ctx.rotate(p.life * 0.3);
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+            ctx.restore();
+            ctx.globalAlpha = 1;
+            continue;
+        }
+
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.shadowBlur = p.size * alpha * 2;
+        ctx.shadowColor = p.color;
+        ctx.beginPath();
+        ctx.arc(sx, p.y, p.size * alpha, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
+}
+
+function drawAmbientParticles() {
+    for (const l of ambientParticles) {
+        const sx = l.x - cameraX;
+        if (sx < -10 || sx > W + 10) continue;
+        ctx.save();
+        ctx.translate(sx, l.y);
+        ctx.rotate(l.rot);
+        ctx.fillStyle = l.color;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, l.size, l.size * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+}
+
+function drawHUD() {
+    // === BOOM BEACH STYLE HUD ===
+
+    // Top bar — wooden/metal panel
+    ctx.save();
+    const hudGrad = ctx.createLinearGradient(0, 0, 0, 56);
+    hudGrad.addColorStop(0, 'rgba(62,39,25,0.9)');
+    hudGrad.addColorStop(0.5, 'rgba(78,52,46,0.85)');
+    hudGrad.addColorStop(1, 'rgba(50,30,20,0.9)');
+    ctx.fillStyle = hudGrad;
+    roundRect(0, 0, W, 54, 0);
+    ctx.fill();
+    // Metal border bottom
+    ctx.fillStyle = '#5d4037';
+    ctx.fillRect(0, 52, W, 3);
+    ctx.fillStyle = 'rgba(141,110,99,0.5)';
+    ctx.fillRect(0, 52, W, 1);
+    // Wood grain texture
+    ctx.strokeStyle = 'rgba(93,64,55,0.2)';
+    ctx.lineWidth = 1;
+    for (let gy = 5; gy < 50; gy += 12) {
+        ctx.beginPath();
+        ctx.moveTo(0, gy);
+        for (let gx = 0; gx < W; gx += 20) {
+            ctx.lineTo(gx, gy + Math.sin(gx * 0.01) * 2);
+        }
+        ctx.stroke();
+    }
+
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'left';
+
+    // Money panel
+    drawHUDPanel(8, 6, 105, 24);
+    ctx.fillStyle = '#ffd54f';
+    ctx.shadowBlur = 2;
+    ctx.shadowColor = 'rgba(255,193,7,0.5)';
+    ctx.fillText(`$ ${Math.floor(money)}`, 36, 24);
+    ctx.shadowBlur = 0;
+    // Coin icon
+    ctx.fillStyle = '#ffc107';
+    ctx.beginPath();
+    ctx.arc(23, 18, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#f57f17';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#f57f17';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('$', 23, 22);
+
+    // Player base HP panel
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'left';
+    drawHUDPanel(120, 6, 170, 24);
+    ctx.fillStyle = '#81d4fa';
+    ctx.fillText(`Base: ${Math.max(0, Math.ceil(playerBase.hp))}/${playerBase.maxHp}`, 132, 23);
+
+    // Heli HP panel
+    drawHUDPanel(298, 6, 160, 24);
+    ctx.fillStyle = heli.hp > 50 ? '#a5d6a7' : '#ef9a9a';
+    ctx.fillText(`Heli HP: ${Math.max(0, Math.ceil(heli.hp))}/${heli.maxHp}`, 308, 23);
+
+    // Carrying panel
+    if (heli.carrying.length > 0) {
+        drawHUDPanel(466, 6, 130, 24);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`Carry: ${heli.carrying.length}/${heli.maxCarry}`, 476, 23);
+    }
+
+    // Enemy base HP panel
+    ctx.textAlign = 'right';
+    drawHUDPanel(W - 215, 6, 205, 24);
+    ctx.fillStyle = '#ef9a9a';
+    ctx.fillText(`Enemy Base: ${Math.max(0, Math.ceil(enemyBase.hp))}/${enemyBase.maxHp}`, W - 18, 23);
+
+    // Spawn buttons — Boom Beach deploy style
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 11px sans-serif';
+    const btnY = 36;
+    const btnDefs = [
+        { key: '1', label: 'Infantry', cost: 10, x: W / 2 - 100 },
+        { key: '2', label: 'Tank', cost: 40, x: W / 2 },
+        { key: '3', label: 'Bazooka', cost: 25, x: W / 2 + 100 },
+    ];
+    for (const btn of btnDefs) {
+        const canAfford = money >= btn.cost;
+        const bx = btn.x - 42;
+        // Button background
+        const btnGrad = ctx.createLinearGradient(bx, btnY, bx, btnY + 16);
+        if (canAfford) {
+            btnGrad.addColorStop(0, '#43a047');
+            btnGrad.addColorStop(1, '#2e7d32');
+        } else {
+            btnGrad.addColorStop(0, '#616161');
+            btnGrad.addColorStop(1, '#424242');
+        }
+        ctx.fillStyle = btnGrad;
+        roundRect(bx, btnY, 84, 16, 4);
+        ctx.fill();
+        ctx.strokeStyle = canAfford ? '#1b5e20' : '#333';
+        ctx.lineWidth = 1;
+        roundRect(bx, btnY, 84, 16, 4);
+        ctx.stroke();
+        // Button shine
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(bx + 2, btnY + 1, 80, 6);
+        // Button text
+        ctx.fillStyle = canAfford ? '#fff' : '#999';
+        ctx.fillText(`[${btn.key}] ${btn.label} $${btn.cost}`, btn.x, btnY + 12);
+    }
+
+    // E key hint
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('[E] Pick/Drop', W / 2 + 220, btnY + 12);
+
+    // Minimap — Boom Beach style with terrain
+    const mmW = 200;
+    const mmH = 24;
+    const mmX = W / 2 - mmW / 2;
+    const mmY = 4;
+    // Minimap border (wooden frame)
+    ctx.fillStyle = '#5d4037';
+    roundRect(mmX - 3, mmY - 3, mmW + 6, mmH + 6, 4);
+    ctx.fill();
+    ctx.fillStyle = '#8d6e63';
+    roundRect(mmX - 2, mmY - 2, mmW + 4, mmH + 4, 3);
+    ctx.fill();
+    // Minimap background with terrain colors
+    const mmTerrain = ctx.createLinearGradient(mmX, mmY, mmX, mmY + mmH);
+    mmTerrain.addColorStop(0, '#81d4fa');
+    mmTerrain.addColorStop(0.5, '#66bb6a');
+    mmTerrain.addColorStop(0.8, '#ffcc80');
+    mmTerrain.addColorStop(1, '#0288d1');
+    ctx.fillStyle = mmTerrain;
+    roundRect(mmX, mmY, mmW, mmH, 2);
+    ctx.fill();
+
+    // Units on minimap
+    for (const u of units) {
+        const mx = mmX + (u.x / WORLD_WIDTH) * mmW;
+        ctx.fillStyle = u.team === 'player' ? '#1565c0' : '#c62828';
+        const mh = u.type === 'tank' ? 10 : 6;
+        const mw = u.type === 'tank' ? 3 : 2;
+        ctx.fillRect(mx - mw / 2, mmY + (mmH - mh) / 2, mw, mh);
+    }
+
+    // Heli on minimap
+    const heliMX = mmX + (heli.x / WORLD_WIDTH) * mmW;
+    ctx.fillStyle = '#fff';
+    ctx.shadowBlur = 3;
+    ctx.shadowColor = '#fff';
+    ctx.fillRect(heliMX - 2, mmY + 3, 4, 4);
+    ctx.shadowBlur = 0;
+
+    // Bases on minimap
+    ctx.fillStyle = '#1e88e5';
+    ctx.fillRect(mmX + (playerBase.x / WORLD_WIDTH) * mmW - 3, mmY + 2, 6, mmH - 4);
+    ctx.fillStyle = '#c62828';
+    ctx.fillRect(mmX + (enemyBase.x / WORLD_WIDTH) * mmW - 3, mmY + 2, 6, mmH - 4);
+
+    // Camera viewport on minimap
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mmX + (cameraX / WORLD_WIDTH) * mmW, mmY, (W / WORLD_WIDTH) * mmW, mmH);
+
+    ctx.restore();
+}
+
+function drawHUDPanel(x, y, w, h) {
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    roundRect(x, y, w, h, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(141,110,99,0.3)';
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 4);
+    ctx.stroke();
+}
+
+// ---- MAIN RENDER ----
+function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Apply screen shake
+    ctx.save();
+    ctx.translate(screenShakeX, screenShakeY);
+
+    drawSky();
+    drawBackgroundMountains();
+    drawBirds();
+    drawClouds();
+    drawBackgroundTrees();
+
+    // Background palm trees (behind ground)
+    for (const tree of palmTrees) {
+        drawPalmTree(tree);
+    }
+
+    drawGround();
+    drawFlowers();
+    drawOcean();
+
+    // Bases
+    drawBase(playerBase, 'player');
+    drawBase(enemyBase, 'enemy');
+
+    // Units
+    for (const u of units) {
+        drawUnit(u);
+    }
+
+    // Bullets
+    drawBullets();
+
+    // Helicopter
+    drawHelicopter();
+
+    // Particles (on top)
+    drawParticles();
+    drawAmbientParticles();
+
+    ctx.restore(); // End screen shake
+
+    // HUD (not affected by shake)
+    drawHUD();
+}
+
+// ---- GAME LOOP ----
+function gameLoop() {
+    update();
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+// Start the loop (rendering menu background)
+initGame();
+gameState = 'menu';
+gameLoop();
+
+</script>
+</body>
+</html>
