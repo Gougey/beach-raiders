@@ -1652,8 +1652,29 @@ function drawHelicopter() {
         ctx.ellipse(sx, GROUND_Y - 3, 50 * shadowScale, 9 * shadowScale, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Sprite (flip when facing left — source faces right)
-        drawSprite('heli', sx, sy, 90, f === -1);
+        // Pitch tilt: nose dips toward direction of travel (in WORLD space, not local)
+        // Convention: vx > 0 means "going right" → nose should dip right-and-down
+        // In canvas coords (Y down), rotating by +angle is clockwise = nose-down-right.
+        // So world pitch = +heli.vx * 0.04.
+        const targetPitch = heli.vx * 0.04;
+        heli.pitch = (heli.pitch || 0) + (targetPitch - (heli.pitch || 0)) * 0.15;
+
+        // Order: translate → rotate (in world space) → flip → draw.
+        // Rotating BEFORE flipping means the rotation is applied to the un-flipped sprite,
+        // and then the whole thing is mirrored. Visually, mirroring a clockwise tilt produces
+        // a counter-clockwise tilt — exactly what we want, because a left-facing heli's
+        // nose-dive appears as counter-clockwise rotation on screen.
+        const flip = f === -1;
+        const img = SPRITES.heli;
+        const aspect = img.naturalWidth / img.naturalHeight;
+        const drawHeight = 90;
+        const drawWidth = drawHeight * aspect;
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(heli.pitch);
+        if (flip) ctx.scale(-1, 1);
+        ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+        ctx.restore();
 
         // Health bar
         if (heli.hp < heli.maxHp) {
@@ -1939,12 +1960,12 @@ function drawUnit(u) {
     let spriteKey = null;
     let spriteHeight = 0;
     if (u.type === 'infantry') {
-        // Walk cycle: swap frame every 12 ticks while marching
-        const frame = (u.state === 'march' && Math.floor(frameCount / 12) % 2 === 0) ? 1 : 2;
+        // Walk cycle: swap frame every 9 ticks while marching, synced to bounce phase
+        const frame = (u.state === 'march' && Math.floor(frameCount / 9) % 2 === 0) ? 1 : 2;
         spriteKey = isPlayer ? `infantry_blue_${frame}` : `infantry_red_${frame}`;
         spriteHeight = 50;
     } else if (u.type === 'bazooka') {
-        const frame = (u.state === 'march' && Math.floor(frameCount / 12) % 2 === 0) ? 1 : 2;
+        const frame = (u.state === 'march' && Math.floor(frameCount / 9) % 2 === 0) ? 1 : 2;
         spriteKey = isPlayer ? `bazooka_blue_${frame}` : `bazooka_red_${frame}`;
         spriteHeight = 50;
     } else if (u.type === 'tank') {
@@ -1957,8 +1978,39 @@ function drawUnit(u) {
         // Sprite source faces right; flip enemy units (they march left)
         const flip = !isPlayer;
         // Adjust y so the sprite's feet sit on the ground
-        const drawY = sy - spriteHeight / 2 + u.h / 2;
-        drawSprite(spriteKey, sx, drawY, spriteHeight, flip);
+        let drawY = sy - spriteHeight / 2 + u.h / 2;
+
+        // March animation: when soldiers are walking, add a clearly visible bob, lean
+        // and a vertical squash-stretch so the walk reads at small scale.
+        let bounce = 0;
+        let lean = 0;
+        let squashY = 1;
+        let squashX = 1;
+        if (u.state === 'march') {
+            const phase = (frameCount * 0.35) + u.x * 0.1;
+            if (u.type === 'infantry' || u.type === 'bazooka') {
+                // Two "steps" per cycle — body lifts each foot impact
+                bounce = -Math.abs(Math.sin(phase * 2)) * 7;
+                lean = Math.sin(phase * 2) * 0.08;
+                // Squash on impact, stretch at peak
+                const stepCycle = Math.cos(phase * 2);  // -1 at impact, +1 at peak
+                squashY = 1 + stepCycle * 0.06;
+                squashX = 1 - stepCycle * 0.04;
+            } else if (u.type === 'tank') {
+                bounce = Math.sin(phase * 4) * 0.8;
+            }
+        }
+        drawY += bounce;
+
+        // Draw sprite with lean rotation and squash-stretch scale
+        const aspect = img.naturalWidth / img.naturalHeight;
+        const drawWidth = spriteHeight * aspect;
+        ctx.save();
+        ctx.translate(sx, drawY);
+        ctx.rotate(flip ? -lean : lean);
+        ctx.scale(flip ? -squashX : squashX, squashY);
+        ctx.drawImage(img, -drawWidth / 2, -spriteHeight / 2, drawWidth, spriteHeight);
+        ctx.restore();
 
         // Health bar
         if (u.hp < u.maxHp) {
