@@ -197,30 +197,45 @@ const C = {
 
 // ---- SPRITE LOADER ----
 const SPRITES = {};
-const SPRITE_FILES = {
-    heli: 'assets/heli.png',
-    tank_blue: 'assets/tank_blue.png',
-    tank_red: 'assets/tank_red.png',
-    base_blue: 'assets/base_blue.png',
-    base_red: 'assets/base_red.png',
-    // 4-frame walk cycles per soldier type
-    infantry_blue_1: 'assets/infantry_blue_1.png',
-    infantry_blue_2: 'assets/infantry_blue_2.png',
-    infantry_blue_3: 'assets/infantry_blue_3.png',
-    infantry_blue_4: 'assets/infantry_blue_4.png',
-    infantry_red_1: 'assets/infantry_red_1.png',
-    infantry_red_2: 'assets/infantry_red_2.png',
-    infantry_red_3: 'assets/infantry_red_3.png',
-    infantry_red_4: 'assets/infantry_red_4.png',
-    bazooka_blue_1: 'assets/bazooka_blue_1.png',
-    bazooka_blue_2: 'assets/bazooka_blue_2.png',
-    bazooka_blue_3: 'assets/bazooka_blue_3.png',
-    bazooka_blue_4: 'assets/bazooka_blue_4.png',
-    bazooka_red_1: 'assets/bazooka_red_1.png',
-    bazooka_red_2: 'assets/bazooka_red_2.png',
-    bazooka_red_3: 'assets/bazooka_red_3.png',
-    bazooka_red_4: 'assets/bazooka_red_4.png',
-};
+const SPRITE_FILES = (() => {
+    const files = {
+        heli: 'assets/heli.png',
+        tank_blue: 'assets/tank_blue.png',
+        tank_red: 'assets/tank_red.png',
+        base_blue: 'assets/base_blue.png',
+        base_red: 'assets/base_red.png',
+    };
+    // 8-frame walk cycles per soldier type
+    for (const soldier of ['infantry_blue', 'infantry_red', 'bazooka_blue', 'bazooka_red']) {
+        for (let i = 1; i <= 8; i++) {
+            files[`${soldier}_${i}`] = `assets/${soldier}_${i}.png`;
+        }
+    }
+    return files;
+})();
+
+// 8-frame walk cycle with VARIABLE per-frame timing (ms).
+// Total cycle ≈ 520ms. Contact and push-off frames hold longer than recoil/midstance.
+const WALK_FRAME_MS = [80, 55, 55, 70, 80, 55, 55, 70];
+const WALK_CYCLE_MS = WALK_FRAME_MS.reduce((a, b) => a + b, 0);
+const WALK_FRAME_ENDS = WALK_FRAME_MS.reduce((acc, d) => {
+    acc.push((acc[acc.length - 1] || 0) + d);
+    return acc;
+}, []);
+
+// Per-frame VERTICAL OFFSET in pixels (positive = lower on screen).
+// Spec: lowest at F3/F7 (midstance, drop ~5px), highest at F4/F8 (push-off).
+// Indexed 0..7 for frames 1..8.
+const WALK_FRAME_Y_OFFSET = [0, 2, 5, -3, 0, 2, 5, -3];
+
+// Given a time in ms within the cycle, return frame number (1..8).
+function walkFrameAt(ms) {
+    const t = ((ms % WALK_CYCLE_MS) + WALK_CYCLE_MS) % WALK_CYCLE_MS;
+    for (let i = 0; i < 8; i++) {
+        if (t < WALK_FRAME_ENDS[i]) return i + 1;
+    }
+    return 8;
+}
 let spritesLoaded = 0;
 let spritesTotal = Object.keys(SPRITE_FILES).length;
 let allSpritesReady = false;
@@ -1968,18 +1983,18 @@ function drawUnit(u) {
     // Try sprite rendering first
     let spriteKey = null;
     let spriteHeight = 0;
-    if (u.type === 'infantry') {
-        // 4-frame walk cycle: contact-L → passing-L-planted → contact-R → passing-R-planted
-        // Each frame holds for ~7 ticks (cycle = ~28 ticks ≈ 0.47s at 60fps)
-        // When stationary (fighting/idle), hold frame 1
-        const cycle = u.state === 'march' ? Math.floor((frameCount + (u.x | 0)) / 7) % 4 : 0;
-        const frame = cycle + 1;  // 1..4
-        spriteKey = isPlayer ? `infantry_blue_${frame}` : `infantry_red_${frame}`;
-        spriteHeight = 50;
-    } else if (u.type === 'bazooka') {
-        const cycle = u.state === 'march' ? Math.floor((frameCount + (u.x | 0)) / 7) % 4 : 0;
-        const frame = cycle + 1;
-        spriteKey = isPlayer ? `bazooka_blue_${frame}` : `bazooka_red_${frame}`;
+    if (u.type === 'infantry' || u.type === 'bazooka') {
+        // Per-unit phase offset (deterministic, derived from spawn x) so units
+        // don't all step in lockstep
+        const phaseOffset = (u.x * 13) % WALK_CYCLE_MS;
+        const frame = u.state === 'march'
+            ? walkFrameAt(performance.now() + phaseOffset)
+            : 1;  // hold contact pose when fighting/idle
+        u._walkFrame = frame;  // stash for Y-offset lookup below
+        const prefix = u.type === 'infantry'
+            ? (isPlayer ? 'infantry_blue' : 'infantry_red')
+            : (isPlayer ? 'bazooka_blue' : 'bazooka_red');
+        spriteKey = `${prefix}_${frame}`;
         spriteHeight = 50;
     } else if (u.type === 'tank') {
         spriteKey = isPlayer ? 'tank_blue' : 'tank_red';
@@ -1993,8 +2008,12 @@ function drawUnit(u) {
         // Adjust y so the sprite's feet sit on the ground
         let drawY = sy - spriteHeight / 2 + u.h / 2;
 
-        // For soldiers, walk motion is INTRINSIC to the 4-frame art (the passing
-        // poses are drawn with one knee high and the body tall) — no extra bounce.
+        // Soldier walk: per-frame vertical offset baked into the cycle.
+        // Spec: F3/F7 (midstance) = body lowest (+5px), F4/F8 (push-off) = body highest (-3px).
+        // Body bobs intrinsically with the 8-frame cycle.
+        if ((u.type === 'infantry' || u.type === 'bazooka') && u.state === 'march') {
+            drawY += WALK_FRAME_Y_OFFSET[(u._walkFrame || 1) - 1];
+        }
         // Tanks get a tiny rumble while moving.
         if (u.type === 'tank' && u.state === 'march') {
             const phase = (frameCount * 0.35) + u.x * 0.1;
