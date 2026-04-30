@@ -1,0 +1,18 @@
+# Secrets — never commit
+*.key
+*.txt
+sk-*
+.env
+.env.*
+*api_key*
+*secret*
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db

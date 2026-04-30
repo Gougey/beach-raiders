@@ -195,6 +195,67 @@ const C = {
     healthRed: '#f44336',
 };
 
+// ---- SPRITE LOADER ----
+const SPRITES = {};
+const SPRITE_FILES = {
+    heli: 'assets/heli.png',
+    tank_blue: 'assets/tank_blue.png',
+    tank_red: 'assets/tank_red.png',
+    base_blue: 'assets/base_blue.png',
+    base_red: 'assets/base_red.png',
+    infantry_blue_1: 'assets/infantry_blue_1.png',
+    infantry_blue_2: 'assets/infantry_blue_2.png',
+    infantry_red_1: 'assets/infantry_red_1.png',
+    infantry_red_2: 'assets/infantry_red_2.png',
+    bazooka_blue_1: 'assets/bazooka_blue_1.png',
+    bazooka_blue_2: 'assets/bazooka_blue_2.png',
+    bazooka_red_1: 'assets/bazooka_red_1.png',
+    bazooka_red_2: 'assets/bazooka_red_2.png',
+};
+let spritesLoaded = 0;
+let spritesTotal = Object.keys(SPRITE_FILES).length;
+let allSpritesReady = false;
+
+function loadSprites() {
+    Object.entries(SPRITE_FILES).forEach(([key, src]) => {
+        const img = new Image();
+        img.onload = () => {
+            spritesLoaded++;
+            if (spritesLoaded === spritesTotal) {
+                allSpritesReady = true;
+                console.log('All sprites loaded');
+            }
+        };
+        img.onerror = () => {
+            console.warn('Failed to load sprite:', src);
+            spritesLoaded++;
+            if (spritesLoaded === spritesTotal) allSpritesReady = true;
+        };
+        img.src = src;
+        SPRITES[key] = img;
+    });
+}
+
+// Draw sprite centred at (x, y) with given height (preserves aspect ratio).
+// flipH=true draws mirrored horizontally (for left-facing).
+function drawSprite(key, x, y, height, flipH = false) {
+    const img = SPRITES[key];
+    if (!img || !img.complete || img.naturalWidth === 0) return false;
+    const aspect = img.naturalWidth / img.naturalHeight;
+    const w = height * aspect;
+    const h = height;
+    ctx.save();
+    if (flipH) {
+        ctx.translate(x, y);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    } else {
+        ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+    }
+    ctx.restore();
+    return true;
+}
+
 // ---- GAME STATE ----
 let gameState = 'menu'; // menu, playing, gameover
 let cameraX = 0;
@@ -1198,6 +1259,28 @@ function drawBase(base, team) {
     if (sx < -120 || sx > W + 120) return;
     const by = GROUND_Y - 5;
 
+    // Try sprite rendering first
+    const spriteKey = team === 'player' ? 'base_blue' : 'base_red';
+    const img = SPRITES[spriteKey];
+    if (img && img.complete && img.naturalWidth > 0) {
+        const baseHeight = 150;
+        // Anchor sprite so its bottom sits on the ground
+        const drawY = by - baseHeight / 2;
+        drawSprite(spriteKey, sx, drawY, baseHeight, false);
+
+        // Health bar above sprite
+        const hbWidth = 70;
+        const hbX = sx - hbWidth / 2;
+        const hbY = by - baseHeight - 18;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(hbX - 2, hbY - 2, hbWidth + 4, 10);
+        const hpRatio = base.hp / base.maxHp;
+        ctx.fillStyle = hpRatio > 0.5 ? C.healthGreen : hpRatio > 0.25 ? '#ff9800' : C.healthRed;
+        ctx.fillRect(hbX, hbY, hbWidth * hpRatio, 6);
+        return;
+    }
+
+    // ---- Fallback: procedural drawing ----
     ctx.save();
     if (team === 'player') {
         // === PLAYER BASE — Boom Beach HQ: Tropical military building ===
@@ -1559,6 +1642,40 @@ function drawHelicopter() {
     const sy = heli.y + Math.sin(heli.bobTimer) * 2;
     const f = heli.facing;
 
+    // Try sprite-based rendering first
+    if (SPRITES.heli && SPRITES.heli.complete && SPRITES.heli.naturalWidth > 0) {
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.beginPath();
+        const shadowDist = GROUND_Y - heli.y;
+        const shadowScale = 1 + shadowDist * 0.002;
+        ctx.ellipse(sx, GROUND_Y - 3, 50 * shadowScale, 9 * shadowScale, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Sprite (flip when facing left — source faces right)
+        drawSprite('heli', sx, sy, 90, f === -1);
+
+        // Health bar
+        if (heli.hp < heli.maxHp) {
+            const hbWidth = 50;
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(sx - hbWidth / 2 - 1, sy - 50, hbWidth + 2, 6);
+            const hpRatio = heli.hp / heli.maxHp;
+            ctx.fillStyle = hpRatio > 0.5 ? C.healthGreen : C.healthRed;
+            ctx.fillRect(sx - hbWidth / 2, sy - 49, hbWidth * hpRatio, 4);
+        }
+
+        // Carrying indicator
+        if (heli.carrying.length > 0) {
+            ctx.fillStyle = C.gold;
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`×${heli.carrying.length}`, sx, sy + 55);
+        }
+        return;
+    }
+
+    // ---- Fallback: procedural drawing ----
     ctx.save();
     ctx.translate(sx, sy);
 
@@ -1818,6 +1935,44 @@ function drawUnit(u) {
     const isPlayer = u.team === 'player';
     const dir = isPlayer ? 1 : -1;
 
+    // Try sprite rendering first
+    let spriteKey = null;
+    let spriteHeight = 0;
+    if (u.type === 'infantry') {
+        // Walk cycle: swap frame every 12 ticks while marching
+        const frame = (u.state === 'march' && Math.floor(frameCount / 12) % 2 === 0) ? 1 : 2;
+        spriteKey = isPlayer ? `infantry_blue_${frame}` : `infantry_red_${frame}`;
+        spriteHeight = 50;
+    } else if (u.type === 'bazooka') {
+        const frame = (u.state === 'march' && Math.floor(frameCount / 12) % 2 === 0) ? 1 : 2;
+        spriteKey = isPlayer ? `bazooka_blue_${frame}` : `bazooka_red_${frame}`;
+        spriteHeight = 50;
+    } else if (u.type === 'tank') {
+        spriteKey = isPlayer ? 'tank_blue' : 'tank_red';
+        spriteHeight = 55;
+    }
+
+    const img = spriteKey ? SPRITES[spriteKey] : null;
+    if (img && img.complete && img.naturalWidth > 0) {
+        // Sprite source faces right; flip enemy units (they march left)
+        const flip = !isPlayer;
+        // Adjust y so the sprite's feet sit on the ground
+        const drawY = sy - spriteHeight / 2 + u.h / 2;
+        drawSprite(spriteKey, sx, drawY, spriteHeight, flip);
+
+        // Health bar
+        if (u.hp < u.maxHp) {
+            const hbWidth = u.type === 'tank' ? 40 : 28;
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(sx - hbWidth / 2 - 1, drawY - spriteHeight / 2 - 8, hbWidth + 2, 5);
+            const hpRatio = u.hp / u.maxHp;
+            ctx.fillStyle = hpRatio > 0.5 ? C.healthGreen : C.healthRed;
+            ctx.fillRect(sx - hbWidth / 2, drawY - spriteHeight / 2 - 7, hbWidth * hpRatio, 3);
+        }
+        return;
+    }
+
+    // ---- Fallback: procedural drawing ----
     ctx.save();
     ctx.translate(sx, sy);
 
@@ -2542,6 +2697,7 @@ function gameLoop() {
 }
 
 // Start the loop (rendering menu background)
+loadSprites();
 initGame();
 gameState = 'menu';
 gameLoop();
