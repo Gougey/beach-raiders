@@ -2,13 +2,37 @@
 Beach Raiders sprite generator.
 
 Generates all game assets via OpenAI's gpt-image-1 model with true
-alpha-channel transparency. Uses the edit endpoint to keep walk-cycle
-frames consistent (same character, only legs change).
+alpha-channel transparency.
+
+Walk cycles: each soldier gets a proper 4-pose walk cycle following
+classical animation principles:
+
+    Frame 1 — CONTACT (front foot strike)
+        Front foot just hit ground, back foot just leaving.
+        Body at MIDDLE vertical height. Arms at extreme positions.
+
+    Frame 2 — PASSING (high point on planted leg)
+        Back leg passes by planted leg, knee high.
+        Planted leg straight. Body at HIGHEST point. Arms central.
+
+    Frame 3 — CONTACT (other foot strike — mirror of 1)
+        Other foot just hit ground.
+        Body at MIDDLE height. Arms swapped.
+
+    Frame 4 — PASSING (high point on other planted leg)
+        Body at HIGHEST point on the other side. Arms central.
+
+Looping 1 -> 2 -> 3 -> 4 -> 1 produces a natural rise/fall walk
+without needing programmatic bounce.
+
+Frames 2-4 are produced via the image-edit endpoint with frame 1
+as the reference, so the character stays identical.
 
 Usage:
-    python generate_sprites.py            # generate all
-    python generate_sprites.py --only heli  # generate one
-    python generate_sprites.py --skip-existing  # don't redo done ones
+    python generate_sprites.py                  # generate everything
+    python generate_sprites.py --only heli      # one asset only
+    python generate_sprites.py --skip-existing  # don't overwrite
+    python generate_sprites.py --soldiers       # only walk-cycle soldiers
 """
 
 import argparse
@@ -42,7 +66,7 @@ Cheerful tropical military aesthetic, never realistic, never gritty.
 Strict side profile view facing RIGHT for vehicles and units.
 Slight 3/4 front view for buildings.
 TRUE ALPHA-CHANNEL TRANSPARENT BACKGROUND - the only visible pixels should be the subject itself.
-Subject centred, fills ~80% of canvas, no text, no labels, no scenery, no ground.
+Subject centred horizontally, no text, no labels, no scenery, no ground.
 
 COLOUR CODING:
 - PLAYER (blue) team: cobalt blue #1565c0, sky blue #42a5f5, olive green #558b2f uniforms
@@ -116,75 +140,104 @@ Menacing but still cartoonish, never horror. Soft drop shadow underneath."""
     },
 ]
 
-# Soldier definitions — each has frame 1 prompt; frame 2 made by edit
-SOLDIERS = [
-    {
-        "base_name": "infantry_blue",
-        "size": "1024x1024",
-        "frame1_prompt": """Subject: chunky cartoon soldier, strict side profile facing right.
-Standing/marching pose with LEFT LEG FORWARD, right leg back (mid-stride).
-Oversized head (~one-third of body height) with friendly determined expression, big eyes.
-Olive green (#558b2f) army helmet with chinstrap and small white highlight shine on top.
-Warm tan (#ffcc80) skin.
-Olive green combat vest over a teal-blue (#1565c0) undershirt - vest has visible pockets.
-Olive green trousers, brown leather boots.
-Holding a small black assault rifle in both hands at waist level, barrel pointing right.
-Stocky build, short legs, slightly bowed stance. Soft drop shadow at feet."""
-    },
-    {
-        "base_name": "infantry_red",
-        "size": "1024x1024",
-        "frame1_prompt": """Subject: chunky cartoon enemy soldier, strict side profile facing right.
-Standing/marching pose with LEFT LEG FORWARD, right leg back (mid-stride).
-Oversized head (~one-third of body height) with slight scowl, menacing but cartoonish.
-Crimson red (#c62828) army helmet with darker (#8e0000) shadow tone, chinstrap and white highlight.
-Warm tan (#ffcc80) skin.
-Dark crimson combat vest with black accents over a black undershirt - vest has visible pockets.
-Dark grey trousers, black boots.
-Holding a small black assault rifle in both hands at waist level, barrel pointing right.
-Stocky build, short legs. Soft drop shadow at feet.
-MUST match player infantry proportions and silhouette exactly - only team colours and expression differ."""
-    },
-    {
-        "base_name": "bazooka_blue",
-        "size": "1024x1024",
-        "frame1_prompt": """Subject: chunky cartoon soldier with rocket launcher, strict side profile facing right.
-Standing/marching pose with LEFT LEG FORWARD, right leg back (mid-stride).
-Oversized head with friendly determined expression and big eyes.
-Olive green (#558b2f) helmet with round goggles pushed up on the brim.
-Warm tan (#ffcc80) skin.
-Olive green combat vest over teal-blue (#1565c0) undershirt.
-Olive green trousers, brown leather boots.
-A long dark grey (#37474f) bazooka tube resting on his RIGHT shoulder, pointing right,
-with a small front sight and a clearly visible round opening at the muzzle end.
-Both hands gripping the launcher. Stocky build. Soft drop shadow at feet."""
-    },
-    {
-        "base_name": "bazooka_red",
-        "size": "1024x1024",
-        "frame1_prompt": """Subject: chunky cartoon enemy soldier with rocket launcher, strict side profile facing right.
-Standing/marching pose with LEFT LEG FORWARD, right leg back (mid-stride).
-Oversized head with slight scowl, menacing but cartoonish.
-Crimson red (#c62828) helmet with goggles pushed up on the brim.
-Warm tan (#ffcc80) skin.
-Dark crimson combat vest with black accents over black undershirt.
-Dark grey trousers, black boots.
-A long dark grey (#37474f) bazooka tube resting on his RIGHT shoulder, pointing right,
-with a small front sight and a clearly visible round opening at the muzzle end.
-Both hands gripping the launcher. Stocky build. Soft drop shadow at feet.
-MUST match player bazooka soldier proportions and silhouette exactly - only colours differ."""
-    },
+# ---- Soldier definitions with 4-frame walk cycle -------------------------
+
+# Per-soldier appearance description (re-used across all 4 frames so the
+# character stays visually identical between poses).
+SOLDIER_APPEARANCE = {
+    "infantry_blue": """A chunky cartoon Boom Beach style soldier, side profile facing right.
+- Oversized head (~one-third of body height), friendly determined expression, big eyes
+- Olive green (#558b2f) army helmet with chinstrap and a small white highlight shine on top
+- Warm tan (#ffcc80) skin
+- Olive green combat vest over a teal-blue (#1565c0) undershirt - vest has visible pockets
+- Olive green trousers, brown leather combat boots
+- Holding a small black assault rifle in both hands at chest level, barrel pointing right
+- Stocky, slightly bowed cartoon proportions""",
+
+    "infantry_red": """A chunky cartoon Boom Beach style ENEMY soldier, side profile facing right.
+- Oversized head (~one-third of body height), slight scowl, menacing but cartoonish
+- Crimson red (#c62828) army helmet with darker (#8e0000) shadow tone, chinstrap, white highlight
+- Warm tan (#ffcc80) skin
+- Dark crimson combat vest with black accents over a black undershirt - vest has visible pockets
+- Dark grey trousers, black combat boots
+- Holding a small black assault rifle in both hands at chest level, barrel pointing right
+- Stocky cartoon proportions, must match player soldier's silhouette/build""",
+
+    "bazooka_blue": """A chunky cartoon Boom Beach style soldier with rocket launcher, side profile facing right.
+- Oversized head, friendly determined expression, big eyes
+- Olive green (#558b2f) helmet with round goggles pushed up on the brim
+- Warm tan (#ffcc80) skin
+- Olive green combat vest over a teal-blue (#1565c0) undershirt
+- Olive green trousers, brown leather combat boots
+- Long dark grey (#37474f) bazooka tube on his RIGHT shoulder, pointing right,
+  with a small front sight and visible round opening at the muzzle end
+- Both hands gripping the launcher (one near the trigger, one supporting front)
+- Stocky cartoon proportions""",
+
+    "bazooka_red": """A chunky cartoon Boom Beach style ENEMY soldier with rocket launcher, side profile facing right.
+- Oversized head, slight scowl, menacing but cartoonish
+- Crimson red (#c62828) helmet with goggles pushed up on the brim
+- Warm tan (#ffcc80) skin
+- Dark crimson combat vest with black accents over black undershirt
+- Dark grey trousers, black combat boots
+- Long dark grey (#37474f) bazooka tube on his RIGHT shoulder, pointing right,
+  with a small front sight and visible round opening at the muzzle end
+- Both hands gripping the launcher
+- Stocky cartoon proportions, must match player bazooka silhouette/build""",
+}
+
+# Pose descriptions for each frame of the walk cycle.
+# These are the KEY POSES of a classical 4-pose walk cycle.
+# Frames 2 and 4 deliberately have the body drawn HIGHER on the canvas
+# so the rise-and-fall motion is intrinsic to the art.
+
+POSE_FRAME_1 = """WALK CYCLE FRAME 1 of 4 — LEFT-FOOT CONTACT POSE.
+- LEFT leg is forward and STRAIGHT, foot flat on the ground (heel just struck)
+- RIGHT leg is back, knee slightly bent, heel lifted, pushing off
+- Legs visibly apart in a clear stride
+- Body at MIDDLE vertical height
+- Right arm swung FORWARD, left arm swung BACK (counter to legs)
+- Slight forward lean in the torso
+- Centre the figure horizontally, position so feet are near bottom of the canvas"""
+
+POSE_FRAME_2 = """WALK CYCLE FRAME 2 of 4 — DRAMATIC HIGH-STEP, LEFT LEG PLANTED.
+- LEFT leg STRAIGHT and PLANTED on the ground (vertical, foot flat).
+- RIGHT leg LIFTED HIGH IN THE AIR with the KNEE BENT AT 90 DEGREES,
+  the right knee pointing forward at WAIST HEIGHT, right foot completely
+  off the ground pointing forward. This is a strong marching/parading high-step.
+- Body standing tall and upright (do NOT lean forward).
+- IMPORTANT: the character is still holding their weapon in both hands
+  exactly as in the contact frames (do not drop or hide the weapon).
+- The lifted right knee is the dominant visual feature so the motion reads clearly."""
+
+POSE_FRAME_3 = """WALK CYCLE FRAME 3 of 4 — RIGHT-FOOT CONTACT POSE (mirror of frame 1's leg/arm action).
+- RIGHT leg is forward and STRAIGHT, foot flat on the ground (heel just struck)
+- LEFT leg is back, knee slightly bent, heel lifted, pushing off
+- Legs visibly apart in a clear stride
+- Body at MIDDLE vertical height (same height as frame 1)
+- Left arm swung FORWARD, right arm swung BACK (counter to legs, opposite of frame 1)
+- Slight forward lean in the torso"""
+
+POSE_FRAME_4 = """WALK CYCLE FRAME 4 of 4 — DRAMATIC HIGH-STEP, RIGHT LEG PLANTED (mirror of frame 2).
+- RIGHT leg STRAIGHT and PLANTED on the ground (vertical, foot flat).
+- LEFT leg LIFTED HIGH IN THE AIR with the KNEE BENT AT 90 DEGREES,
+  the left knee pointing forward at WAIST HEIGHT, left foot completely
+  off the ground pointing forward.
+- Body standing tall and upright (do NOT lean forward).
+- IMPORTANT: the character is still holding their weapon in both hands
+  exactly as in the contact frames (do not drop or hide the weapon).
+- The lifted left knee is the dominant visual feature."""
+
+# Order matters: this is the cycle we'll loop through 1 -> 2 -> 3 -> 4 -> 1
+WALK_FRAMES = [
+    ("1", POSE_FRAME_1),
+    ("2", POSE_FRAME_2),
+    ("3", POSE_FRAME_3),
+    ("4", POSE_FRAME_4),
 ]
 
-# Frame 2 prompt for walk cycle (used with image edit)
-FRAME2_EDIT_PROMPT = """Same exact character, identical colours, identical proportions, identical outline weight,
-identical face, identical helmet, identical vest, identical weapon, identical pose of upper body.
-
-ONLY CHANGE: the leg position. Now show the OPPOSITE stride - RIGHT LEG FORWARD, left leg back.
-This is the second frame of a 2-frame walk cycle so the legs must clearly be in mirrored stride position
-to the input image. Keep everything above the waist absolutely identical.
-
-True alpha-channel transparent background. No checkerboard. No background fill."""
+SOLDIERS = list(SOLDIER_APPEARANCE.keys())  # infantry_blue, infantry_red, bazooka_blue, bazooka_red
+SOLDIER_SIZE = "1024x1024"
 
 
 # ---- Generation helpers --------------------------------------------------
@@ -193,12 +246,34 @@ def build_prompt(asset_prompt):
     return f"{STYLE}\n\n{asset_prompt}"
 
 
+def soldier_prompt(soldier_key, pose_text):
+    return build_prompt(
+        f"CHARACTER:\n{SOLDIER_APPEARANCE[soldier_key]}\n\n"
+        f"POSE:\n{pose_text}\n\n"
+        f"The character must look identical to other frames in this same walk cycle - "
+        f"same colours, same outfit, same head, same weapon, same proportions. "
+        f"Only the leg/arm position and overall body height change between frames."
+    )
+
+
+def soldier_edit_prompt(pose_text):
+    """Prompt used when editing frame 1 to produce frames 2/3/4."""
+    return (
+        "Generate a new pose of THE SAME EXACT CHARACTER shown in the input image. "
+        "Keep ALL visual details identical: same colours, same helmet shape, same vest, "
+        "same skin tone, same weapon, same face, same body proportions, same outline weight, "
+        "same art style. The character must be recognisable as the same soldier between frames.\n\n"
+        f"{pose_text}\n\n"
+        "True alpha-channel transparent background. No checkerboard. No background fill. "
+        "Subject centred horizontally."
+    )
+
+
 def save_b64_png(b64_data, path):
     path.write_bytes(base64.b64decode(b64_data))
 
 
 def generate_image(prompt, size, name):
-    """Call gpt-image-1 generate endpoint with transparent background."""
     print(f"  Generating {name} (size={size})...")
     t0 = time.time()
     resp = client.images.generate(
@@ -209,13 +284,11 @@ def generate_image(prompt, size, name):
         quality="high",
         n=1,
     )
-    elapsed = time.time() - t0
-    print(f"    Done in {elapsed:.1f}s")
+    print(f"    Done in {time.time() - t0:.1f}s")
     return resp.data[0].b64_json
 
 
 def edit_image(input_path, prompt, size, name):
-    """Call gpt-image-1 edit endpoint - frame 2 of walk cycle."""
     print(f"  Editing {name} (size={size})...")
     t0 = time.time()
     with open(input_path, "rb") as f:
@@ -228,8 +301,7 @@ def edit_image(input_path, prompt, size, name):
             quality="high",
             n=1,
         )
-    elapsed = time.time() - t0
-    print(f"    Done in {elapsed:.1f}s")
+    print(f"    Done in {time.time() - t0:.1f}s")
     return resp.data[0].b64_json
 
 
@@ -237,9 +309,11 @@ def edit_image(input_path, prompt, size, name):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--only", help="Generate just one asset by name (without .png)")
+    parser.add_argument("--only", help="Generate just one asset prefix (e.g. 'heli', 'infantry_blue')")
     parser.add_argument("--skip-existing", action="store_true",
-                        help="Skip files that already exist")
+                        help="Skip files that already exist on disk")
+    parser.add_argument("--soldiers", action="store_true",
+                        help="Only generate the walk-cycle soldier frames")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -249,60 +323,65 @@ def main():
 
     generated = 0
 
-    # Base assets
-    for asset in BASE_ASSETS:
-        name = asset["name"]
-        if args.only and not name.startswith(args.only):
-            continue
-
-        path = ASSETS_DIR / name
-        if args.skip_existing and path.exists():
-            print(f"\n[SKIP] {name} already exists")
-            continue
-
-        print(f"\n[GENERATE] {name}")
-        prompt = build_prompt(asset["prompt"])
-        try:
-            b64 = generate_image(prompt, asset["size"], name)
-            save_b64_png(b64, path)
-            print(f"  Saved {path}")
-            generated += 1
-        except Exception as e:
-            print(f"  FAILED: {e}")
-
-    # Soldiers — generate frame 1, then edit for frame 2
-    for soldier in SOLDIERS:
-        base_name = soldier["base_name"]
-        if args.only and not base_name.startswith(args.only):
-            continue
-
-        f1_path = ASSETS_DIR / f"{base_name}_1.png"
-        f2_path = ASSETS_DIR / f"{base_name}_2.png"
-
-        # Frame 1
-        if args.skip_existing and f1_path.exists():
-            print(f"\n[SKIP] {f1_path.name} already exists")
-        else:
-            print(f"\n[GENERATE] {f1_path.name}")
-            prompt = build_prompt(soldier["frame1_prompt"])
+    # Base assets (skip when --soldiers)
+    if not args.soldiers:
+        for asset in BASE_ASSETS:
+            name = asset["name"]
+            if args.only and not name.startswith(args.only):
+                continue
+            path = ASSETS_DIR / name
+            if args.skip_existing and path.exists():
+                print(f"\n[SKIP] {name}")
+                continue
+            print(f"\n[GENERATE] {name}")
             try:
-                b64 = generate_image(prompt, soldier["size"], f1_path.name)
-                save_b64_png(b64, f1_path)
-                print(f"  Saved {f1_path}")
+                b64 = generate_image(build_prompt(asset["prompt"]), asset["size"], name)
+                save_b64_png(b64, path)
                 generated += 1
             except Exception as e:
                 print(f"  FAILED: {e}")
-                continue  # can't edit if frame 1 failed
 
-        # Frame 2 — edit from frame 1
-        if args.skip_existing and f2_path.exists():
-            print(f"[SKIP] {f2_path.name} already exists")
+    # Soldiers — 4-frame walk cycle each
+    for soldier_key in SOLDIERS:
+        if args.only and not soldier_key.startswith(args.only):
+            continue
+
+        # Frame 1: generate from scratch
+        f1_path = ASSETS_DIR / f"{soldier_key}_1.png"
+        if args.skip_existing and f1_path.exists():
+            print(f"\n[SKIP] {f1_path.name}")
         else:
-            print(f"[EDIT]  {f2_path.name}")
+            print(f"\n[GENERATE] {f1_path.name} (contact pose, left foot forward)")
             try:
-                b64 = edit_image(f1_path, FRAME2_EDIT_PROMPT, soldier["size"], f2_path.name)
-                save_b64_png(b64, f2_path)
-                print(f"  Saved {f2_path}")
+                b64 = generate_image(
+                    soldier_prompt(soldier_key, POSE_FRAME_1),
+                    SOLDIER_SIZE,
+                    f1_path.name,
+                )
+                save_b64_png(b64, f1_path)
+                generated += 1
+            except Exception as e:
+                print(f"  FAILED: {e}")
+                continue
+
+        # Frames 2-4: edit from frame 1
+        for frame_num, pose_text in WALK_FRAMES[1:]:  # 2, 3, 4
+            fn_path = ASSETS_DIR / f"{soldier_key}_{frame_num}.png"
+            if args.skip_existing and fn_path.exists():
+                print(f"[SKIP] {fn_path.name}")
+                continue
+            label = {"2": "passing pose, left leg planted, body high",
+                     "3": "contact pose, right foot forward",
+                     "4": "passing pose, right leg planted, body high"}[frame_num]
+            print(f"[EDIT]  {fn_path.name} ({label})")
+            try:
+                b64 = edit_image(
+                    f1_path,
+                    soldier_edit_prompt(pose_text),
+                    SOLDIER_SIZE,
+                    fn_path.name,
+                )
+                save_b64_png(b64, fn_path)
                 generated += 1
             except Exception as e:
                 print(f"  FAILED: {e}")
