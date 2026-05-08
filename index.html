@@ -397,18 +397,24 @@ let cpCap = CP_CAP_DEFAULT;
 let enemyCommandPoints = CP_CAP_DEFAULT;
 
 // ---- WAVE SYSTEM ----
+// State machine: 'warning' (5s countdown) -> 'active' (spawning) -> 'shop'
+// (paused, upgrade UI) -> 'warning' (next wave) -> ... → final wave 'active'
+// completes into 'gameover' on victory.
 const TOTAL_WAVES = 5;
+const WAVE_WARNING_MS = 5000;
+const WAVE_DURATION_MS = 30000;
 let currentWave = 1;
-let waveTimer = 0;          // ms within current wave
-const WAVE_DURATION_MS = 35000;
-// Composition per wave: which unit types the enemy spawns and how often
+let waveTimer = 0;            // ms within current state
+let waveState = 'warning';    // 'warning' | 'active' | 'shop'
+// Composition per wave + special elites
 const WAVE_COMPOSITIONS = [
-    { types: ['infantry', 'infantry', 'bazooka'],          spawnEvery: 140 },
-    { types: ['infantry', 'bazooka', 'tank'],              spawnEvery: 130 },
-    { types: ['infantry', 'bazooka', 'bazooka', 'tank'],   spawnEvery: 120 },
-    { types: ['bazooka', 'bazooka', 'tank', 'tank'],       spawnEvery: 110 },
-    { types: ['tank', 'tank', 'bazooka', 'infantry'],      spawnEvery: 90 },
+    { types: ['infantry', 'infantry', 'bazooka'],          spawnEvery: 140, summary: '3× INFANTRY · 1× BAZOOKA' },
+    { types: ['infantry', 'bazooka', 'tank'],              spawnEvery: 130, summary: '2× INFANTRY · 2× BAZOOKA · 1× TANK' },
+    { types: ['infantry', 'bazooka', 'bazooka', 'tank'],   spawnEvery: 120, summary: 'MIXED ARMS · MINI-BOSS', boss: 'miniBossTank' },
+    { types: ['bazooka', 'bazooka', 'tank', 'tank'],       spawnEvery: 110, summary: 'HEAVY ARMOUR' },
+    { types: ['tank', 'tank', 'bazooka', 'infantry'],      spawnEvery: 90,  summary: 'FINAL ASSAULT · BOSS', boss: 'bossTank' },
 ];
+let bossSpawnedThisWave = false;
 
 // ---- POWERUPS ----
 // Active effect timers (ms remaining)
@@ -536,7 +542,10 @@ function initGame() {
     enemySpawnTimer = 0;
     currentWave = 1;
     waveTimer = 0;
+    waveState = 'warning';
+    bossSpawnedThisWave = false;
     powerupShieldMs = 0;
+    upgradeLevels = makeFreshUpgradeLevels();
     frameCount = 0;
     particles = [];
     bullets = [];
@@ -677,6 +686,114 @@ function spawnFloatingText(x, y, text, color = '#ffd54f') {
     floatingTexts.push({ x, y, text, color, life: 60, maxLife: 60, vy: -1.2 });
 }
 
+// ---- BOSS UNITS (elite tanks for wave 3 mini-boss and wave 5 boss) ----
+// These reuse the tank rendering but have inflated stats.
+const BOSS_DEFS = {
+    miniBossTank: { hpMul: 4,  damageMul: 1.5, speedMul: 0.8, scale: 1.25, bounty: 100, label: 'MINI-BOSS' },
+    bossTank:     { hpMul: 8,  damageMul: 2.0, speedMul: 0.7, scale: 1.5,  bounty: 250, label: 'BOSS' },
+};
+
+function spawnBossUnit(bossKey) {
+    const tank = UNIT_DEFS.tank;
+    const boss = BOSS_DEFS[bossKey];
+    units.push({
+        type: 'tank',
+        team: 'enemy',
+        x: enemyBase.x - 80,
+        y: GROUND_Y - tank.h / 2,
+        hp: tank.hp * boss.hpMul,
+        maxHp: tank.hp * boss.hpMul,
+        speed: tank.speed * boss.speedMul,
+        damage: tank.damage * boss.damageMul,
+        range: tank.range,
+        attackRate: tank.attackRate,
+        attackCooldown: 0,
+        w: tank.w * boss.scale,
+        h: tank.h * boss.scale,
+        state: 'march',
+        walkFrame: Math.random() * Math.PI * 2,
+        isBoss: true,
+        bossScale: boss.scale,
+        bossLabel: boss.label,
+        bossBounty: boss.bounty,
+    });
+    spawnFloatingText(enemyBase.x - 80, GROUND_Y - 120, `${boss.label} INCOMING`, '#ef5350');
+    triggerScreenShake(8, 30);
+}
+
+// ---- UPGRADE SYSTEM ----
+// Persistent (within a level) upgrades the player buys between waves.
+const UPGRADES = {
+    infantryDamage: {
+        name: 'Infantry Damage', icon: 'infantry_blue_1', desc: '+ damage to infantry',
+        tiers: [{ cost: 80, mult: 1.20 }, { cost: 200, mult: 1.40 }, { cost: 500, mult: 1.75 }],
+        apply(unit) { if (unit.type === 'infantry') unit.damage *= this.tiers[upgradeLevels[this.id] - 1].mult / (upgradeLevels[this.id] > 1 ? this.tiers[upgradeLevels[this.id] - 2].mult : 1); }
+    },
+    bazookaRange:   {
+        name: 'Bazooka Range', icon: 'bazooka_blue_1', desc: '+ bazooka range',
+        tiers: [{ cost: 100, mult: 1.15 }, { cost: 250, mult: 1.30 }, { cost: 500, mult: 1.50 }],
+    },
+    tankHp:         {
+        name: 'Tank Armour', icon: 'tank_blue', desc: '+ tank max HP',
+        tiers: [{ cost: 120, mult: 1.20 }, { cost: 300, mult: 1.40 }, { cost: 600, mult: 1.75 }],
+    },
+    heliHp:         {
+        name: 'Heli Armour', icon: 'heli', desc: '+ helicopter max HP',
+        tiers: [{ cost: 80, hp: 30 }, { cost: 180, hp: 50 }, { cost: 400, hp: 100 }],
+    },
+    cpCap:          {
+        name: 'CP Capacity', icon: null, desc: '+ Command Points cap',
+        tiers: [{ cost: 300, cap: 12 }, { cost: 600, cap: 14 }, { cost: 1200, cap: 16 }],
+    },
+};
+// Inject id onto each entry for easy lookup
+for (const k of Object.keys(UPGRADES)) UPGRADES[k].id = k;
+
+let upgradeLevels = {};
+function makeFreshUpgradeLevels() {
+    const o = {};
+    for (const k of Object.keys(UPGRADES)) o[k] = 0;
+    return o;
+}
+upgradeLevels = makeFreshUpgradeLevels();
+
+// Apply an upgrade's effect to a freshly-spawned unit (mutate the unit)
+function applyUpgradesToUnit(unit) {
+    if (unit.type === 'infantry' && upgradeLevels.infantryDamage > 0) {
+        unit.damage *= UPGRADES.infantryDamage.tiers[upgradeLevels.infantryDamage - 1].mult;
+    }
+    if (unit.type === 'bazooka' && upgradeLevels.bazookaRange > 0) {
+        unit.range *= UPGRADES.bazookaRange.tiers[upgradeLevels.bazookaRange - 1].mult;
+    }
+    if (unit.type === 'tank' && upgradeLevels.tankHp > 0) {
+        const m = UPGRADES.tankHp.tiers[upgradeLevels.tankHp - 1].mult;
+        unit.hp *= m; unit.maxHp *= m;
+    }
+}
+
+// Apply heli HP and CP cap upgrades immediately when bought
+function buyUpgrade(id) {
+    const up = UPGRADES[id];
+    if (!up) return;
+    const lvl = upgradeLevels[id];
+    if (lvl >= up.tiers.length) return;
+    const tier = up.tiers[lvl];
+    if (money < tier.cost) {
+        spawnFloatingText(W / 2 + cameraX, H / 2 - 100, 'NOT ENOUGH GOLD', '#ef5350');
+        return;
+    }
+    money -= tier.cost;
+    upgradeLevels[id] = lvl + 1;
+    if (id === 'heliHp') {
+        heli.maxHp += tier.hp;
+        heli.hp += tier.hp;
+    }
+    if (id === 'cpCap') {
+        cpCap = tier.cap;
+        commandPoints = cpCap;
+    }
+}
+
 function spawnPlayerUnit(type) {
     const def = UNIT_DEFS[type];
     if (commandPoints < def.cpCost) {
@@ -685,7 +802,7 @@ function spawnPlayerUnit(type) {
         return;
     }
     commandPoints -= def.cpCost;
-    units.push({
+    const u = {
         type, team: 'player',
         x: playerBase.x + 80, y: GROUND_Y - def.h / 2,
         hp: def.hp, maxHp: def.hp,
@@ -695,7 +812,9 @@ function spawnPlayerUnit(type) {
         w: def.w, h: def.h,
         state: 'march',
         walkFrame: Math.random() * Math.PI * 2,
-    });
+    };
+    applyUpgradesToUnit(u);
+    units.push(u);
     spawnFloatingText(playerBase.x + 80, GROUND_Y - 60, `-${def.cpCost} CP`, '#42a5f5');
 }
 
@@ -861,6 +980,11 @@ function spawnExplosion(x, y, size) {
     }
 }
 
+function triggerScreenShake(intensity, frames) {
+    screenShakeTimer = Math.max(screenShakeTimer, frames);
+    // The render loop reads screenShakeTimer to compute X/Y jitter.
+}
+
 function spawnDustCloud(x, y) {
     for (let i = 0; i < 2; i++) {
         particles.push({
@@ -993,11 +1117,15 @@ function update() {
             spawnExplosion(u.x, u.y, u.type === 'tank' ? 4 : 2);
             // Bounty: player gains gold for killing enemy units
             if (u.team === 'enemy') {
-                const def = UNIT_DEFS[u.type];
-                const bounty = def && def.bounty ? def.bounty : 0;
+                const bounty = u.isBoss ? u.bossBounty : (UNIT_DEFS[u.type]?.bounty || 0);
                 if (bounty > 0) {
                     money += bounty;
                     spawnFloatingText(u.x, u.y - 30, `+$${bounty}`, '#69f0ae');
+                }
+                if (u.isBoss) {
+                    spawnExplosion(u.x, u.y, 8);
+                    triggerScreenShake(12, 30);
+                    spawnFloatingText(u.x, u.y - 60, `${u.bossLabel} DOWN`, '#ffd54f');
                 }
             }
             units.splice(i, 1);
@@ -1205,25 +1333,57 @@ function update() {
         if (l.y > GROUND_Y) ambientParticles.splice(i, 1);
     }
 
-    // Wave-based enemy AI spawning (uses CP, not gold)
+    // Wave state machine
     waveTimer += 16.67;
-    if (waveTimer > WAVE_DURATION_MS && currentWave < TOTAL_WAVES) {
-        currentWave++;
-        waveTimer = 0;
-        // Wave clear bonus for the player
-        money += 50;
-        spawnFloatingText(playerBase.x, GROUND_Y - 100, '+$50 WAVE CLEAR', '#69f0ae');
-    }
     const wave = WAVE_COMPOSITIONS[Math.min(currentWave - 1, TOTAL_WAVES - 1)];
-    enemySpawnTimer++;
-    if (enemySpawnTimer > wave.spawnEvery) {
-        enemySpawnTimer = 0;
-        const type = wave.types[Math.floor(Math.random() * wave.types.length)];
-        const cpCost = UNIT_DEFS[type].cpCost;
-        if (enemyCommandPoints >= cpCost) {
-            spawnEnemyUnit(type);
-            enemyCommandPoints -= cpCost;
+
+    if (waveState === 'warning') {
+        // Brief countdown before wave starts spawning
+        if (waveTimer >= WAVE_WARNING_MS) {
+            waveState = 'active';
+            waveTimer = 0;
+            bossSpawnedThisWave = false;
+            enemySpawnTimer = 0;
         }
+    } else if (waveState === 'active') {
+        // Normal spawning during the wave
+        enemySpawnTimer++;
+        if (enemySpawnTimer > wave.spawnEvery) {
+            enemySpawnTimer = 0;
+            const type = wave.types[Math.floor(Math.random() * wave.types.length)];
+            const cpCost = UNIT_DEFS[type].cpCost;
+            if (enemyCommandPoints >= cpCost) {
+                spawnEnemyUnit(type);
+                enemyCommandPoints -= cpCost;
+            }
+        }
+        // Mini-boss / boss spawn at the START of an elite wave (~20% in)
+        if (wave.boss && !bossSpawnedThisWave && waveTimer > 4000) {
+            spawnBossUnit(wave.boss);
+            bossSpawnedThisWave = true;
+        }
+        // Wave ends when timer expires AND no enemy units remain on the field
+        const enemiesAlive = units.some(u => u.team === 'enemy');
+        if (waveTimer >= WAVE_DURATION_MS && !enemiesAlive) {
+            // Wave clear bonus for the player
+            money += 50;
+            spawnFloatingText(playerBase.x, GROUND_Y - 100, '+$50 WAVE CLEAR', '#69f0ae');
+            commandPoints = cpCap;  // refill CP for next wave
+            if (currentWave >= TOTAL_WAVES) {
+                // Final wave cleared = victory
+                gameState = 'gameover';
+                gameOverResult = 'win';
+                document.getElementById('game-over-text').textContent = 'VICTORY!';
+                document.getElementById('game-over-text').style.color = '#4caf50';
+                document.getElementById('game-over-screen').style.display = 'flex';
+            } else {
+                waveState = 'shop';
+                waveTimer = 0;
+            }
+        }
+    } else if (waveState === 'shop') {
+        // Pause spawning. Player browses the shop (UI handles the click to advance).
+        // Nothing happens here automatically; the "READY" button advances state.
     }
     // Decay shield powerup
     if (powerupShieldMs > 0) powerupShieldMs = Math.max(0, powerupShieldMs - 16.67);
@@ -2422,7 +2582,7 @@ function drawUnit(u) {
         spriteHeight = 50;
     } else if (u.type === 'tank') {
         spriteKey = isPlayer ? 'tank_blue' : 'tank_red';
-        spriteHeight = 55;
+        spriteHeight = 55 * (u.bossScale || 1);
     }
 
     const img = spriteKey ? SPRITES[spriteKey] : null;
@@ -3288,6 +3448,8 @@ function drawHUD() {
     drawTopHUD();
     drawDeployPanel();
     drawIncomePowerupPanel();
+    if (waveState === 'warning') drawWaveWarning();
+    if (waveState === 'shop')    drawShopOverlay();
 
     // Pause overlay if game is paused
     if (gameState === 'paused') {
@@ -3382,94 +3544,96 @@ function drawTopHUD() {
 }
 
 function drawWaveBar() {
-    // Position centered below the top edge, between the left and right panels
-    const barY = 30;
-    const barH = 20;
-    const barX = 510;
-    const barW = W - 510 - 320;  // ~370 wide
+    // Battlefield minimap — shows the full world so the player can see waves
+    // approaching from the right.
+    const mapH = 50;
+    const mapX = 510;
+    const mapW = W - 510 - 320;
+    const mapY = 16;
 
-    // Wood/dark backdrop
-    hudPanel(barX - 20, barY - 14, barW + 40, barH + 30, { radius: 14 });
+    // Backing panel
+    hudPanel(mapX - 12, mapY - 8, mapW + 24, mapH + 26, { radius: 14 });
 
-    // Star icons at ends
-    iconStar(barX - 4, barY + barH / 2, 12, '#42a5f5', '#0d47a1');
-    iconStar(barX + barW + 4, barY + barH / 2, 12, '#e53935', '#4e0000');
-
-    // Bar background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-    roundRect(barX + 10, barY, barW - 20, barH, 10);
+    // Map content background — sky → ground → water gradient mimicking the world
+    const grad = ctx.createLinearGradient(mapX, mapY, mapX, mapY + mapH);
+    grad.addColorStop(0, '#4fc3f7');
+    grad.addColorStop(0.6, '#a5d6a7');
+    grad.addColorStop(0.8, '#ffe0b2');
+    grad.addColorStop(1, '#0288d1');
+    ctx.fillStyle = grad;
+    roundRect(mapX, mapY, mapW, mapH, 8);
     ctx.fill();
 
-    // Player progress (blue) — fills based on enemy base HP destroyed
-    const enemyHpRatio = enemyBase.hp / enemyBase.maxHp;
-    const playerProgress = (1 - enemyHpRatio) * 0.5; // half the bar belongs to each side conceptually
-    // Enemy progress (red) — fills based on player base HP destroyed
-    const playerHpRatio = playerBase.hp / playerBase.maxHp;
-    const enemyProgress = (1 - playerHpRatio) * 0.5;
+    // Bases as little flags
+    const playerMX = mapX + (playerBase.x / WORLD_WIDTH) * mapW;
+    const enemyMX  = mapX + (enemyBase.x  / WORLD_WIDTH) * mapW;
+    drawMiniBase(playerMX, mapY + mapH - 10, '#1565c0', '#42a5f5');
+    drawMiniBase(enemyMX,  mapY + mapH - 10, '#c62828', '#e53935');
 
-    // We mostly visualise wave progress: blue from left up to current wave end,
-    // red from current wave to total. Like a tug-of-war progress bar.
-    const waveFrac = Math.min(1, ((currentWave - 1) + waveTimer / WAVE_DURATION_MS) / TOTAL_WAVES);
-    const blueW = (barW - 20) * waveFrac;
-
-    // Blue (player progress)
-    if (blueW > 0) {
-        const bg = ctx.createLinearGradient(0, barY, 0, barY + barH);
-        bg.addColorStop(0, '#42a5f5');
-        bg.addColorStop(1, '#1565c0');
-        ctx.fillStyle = bg;
-        roundRect(barX + 10, barY, blueW, barH, 10);
-        ctx.fill();
-    }
-    // Red (remaining waves)
-    const redW = (barW - 20) - blueW;
-    if (redW > 0) {
-        const rg = ctx.createLinearGradient(0, barY, 0, barY + barH);
-        rg.addColorStop(0, '#ef5350');
-        rg.addColorStop(1, '#c62828');
-        ctx.fillStyle = rg;
-        roundRect(barX + 10 + blueW, barY, redW, barH, 10);
-        ctx.fill();
+    // Units — tiny coloured dashes along the ground line of the minimap
+    const groundLineY = mapY + mapH - 8;
+    for (const u of units) {
+        const ux = mapX + (u.x / WORLD_WIDTH) * mapW;
+        if (ux < mapX || ux > mapX + mapW) continue;
+        const isTank = u.type === 'tank';
+        ctx.fillStyle = u.team === 'player' ? '#42a5f5' : '#e53935';
+        ctx.fillRect(ux - (isTank ? 2 : 1), groundLineY - (isTank ? 6 : 5),
+                     isTank ? 4 : 2, isTank ? 7 : 6);
     }
 
-    // Soldier icons distributed along the red section to show upcoming waves
-    const upcomingCount = TOTAL_WAVES - currentWave;
-    const startSoldiers = barX + 10 + blueW + 18;
-    const endSoldiers = barX + barW - 12;
-    if (upcomingCount > 0) {
-        const span = Math.max(20, endSoldiers - startSoldiers);
-        for (let i = 0; i < upcomingCount; i++) {
-            const sx = startSoldiers + (i + 0.5) * (span / upcomingCount);
-            iconSoldier(sx, barY + barH / 2, 18, '#5d4037');
-        }
-    }
-
-    // Wave indicator triangle below the current wave boundary
-    const triX = barX + 10 + blueW;
-    ctx.fillStyle = '#69f0ae';
-    ctx.strokeStyle = '#1b5e20';
-    ctx.lineWidth = 1.5;
+    // Helicopter — white dot with glow
+    const heliMX = mapX + (heli.x / WORLD_WIDTH) * mapW;
+    const heliMY = mapY + 4 + (heli.y / GROUND_Y) * (mapH - 14);
+    ctx.save();
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = '#fff';
+    ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.moveTo(triX, barY + barH + 2);
-    ctx.lineTo(triX - 6, barY + barH + 12);
-    ctx.lineTo(triX + 6, barY + barH + 12);
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
+    ctx.arc(heliMX, heliMY, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
-    // Bar border
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+    // Camera viewport — outline of what the player currently sees
+    const camLeft = mapX + (cameraX / WORLD_WIDTH) * mapW;
+    const camWidth = (W / WORLD_WIDTH) * mapW;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(camLeft, mapY + 2, camWidth, mapH - 4);
+
+    // Border
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
     ctx.lineWidth = 2;
-    roundRect(barX + 10, barY, barW - 20, barH, 10);
+    roundRect(mapX, mapY, mapW, mapH, 8);
     ctx.stroke();
 
-    // "WAVE 3 / 5" text below the bar
+    // "WAVE 3 / 5" label below the minimap with state indicator
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 14px "Lilita One", sans-serif';
+    ctx.font = 'bold 13px "Lilita One", sans-serif';
     ctx.textAlign = 'center';
     ctx.shadowBlur = 4;
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.fillText(`WAVE ${currentWave} / ${TOTAL_WAVES}`, barX + barW / 2, barY + barH + 22);
+    let stateText = `WAVE ${currentWave} / ${TOTAL_WAVES}`;
+    if (waveState === 'warning') stateText += '  •  INCOMING';
+    if (waveState === 'shop')    stateText += '  •  SHOP OPEN';
+    if (waveState === 'active')  stateText += '  •  IN COMBAT';
+    ctx.fillText(stateText, mapX + mapW / 2, mapY + mapH + 18);
     ctx.shadowBlur = 0;
+}
+
+// Tiny base flag for the minimap
+function drawMiniBase(x, y, body, accent) {
+    ctx.save();
+    ctx.fillStyle = body;
+    ctx.fillRect(x - 4, y - 8, 8, 8);
+    ctx.fillStyle = accent;
+    ctx.fillRect(x - 1, y - 14, 2, 6);  // pole
+    ctx.beginPath();
+    ctx.moveTo(x + 1, y - 14);
+    ctx.lineTo(x + 7, y - 12);
+    ctx.lineTo(x + 1, y - 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 }
 
 // ----- Bottom-left DEPLOY panel -----
@@ -3673,6 +3837,208 @@ function drawIncomePowerupPanel() {
         ctx.fillText(`SHIELD ${(powerupShieldMs / 1000).toFixed(1)}s`,
                      panelX + panelW - 16, panelY + 22);
     }
+}
+
+// ---- Pre-wave warning banner ----
+function drawWaveWarning() {
+    const wave = WAVE_COMPOSITIONS[Math.min(currentWave - 1, TOTAL_WAVES - 1)];
+    const remainingMs = Math.max(0, WAVE_WARNING_MS - waveTimer);
+    const seconds = Math.ceil(remainingMs / 1000);
+    const cy = H / 2 - 30;
+
+    // Pulsing red banner background
+    const pulse = 0.7 + Math.sin(frameCount * 0.2) * 0.15;
+    ctx.save();
+    const bw = 700, bh = 130;
+    const bx = W / 2 - bw / 2;
+    const by = cy - bh / 2;
+    // Backdrop
+    ctx.fillStyle = `rgba(80, 0, 0, ${0.55 * pulse})`;
+    roundRect(bx, by, bw, bh, 16); ctx.fill();
+    ctx.strokeStyle = `rgba(255, 80, 80, ${pulse})`;
+    ctx.lineWidth = 4;
+    roundRect(bx, by, bw, bh, 16); ctx.stroke();
+
+    // Title
+    ctx.fillStyle = '#ffd54f';
+    ctx.font = 'bold 36px "Lilita One", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(255, 80, 80, 0.9)';
+    ctx.fillText(`⚠  WAVE ${currentWave} INCOMING  ⚠`, W / 2, by + 32);
+
+    // Composition summary
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.fillText(wave.summary, W / 2, by + 70);
+
+    // Countdown
+    ctx.fillStyle = '#69f0ae';
+    ctx.font = 'bold 28px "Lilita One", sans-serif';
+    ctx.fillText(`${seconds}`, W / 2, by + 105);
+    ctx.shadowBlur = 0;
+
+    // Composition unit icons row at the bottom
+    const iconY = by + 105;
+    const counts = wave.types.reduce((acc, t) => { acc[t] = (acc[t] || 0) + 1; return acc; }, {});
+    const types = Object.keys(counts);
+    ctx.font = 'bold 14px "Lilita One", sans-serif';
+    let drawX = W / 2 - (types.length * 70) / 2 + 70;
+    drawX = W / 2 + 80;  // place to the right of the countdown
+    for (const t of types) {
+        const sprite = SPRITES[`${t}_red_1`] || SPRITES[`${t}_red`] || SPRITES[`${t === 'tank' ? 'tank_red' : t + '_red_1'}`];
+        if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+            const aspect = sprite.naturalWidth / sprite.naturalHeight;
+            const ih = 36, iw = ih * aspect;
+            ctx.drawImage(sprite, drawX - iw / 2, iconY - ih / 2, iw, ih);
+        }
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`×${counts[t]}`, drawX + 22, iconY);
+        drawX += 65;
+    }
+    ctx.restore();
+}
+
+// ---- Between-wave shop overlay ----
+function drawShopOverlay() {
+    // Dim background
+    ctx.save();
+    ctx.fillStyle = 'rgba(10, 22, 40, 0.78)';
+    ctx.fillRect(0, 0, W, H);
+
+    // Title
+    ctx.fillStyle = '#ffd54f';
+    ctx.font = 'bold 44px "Lilita One", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 14; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.fillText('— BETWEEN WAVES —', W / 2, 80);
+
+    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.fillStyle = '#90caf9';
+    ctx.shadowBlur = 4;
+    ctx.fillText(`Wave ${currentWave} cleared. Spend gold on upgrades, then deploy.`, W / 2, 116);
+    ctx.shadowBlur = 0;
+
+    // Money display
+    ctx.fillStyle = '#69f0ae';
+    ctx.font = 'bold 28px "Lilita One", sans-serif';
+    ctx.fillText(`$${Math.floor(money)}`, W / 2, 150);
+
+    // 5 upgrade cards in a row
+    const upgradeIds = ['infantryDamage', 'bazookaRange', 'tankHp', 'heliHp', 'cpCap'];
+    const cardW = 170, cardH = 220;
+    const totalW = upgradeIds.length * cardW + (upgradeIds.length - 1) * 14;
+    let cx = W / 2 - totalW / 2;
+    const cardY = H / 2 - cardH / 2 + 20;
+
+    for (const id of upgradeIds) {
+        const up = UPGRADES[id];
+        const lvl = upgradeLevels[id];
+        const maxed = lvl >= up.tiers.length;
+        const tier = maxed ? up.tiers[up.tiers.length - 1] : up.tiers[lvl];
+        const canAfford = !maxed && money >= tier.cost;
+
+        // Card frame
+        bevelButton(cx, cardY, cardW, cardH, {
+            radius: 14,
+            top:    canAfford ? 'rgba(35, 80, 50, 0.95)' : (maxed ? 'rgba(120, 90, 30, 0.95)' : 'rgba(40, 50, 70, 0.95)'),
+            bottom: canAfford ? 'rgba(15, 50, 30, 0.95)' : (maxed ? 'rgba(70, 50, 15, 0.95)' : 'rgba(20, 30, 50, 0.95)'),
+        });
+
+        // Icon (use unit sprite if specified)
+        const iconImg = up.icon ? SPRITES[up.icon] : null;
+        if (iconImg && iconImg.complete && iconImg.naturalWidth > 0) {
+            const aspect = iconImg.naturalWidth / iconImg.naturalHeight;
+            const ih = 70, iw = ih * aspect;
+            ctx.drawImage(iconImg, cx + cardW / 2 - iw / 2, cardY + 16, iw, ih);
+        } else {
+            // CP icon — lightning bolt
+            ctx.fillStyle = '#42a5f5';
+            const ix = cx + cardW / 2, iy = cardY + 50;
+            ctx.beginPath();
+            ctx.moveTo(ix - 6, iy - 26);
+            ctx.lineTo(ix - 18, iy + 4);
+            ctx.lineTo(ix - 4, iy + 4);
+            ctx.lineTo(ix - 8, iy + 32);
+            ctx.lineTo(ix + 18, iy - 6);
+            ctx.lineTo(ix + 4, iy - 6);
+            ctx.lineTo(ix + 8, iy - 26);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Name
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 16px "Lilita One", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.fillText(up.name, cx + cardW / 2, cardY + 105);
+
+        // Tier dots
+        for (let t = 0; t < up.tiers.length; t++) {
+            const dotX = cx + cardW / 2 - (up.tiers.length - 1) * 10 + t * 20;
+            ctx.fillStyle = t < lvl ? '#69f0ae' : 'rgba(255,255,255,0.2)';
+            ctx.beginPath();
+            ctx.arc(dotX, cardY + 130, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Cost / status
+        if (maxed) {
+            ctx.fillStyle = '#ffc107';
+            ctx.font = 'bold 18px "Lilita One", sans-serif';
+            ctx.fillText('MAX', cx + cardW / 2, cardY + 170);
+        } else {
+            ctx.fillStyle = canAfford ? '#69f0ae' : '#888';
+            ctx.font = 'bold 22px "Lilita One", sans-serif';
+            ctx.fillText(`$${tier.cost}`, cx + cardW / 2, cardY + 170);
+            // Action hint
+            ctx.fillStyle = canAfford ? '#fff' : '#666';
+            ctx.font = 'bold 12px "Lilita One", sans-serif';
+            ctx.fillText('CLICK TO BUY', cx + cardW / 2, cardY + 195);
+        }
+        ctx.shadowBlur = 0;
+
+        if (!maxed) {
+            hudHitRects.push({ x: cx, y: cardY, w: cardW, h: cardH, action: () => buyUpgrade(id) });
+        }
+
+        cx += cardW + 14;
+    }
+
+    // Ready button
+    const readyW = 240, readyH = 60;
+    const readyX = W / 2 - readyW / 2;
+    const readyY = cardY + cardH + 20;
+    const pulse = 1 + Math.sin(frameCount * 0.1) * 0.04;
+    ctx.save();
+    ctx.translate(readyX + readyW / 2, readyY + readyH / 2);
+    ctx.scale(pulse, pulse);
+    bevelButton(-readyW / 2, -readyH / 2, readyW, readyH, {
+        radius: 14,
+        top: 'rgba(80, 200, 100, 0.95)',
+        bottom: 'rgba(30, 100, 50, 0.95)',
+    });
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 26px "Lilita One", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 6; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.fillText('READY ▶', 0, 0);
+    ctx.restore();
+    hudHitRects.push({
+        x: readyX, y: readyY, w: readyW, h: readyH,
+        action: () => {
+            waveState = 'warning';
+            waveTimer = 0;
+            currentWave = Math.min(TOTAL_WAVES, currentWave + 1);
+        },
+    });
+
+    ctx.restore();
 }
 
 // ---- MAIN RENDER ----
