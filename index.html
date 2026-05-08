@@ -3570,15 +3570,16 @@ function drawWaveBar() {
     drawMiniBase(playerMX, mapY + mapH - 10, '#1565c0', '#42a5f5');
     drawMiniBase(enemyMX,  mapY + mapH - 10, '#c62828', '#e53935');
 
-    // Units — tiny coloured dashes along the ground line of the minimap
-    const groundLineY = mapY + mapH - 8;
+    // Units — distinct shape per type so it's easy to read at a glance:
+    //   infantry: small filled triangle (▴)
+    //   bazooka:  diamond (◆)
+    //   tank:     filled square (■) with turret nub
+    //   boss:     large square with pulsing star outline
+    const groundLineY = mapY + mapH - 9;
     for (const u of units) {
         const ux = mapX + (u.x / WORLD_WIDTH) * mapW;
-        if (ux < mapX || ux > mapX + mapW) continue;
-        const isTank = u.type === 'tank';
-        ctx.fillStyle = u.team === 'player' ? '#42a5f5' : '#e53935';
-        ctx.fillRect(ux - (isTank ? 2 : 1), groundLineY - (isTank ? 6 : 5),
-                     isTank ? 4 : 2, isTank ? 7 : 6);
+        if (ux < mapX - 6 || ux > mapX + mapW + 6) continue;
+        drawMinimapUnit(ux, groundLineY, u);
     }
 
     // Helicopter — white dot with glow
@@ -3606,6 +3607,9 @@ function drawWaveBar() {
     roundRect(mapX, mapY, mapW, mapH, 8);
     ctx.stroke();
 
+    // Legend strip above the map so the shapes are readable at a glance
+    drawMinimapLegend(mapX, mapY, mapW);
+
     // "WAVE 3 / 5" label below the minimap with state indicator
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 13px "Lilita One", sans-serif';
@@ -3618,6 +3622,132 @@ function drawWaveBar() {
     if (waveState === 'active')  stateText += '  •  IN COMBAT';
     ctx.fillText(stateText, mapX + mapW / 2, mapY + mapH + 18);
     ctx.shadowBlur = 0;
+}
+
+// Per-type unit marker on the minimap
+function drawMinimapUnit(x, y, u) {
+    const fill = u.team === 'player' ? '#42a5f5' : '#ef5350';
+    const stroke = u.team === 'player' ? '#0d47a1' : '#7f0000';
+
+    ctx.save();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = stroke;
+    ctx.fillStyle = fill;
+
+    if (u.isBoss) {
+        // Big diamond with pulsing star outline so the boss really pops
+        const pulse = 1 + Math.sin(frameCount * 0.18) * 0.25;
+        const r = 5 * pulse;
+        ctx.fillStyle = '#ffd54f';
+        ctx.strokeStyle = '#7f0000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+            const a = (i * Math.PI) / 5 - Math.PI / 2;
+            const rad = i % 2 === 0 ? r : r * 0.5;
+            const px = x + Math.cos(a) * rad;
+            const py = y - 3 + Math.sin(a) * rad;
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+    } else if (u.type === 'tank') {
+        // Filled square + tiny turret line
+        ctx.fillRect(x - 4, y - 5, 8, 6);
+        ctx.strokeRect(x - 4, y - 5, 8, 6);
+        // Turret bump on top
+        ctx.fillRect(x - 1, y - 8, 2, 3);
+        ctx.strokeRect(x - 1, y - 8, 2, 3);
+    } else if (u.type === 'bazooka') {
+        // Diamond
+        ctx.beginPath();
+        ctx.moveTo(x, y - 5);
+        ctx.lineTo(x + 4, y - 1);
+        ctx.lineTo(x, y + 3);
+        ctx.lineTo(x - 4, y - 1);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+    } else {
+        // Infantry — small upward triangle
+        ctx.beginPath();
+        ctx.moveTo(x, y - 5);
+        ctx.lineTo(x + 3.5, y + 1);
+        ctx.lineTo(x - 3.5, y + 1);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+}
+
+// Compact legend overlaid in the top-left of the minimap
+function drawMinimapLegend(mapX, mapY, mapW) {
+    const items = [
+        { label: 'INF',  shape: 'triangle' },
+        { label: 'BZK',  shape: 'diamond' },
+        { label: 'TANK', shape: 'square' },
+        { label: 'BOSS', shape: 'star' },
+    ];
+    const itemW = 52;
+    const stripW = items.length * itemW;
+    const stripH = 14;
+    const sx = mapX + 4;
+    const sy = mapY + 3;
+
+    ctx.save();
+    // Dark backdrop for legibility
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    roundRect(sx - 2, sy - 1, stripW + 4, stripH + 2, 4); ctx.fill();
+
+    ctx.font = 'bold 9px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+
+    items.forEach((it, idx) => {
+        it.x = sx + idx * itemW + 6;
+    });
+    const ly = sy + stripH / 2;
+    for (const it of items) {
+        // Draw shape neutrally (white) so it works as a key
+        ctx.fillStyle = '#cfd8dc';
+        ctx.strokeStyle = '#0a1628';
+        ctx.lineWidth = 1.2;
+        if (it.shape === 'triangle') {
+            ctx.beginPath();
+            ctx.moveTo(it.x, ly - 4);
+            ctx.lineTo(it.x + 3.5, ly + 2);
+            ctx.lineTo(it.x - 3.5, ly + 2);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+        } else if (it.shape === 'diamond') {
+            ctx.beginPath();
+            ctx.moveTo(it.x, ly - 4);
+            ctx.lineTo(it.x + 4, ly);
+            ctx.lineTo(it.x, ly + 4);
+            ctx.lineTo(it.x - 4, ly);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+        } else if (it.shape === 'square') {
+            ctx.fillRect(it.x - 4, ly - 4, 8, 8);
+            ctx.strokeRect(it.x - 4, ly - 4, 8, 8);
+        } else if (it.shape === 'star') {
+            ctx.fillStyle = '#ffd54f';
+            const r = 5;
+            ctx.beginPath();
+            for (let i = 0; i < 10; i++) {
+                const a = (i * Math.PI) / 5 - Math.PI / 2;
+                const rad = i % 2 === 0 ? r : r * 0.5;
+                const px = it.x + Math.cos(a) * rad;
+                const py = ly + Math.sin(a) * rad;
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+        }
+        ctx.fillStyle = '#fff';
+        ctx.fillText(it.label, it.x + 8, ly);
+    }
+    ctx.restore();
 }
 
 // Tiny base flag for the minimap
