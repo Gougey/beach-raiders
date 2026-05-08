@@ -76,6 +76,107 @@ COLOUR CODING:
 - Skin tone: warm tan #ffcc80
 - Neutrals: brown wood #5d4037, grey metal #546e7a"""
 
+# ---- Background scenery & UI assets --------------------------------------
+
+ENVIRONMENT_ASSETS = [
+    {
+        "name": "palm_tree_1.png",
+        "size": "1024x1536",
+        "prompt": """A single chunky cartoon tropical palm tree, full plant from base to crown.
+Curved brown trunk with cross-hatched bark texture in warm browns (#8d6e63 base, #5d4037 shadow).
+3-4 coconuts clustered at the top of the trunk in dark brown (#4e342e).
+6-8 large palm fronds fanning out in two shades of green (#558b2f base, #33691e shadow),
+each frond drawn as a curved leaf with visible vein lines and serrated edges.
+Thick black outlines (3-4px), saturated cel-shaded colours, Boom Beach style.
+True alpha-channel transparent background. Tree centred. No ground, no sky."""
+    },
+    {
+        "name": "palm_tree_2.png",
+        "size": "1024x1536",
+        "prompt": """A single tall slender cartoon tropical palm tree, full plant from base to crown,
+slightly different shape from a typical palm — taller, thinner, leaning right by ~15 degrees.
+Curved tan/brown trunk with cross-hatch bark texture (#a1887f base, #6d4c41 shadow).
+Coconuts at the crown.
+5-7 long drooping palm fronds in two shades of green (#66bb6a base, #2e7d32 shadow),
+fronds curve downward more dramatically than a typical palm.
+Thick black outlines (3-4px), Boom Beach style.
+True alpha-channel transparent background. Tree centred. No ground, no sky."""
+    },
+    {
+        "name": "bush_1.png",
+        "size": "1024x1024",
+        "prompt": """A single tropical jungle bush — small clump of dense leafy greenery on the ground.
+Multiple overlapping rounded leaves in two greens (#43a047 base, #1b5e20 shadow).
+Two or three bright tropical flowers (pink #e91e63, orange #ff9800, yellow #ffeb3b)
+peeking through the leaves.
+Thick black outlines (3-4px), chunky cartoon Boom Beach style.
+The bush should be wider than it is tall, nestled into ground level, fitting in the lower half of the canvas.
+True alpha-channel transparent background. Bush centred horizontally. No ground line, no sky, no other elements."""
+    },
+    {
+        "name": "rock_1.png",
+        "size": "1024x1024",
+        "prompt": """A single chunky grey beach rock / boulder, low and rounded.
+Stone-grey body (#90a4ae base, #546e7a shadow) with a small white highlight on top-left.
+A few small cracks and texture lines.
+A tiny bit of moss/grass on top in green.
+Thick black outlines (3-4px), chunky cartoon Boom Beach style.
+The rock should be wider than tall, fitting in the lower half of the canvas.
+True alpha-channel transparent background. Rock centred horizontally. No ground, no sky, no other elements."""
+    },
+    {
+        "name": "cloud_1.png",
+        "size": "1536x1024",
+        "prompt": """A single fluffy cartoon cloud, classic puffy chunky shape.
+Bright white body (#ffffff) with subtle pale-blue shadow underneath (#e1f5fe).
+Multiple rounded lobes giving a bumpy bubbly outline.
+Thin grey-blue outline (~2-3px) for that cartoon look.
+True alpha-channel transparent background. Cloud centred. No sky."""
+    },
+    {
+        "name": "mountain_bg.png",
+        "size": "1536x1024",
+        "prompt": """A SCENERY-ONLY background image of distant tropical jungle mountain silhouettes.
+Two or three rounded green-blue mountain hills layered behind each other,
+furthest in pale teal (#80cbc4), middle in muted green (#66bb6a), nearest in deeper jungle green (#388e3c).
+Each mountain has tiny palm tree silhouettes visible along its ridgeline.
+Soft hazy atmospheric depth, flat painterly cartoon style.
+Mountains span the FULL WIDTH of the image, occupying mainly the lower two-thirds.
+
+CRITICAL CONSTRAINTS:
+- ABSOLUTELY NO characters, soldiers, people, animals, vehicles, helicopters, tanks, weapons, or military elements.
+- NO foreground elements, NO buildings, NO bases.
+- The image is ONLY mountain silhouette shapes.
+- Everything above the mountains and outside their silhouette must be TRUE TRANSPARENT (alpha = 0).
+- This is a clean parallax background layer for a side-scrolling game.
+Boom Beach scenery style — distant island chain on the horizon."""
+    },
+    {
+        "name": "logo.png",
+        "size": "1536x1024",
+        "prompt": """A bold chunky 3D cartoon video game logo wordmark for a mobile game called
+"FRONTLINE EXTRACTION".
+
+Two-line layout:
+- Top word: "FRONTLINE" — large bold extruded sans-serif letters
+- Bottom word: "EXTRACTION" — slightly smaller, same style
+
+Visual style:
+- Thick chunky letters with a strong 3D extruded depth (light yellow-orange faces #ffd54f,
+  darker red-orange sides #e65100 for the depth)
+- Bold black outline around every letter (~4-6px)
+- Subtle white highlight glints on the top edges of letters
+- A soft drop shadow underneath
+- Letter style: condensed bold cartoon with slight perspective, like Boom Beach / Clash Royale logos
+- Optional small decorative elements: a couple of palm leaves crossed behind the wordmark,
+  or a small military star emblem — keep them minor, the wordmark is the hero
+- Tropical military feel — bright, exciting, not gritty
+
+True alpha-channel transparent background. The logo fills ~90% of the canvas.
+No background colours, no scenery, just the logo on transparency."""
+    },
+]
+
 # ---- Base assets (helicopter, tanks, bases) ------------------------------
 
 BASE_ASSETS = [
@@ -321,16 +422,38 @@ def main():
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--soldiers", action="store_true",
                         help="Only generate the walk-cycle soldier frames")
+    parser.add_argument("--environment", action="store_true",
+                        help="Only generate environment + logo assets")
     args = parser.parse_args()
 
     print("=" * 60)
-    print("BEACH RAIDERS — Sprite Generator (8-frame walk cycles)")
+    print("BEACH RAIDERS — Sprite Generator")
     print("=" * 60)
 
     generated = 0
 
-    # Base assets (skip when --soldiers)
+    # Environment + logo assets
     if not args.soldiers:
+        for asset in ENVIRONMENT_ASSETS:
+            name = asset["name"]
+            if args.only and not name.startswith(args.only):
+                continue
+            path = ASSETS_DIR / name
+            if args.skip_existing and path.exists():
+                print(f"\n[SKIP] {name}")
+                continue
+            print(f"\n[GENERATE] {name}")
+            # Logo gets a self-contained prompt — no side-profile style guide
+            full_prompt = asset["prompt"] if name == "logo.png" else f"{STYLE}\n\n{asset['prompt']}"
+            try:
+                b64 = generate_image(full_prompt, asset["size"], name)
+                save_b64_png(b64, path)
+                generated += 1
+            except Exception as e:
+                print(f"  FAILED: {e}")
+
+    # Base assets (skip when --soldiers or --environment)
+    if not args.soldiers and not args.environment:
         for asset in BASE_ASSETS:
             name = asset["name"]
             if args.only and not name.startswith(args.only):
