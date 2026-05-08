@@ -1328,8 +1328,10 @@ function drawScenery() {
         const h = baseH * s.scale;
         const aspect = img.naturalWidth / img.naturalHeight;
         const w = h * aspect;
+        // Plant slightly into the sand for consistency with trees and bases
+        const anchorY = GROUND_Y + 12;
         ctx.save();
-        ctx.translate(sx, GROUND_Y - 4);
+        ctx.translate(sx, anchorY);
         if (s.flip) ctx.scale(-1, 1);
         ctx.drawImage(img, -w / 2, -h, w, h);
         ctx.restore();
@@ -1348,10 +1350,11 @@ function drawPalmTree(tree) {
         const aspect = img.naturalWidth / img.naturalHeight;
         const drawH = tree.height + 50;
         const drawW = drawH * aspect;
-        const cx = sx;
-        const cy = GROUND_Y - drawH / 2 + 5;  // anchor base just below ground line
+        // Anchor the trunk base into the SAND, not the grass line.
+        // The grass strip runs y=555..590; sand starts ~y=575.
+        const anchorY = GROUND_Y + 16;  // ~y=576 — base of trunk planted in sand
         ctx.save();
-        ctx.translate(cx, GROUND_Y - 5);
+        ctx.translate(sx, anchorY);
         ctx.rotate(sway);
         ctx.drawImage(img, -drawW / 2, -drawH, drawW, drawH);
         ctx.restore();
@@ -1466,14 +1469,16 @@ function drawBase(base, team) {
     const img = SPRITES[spriteKey];
     if (img && img.complete && img.naturalWidth > 0) {
         const baseHeight = 150;
-        // Anchor sprite so its bottom sits on the ground
-        const drawY = by - baseHeight / 2;
+        // Plant the base into the sand — bottom of sprite sits ~16px below the
+        // grass line (around y=576) so the sandbags settle into the sand.
+        const baseAnchorY = GROUND_Y + 16;
+        const drawY = baseAnchorY - baseHeight / 2;
         drawSprite(spriteKey, sx, drawY, baseHeight, false);
 
         // Health bar above sprite
         const hbWidth = 70;
         const hbX = sx - hbWidth / 2;
-        const hbY = by - baseHeight - 18;
+        const hbY = baseAnchorY - baseHeight - 12;
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(hbX - 2, hbY - 2, hbWidth + 4, 10);
         const hpRatio = base.hp / base.maxHp;
