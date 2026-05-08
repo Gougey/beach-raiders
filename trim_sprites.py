@@ -1,8 +1,15 @@
 """
-Trim transparent padding from scenery + base sprites so their content
-sits flush with the bottom of the canvas. The game anchors these to the
-ground line, so any transparent padding below the visible content
-manifests as the asset 'floating' above the beach.
+Trim transparent padding from scenery + base sprites so their SOLID
+content sits flush with the bottom of the canvas.
+
+Critical detail: the AI-generated sprites include soft drop shadows
+that taper off at low alpha (1-180 range) below the visible object.
+A naive bbox trim (alpha > 0) preserves those shadows, so the visible
+trunk/building/bush appears to float above its own shadow.
+
+We trim using a high alpha threshold (≥ ALPHA_SOLID) so the bottom of
+the trimmed image is the bottom of the SOLID object, then add a small
+padding row to keep edge anti-aliasing intact.
 
 Run after generation:
     python trim_sprites.py
@@ -10,11 +17,10 @@ Run after generation:
 
 from pathlib import Path
 from PIL import Image
+import numpy as np
 
 ASSETS = Path(__file__).parent / "assets"
 
-# Sprites that should be ground-anchored — trim transparent borders so the
-# bottommost visible pixel sits at the image's bottom edge.
 TRIM = [
     "palm_tree_1.png",
     "palm_tree_2.png",
@@ -24,7 +30,8 @@ TRIM = [
     "base_red.png",
 ]
 
-PADDING = 4  # tiny soft padding to avoid edge clipping when scaling
+ALPHA_SOLID = 200   # consider only nearly-opaque pixels as "real content"
+PADDING = 4         # keep a small soft border so edges stay smooth
 
 
 def trim(name: str) -> None:
@@ -34,12 +41,20 @@ def trim(name: str) -> None:
         return
 
     img = Image.open(path).convert("RGBA")
-    bbox = img.getbbox()
-    if not bbox:
-        print(f"[skip] {name} (fully transparent)")
+    arr = np.array(img)
+    alpha = arr[:, :, 3]
+
+    # Bounding box of pixels with alpha >= ALPHA_SOLID
+    rows_solid = np.where(alpha.max(axis=1) >= ALPHA_SOLID)[0]
+    cols_solid = np.where(alpha.max(axis=0) >= ALPHA_SOLID)[0]
+
+    if rows_solid.size == 0 or cols_solid.size == 0:
+        print(f"[skip] {name} (no solid content found)")
         return
 
-    x1, y1, x2, y2 = bbox
+    y1, y2 = rows_solid.min(), rows_solid.max() + 1
+    x1, x2 = cols_solid.min(), cols_solid.max() + 1
+
     # Add small padding while staying within image bounds
     x1 = max(0, x1 - PADDING)
     y1 = max(0, y1 - PADDING)
