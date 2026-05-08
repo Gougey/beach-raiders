@@ -2601,14 +2601,40 @@ function drawBullets() {
         if (sx < -10 || sx > W + 10) continue;
 
         if (b.type === 'heli') {
-            // Tracer bullet
+            // Bright tracer round — streak oriented along velocity vector so
+            // it reads clearly against sky and ground. Hot-red core, orange
+            // halo, white-hot tip.
+            const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
+            const dx = b.vx / speed;
+            const dy = b.vy / speed;
+            const len = 14;        // streak length
+            const tailX = sx - dx * len;
+            const tailY = b.y - dy * len;
+
             ctx.save();
-            ctx.shadowBlur = 4;
-            ctx.shadowColor = '#ffc107';
-            ctx.fillStyle = '#ffd54f';
-            ctx.fillRect(sx - 4, b.y - 1.5, 8, 3);
+            // Outer glow
+            ctx.shadowBlur = 14;
+            ctx.shadowColor = '#ff5722';
+            ctx.strokeStyle = '#ff7043';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(tailX, tailY);
+            ctx.lineTo(sx, b.y);
+            ctx.stroke();
+            // Bright core
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#ffeb3b';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(tailX, tailY);
+            ctx.lineTo(sx, b.y);
+            ctx.stroke();
+            // White-hot leading tip
             ctx.fillStyle = '#fff';
-            ctx.fillRect(sx - 2, b.y - 0.5, 4, 1);
+            ctx.beginPath();
+            ctx.arc(sx, b.y, 2.5, 0, Math.PI * 2);
+            ctx.fill();
             ctx.restore();
         } else if (b.type === 'shell') {
             // Tank shell with trail
