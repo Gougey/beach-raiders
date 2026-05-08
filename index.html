@@ -382,11 +382,38 @@ function drawSprite(key, x, y, height, flipH = false) {
 }
 
 // ---- GAME STATE ----
-let gameState = 'menu'; // menu, playing, gameover
+let gameState = 'menu'; // menu, playing, paused, gameover
 let cameraX = 0;
 let money = 50;
 let enemyMoney = 50;
 let enemySpawnTimer = 0;
+
+// ---- WAVE SYSTEM ----
+const TOTAL_WAVES = 5;
+let currentWave = 1;
+let waveTimer = 0;          // ms within current wave
+const WAVE_DURATION_MS = 35000;
+// Composition per wave: which unit types the enemy spawns and how often
+const WAVE_COMPOSITIONS = [
+    { types: ['infantry', 'infantry', 'bazooka'],          spawnEvery: 140 },
+    { types: ['infantry', 'bazooka', 'tank'],              spawnEvery: 130 },
+    { types: ['infantry', 'bazooka', 'bazooka', 'tank'],   spawnEvery: 120 },
+    { types: ['bazooka', 'bazooka', 'tank', 'tank'],       spawnEvery: 110 },
+    { types: ['tank', 'tank', 'bazooka', 'infantry'],      spawnEvery: 90 },
+];
+
+// ---- POWERUPS ----
+// Active effect timers (ms remaining)
+let powerupShieldMs = 0;
+const POWERUPS = {
+    airstrike: { cost: 60, key: 'q' },
+    shield:    { cost: 50, key: 'w' },  // overlaps with W movement key — handled via click only
+    repair:    { cost: 30, key: 'r' },
+};
+
+// Buttons hit-rects (filled in during draw, used by click handler)
+let hudHitRects = [];
+let pauseHitRect = null;
 let frameCount = 0;
 let particles = [];
 let bullets = [];
@@ -401,15 +428,47 @@ let ambientParticles = [];
 // ---- INPUT ----
 document.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
+    // Pause toggle works whenever a game is in progress
+    if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') &&
+        (gameState === 'playing' || gameState === 'paused')) {
+        gameState = gameState === 'playing' ? 'paused' : 'playing';
+    }
     if (gameState === 'playing') {
         if (e.key === '1') spawnPlayerUnit('infantry');
         if (e.key === '2') spawnPlayerUnit('tank');
         if (e.key === '3') spawnPlayerUnit('bazooka');
         if (e.key === 'e' || e.key === 'E') helicopterPickupDrop();
+        // Powerups
+        if (e.key === 'q' || e.key === 'Q') activateAirstrike();
+        if (e.key === 'r' || e.key === 'R') activateRepair();
+        if (e.key === 'f' || e.key === 'F') activateShield();
     }
     if (e.key === ' ') e.preventDefault();
 });
 document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// Click on HUD buttons (pause, deploy cards, powerups)
+canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const cy = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+    if (gameState === 'playing' || gameState === 'paused') {
+        if (pauseHitRect &&
+            cx >= pauseHitRect.x && cx <= pauseHitRect.x + pauseHitRect.w &&
+            cy >= pauseHitRect.y && cy <= pauseHitRect.y + pauseHitRect.h) {
+            gameState = gameState === 'playing' ? 'paused' : 'playing';
+            return;
+        }
+    }
+    if (gameState !== 'playing') return;
+    for (const r of hudHitRects) {
+        if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) {
+            if (r.action) r.action();
+            return;
+        }
+    }
+});
 
 document.getElementById('start-btn').addEventListener('click', () => {
     document.getElementById('start-screen').style.display = 'none';
@@ -463,6 +522,9 @@ function initGame() {
     money = 50;
     enemyMoney = 50;
     enemySpawnTimer = 0;
+    currentWave = 1;
+    waveTimer = 0;
+    powerupShieldMs = 0;
     frameCount = 0;
     particles = [];
     bullets = [];
@@ -769,6 +831,56 @@ function spawnDustCloud(x, y) {
     }
 }
 
+// ---- POWERUPS ----
+
+function activateAirstrike() {
+    const cost = POWERUPS.airstrike.cost;
+    if (money < cost) return;
+    money -= cost;
+    // Find the densest enemy cluster, drop 4 missiles on the area
+    let targetX = enemyBase.x;  // default to enemy base
+    if (units.some(u => u.team === 'enemy')) {
+        const xs = units.filter(u => u.team === 'enemy').map(u => u.x);
+        targetX = xs.reduce((a, b) => a + b, 0) / xs.length;
+    }
+    // Spawn 4 missiles falling from off-screen top, landing in a spread around targetX
+    for (let i = 0; i < 4; i++) {
+        const lx = targetX + (i - 1.5) * 60;
+        bullets.push({
+            x: lx, y: -50,
+            vx: 0, vy: 8,
+            team: 'player',
+            damage: 60,
+            life: 200,
+            type: 'rocket',
+            airstrike: true,
+        });
+    }
+}
+
+function activateShield() {
+    const cost = POWERUPS.shield.cost;
+    if (money < cost) return;
+    money -= cost;
+    powerupShieldMs = 8000;  // 8 seconds of base invulnerability
+}
+
+function activateRepair() {
+    const cost = POWERUPS.repair.cost;
+    if (money < cost) return;
+    money -= cost;
+    // Repair player base + heli for 30% of max
+    playerBase.hp = Math.min(playerBase.maxHp, playerBase.hp + playerBase.maxHp * 0.3);
+    heli.hp = Math.min(heli.maxHp, heli.hp + heli.maxHp * 0.3);
+    // Visual: green sparkle particles
+    for (let i = 0; i < 12; i++) {
+        spawnParticles(playerBase.x + (Math.random() - 0.5) * 80,
+                       GROUND_Y - 30 - Math.random() * 60,
+                       '#69f0ae', 2, 1, 20);
+    }
+    spawnParticles(heli.x, heli.y, '#69f0ae', 8, 1, 18);
+}
+
 // ---- UPDATE ----
 function update() {
     if (gameState !== 'playing') return;
@@ -918,8 +1030,13 @@ function update() {
                 hit = true;
             }
             if (b.team === 'enemy' && Math.abs(b.x - playerBase.x) < 50 && b.y > GROUND_Y - 80) {
-                playerBase.hp -= b.damage;
-                spawnParticles(b.x, b.y, C.explosion1, 3, 1, 6);
+                if (powerupShieldMs > 0) {
+                    // Absorb the hit — shield sparks
+                    spawnParticles(b.x, b.y, '#42a5f5', 6, 1, 10);
+                } else {
+                    playerBase.hp -= b.damage;
+                    spawnParticles(b.x, b.y, C.explosion1, 3, 1, 6);
+                }
                 hit = true;
             }
         }
@@ -990,15 +1107,25 @@ function update() {
         if (l.y > GROUND_Y) ambientParticles.splice(i, 1);
     }
 
-    // Enemy AI spawning
-    enemySpawnTimer++;
-    if (enemySpawnTimer > 120) {
-        enemySpawnTimer = 0;
-        const roll = Math.random();
-        if (roll < 0.5 && enemyMoney >= 10) { spawnEnemyUnit('infantry'); enemyMoney -= 10; }
-        else if (roll < 0.8 && enemyMoney >= 25) { spawnEnemyUnit('bazooka'); enemyMoney -= 25; }
-        else if (enemyMoney >= 40) { spawnEnemyUnit('tank'); enemyMoney -= 40; }
+    // Wave-based enemy AI spawning
+    waveTimer += 16.67;  // approx 60fps
+    if (waveTimer > WAVE_DURATION_MS && currentWave < TOTAL_WAVES) {
+        currentWave++;
+        waveTimer = 0;
     }
+    const wave = WAVE_COMPOSITIONS[Math.min(currentWave - 1, TOTAL_WAVES - 1)];
+    enemySpawnTimer++;
+    if (enemySpawnTimer > wave.spawnEvery) {
+        enemySpawnTimer = 0;
+        const type = wave.types[Math.floor(Math.random() * wave.types.length)];
+        const cost = UNIT_DEFS[type].cost;
+        if (enemyMoney >= cost) {
+            spawnEnemyUnit(type);
+            enemyMoney -= cost;
+        }
+    }
+    // Decay shield powerup
+    if (powerupShieldMs > 0) powerupShieldMs = Math.max(0, powerupShieldMs - 16.67);
 
     // Win/Lose conditions
     if (enemyBase.hp <= 0) {
@@ -2750,185 +2877,629 @@ function drawAmbientParticles() {
     }
 }
 
-function drawHUD() {
-    // === BOOM BEACH STYLE HUD ===
+// ===========================================================================
+// MOCKUP-BASED HUD
+// Top:    [stats panel] [wave bar] [enemy panel] [pause]
+// Bottom: [DEPLOY card panel]                              [income + powerups]
+// ===========================================================================
 
-    // Top bar — wooden/metal panel
+// ---- Reusable HUD helpers ----
+
+function hudPanel(x, y, w, h, opts = {}) {
+    // Dark navy panel with rounded corners and subtle border, like the mockup
+    const r = opts.radius || 14;
     ctx.save();
-    const hudGrad = ctx.createLinearGradient(0, 0, 0, 56);
-    hudGrad.addColorStop(0, 'rgba(62,39,25,0.9)');
-    hudGrad.addColorStop(0.5, 'rgba(78,52,46,0.85)');
-    hudGrad.addColorStop(1, 'rgba(50,30,20,0.9)');
-    ctx.fillStyle = hudGrad;
-    roundRect(0, 0, W, 54, 0);
+    // Drop shadow
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = 'rgba(0, 10, 30, 0.5)';
+    ctx.shadowOffsetY = 3;
+    // Background
+    const grad = ctx.createLinearGradient(x, y, x, y + h);
+    grad.addColorStop(0, opts.top || 'rgba(20, 30, 55, 0.92)');
+    grad.addColorStop(1, opts.bottom || 'rgba(10, 20, 40, 0.92)');
+    ctx.fillStyle = grad;
+    roundRect(x, y, w, h, r);
     ctx.fill();
-    // Metal border bottom
-    ctx.fillStyle = '#5d4037';
-    ctx.fillRect(0, 52, W, 3);
-    ctx.fillStyle = 'rgba(141,110,99,0.5)';
-    ctx.fillRect(0, 52, W, 1);
-    // Wood grain texture
-    ctx.strokeStyle = 'rgba(93,64,55,0.2)';
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    // Inner highlight
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
-    for (let gy = 5; gy < 50; gy += 12) {
-        ctx.beginPath();
-        ctx.moveTo(0, gy);
-        for (let gx = 0; gx < W; gx += 20) {
-            ctx.lineTo(gx, gy + Math.sin(gx * 0.01) * 2);
-        }
-        ctx.stroke();
-    }
-
-    ctx.font = 'bold 16px "Lilita One", sans-serif';
-    ctx.textAlign = 'left';
-
-    // Money panel
-    drawHUDPanel(8, 6, 105, 24);
-    ctx.fillStyle = '#ffd54f';
-    ctx.shadowBlur = 2;
-    ctx.shadowColor = 'rgba(255,193,7,0.5)';
-    ctx.fillText(`$ ${Math.floor(money)}`, 36, 24);
-    ctx.shadowBlur = 0;
-    // Coin icon
-    ctx.fillStyle = '#ffc107';
-    ctx.beginPath();
-    ctx.arc(23, 18, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#f57f17';
-    ctx.lineWidth = 1.5;
+    roundRect(x + 1, y + 1, w - 2, h - 2, r - 1);
     ctx.stroke();
-    ctx.fillStyle = '#f57f17';
-    ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('$', 23, 22);
-
-    // Player base HP panel
-    ctx.font = '600 14px "Fredoka", sans-serif';
-    ctx.textAlign = 'left';
-    drawHUDPanel(120, 6, 170, 24);
-    ctx.fillStyle = '#81d4fa';
-    ctx.fillText(`Base: ${Math.max(0, Math.ceil(playerBase.hp))}/${playerBase.maxHp}`, 132, 23);
-
-    // Heli HP panel
-    drawHUDPanel(298, 6, 160, 24);
-    ctx.fillStyle = heli.hp > 50 ? '#a5d6a7' : '#ef9a9a';
-    ctx.fillText(`Heli HP: ${Math.max(0, Math.ceil(heli.hp))}/${heli.maxHp}`, 308, 23);
-
-    // Carrying panel
-    if (heli.carrying.length > 0) {
-        drawHUDPanel(466, 6, 130, 24);
-        ctx.fillStyle = '#fff';
-        ctx.fillText(`Carry: ${heli.carrying.length}/${heli.maxCarry}`, 476, 23);
-    }
-
-    // Enemy base HP panel
-    ctx.textAlign = 'right';
-    drawHUDPanel(W - 215, 6, 205, 24);
-    ctx.fillStyle = '#ef9a9a';
-    ctx.fillText(`Enemy Base: ${Math.max(0, Math.ceil(enemyBase.hp))}/${enemyBase.maxHp}`, W - 18, 23);
-
-    // Spawn buttons — Boom Beach deploy style
-    ctx.textAlign = 'center';
-    ctx.font = '600 11px "Fredoka", sans-serif';
-    const btnY = 36;
-    const btnDefs = [
-        { key: '1', label: 'Infantry', cost: 10, x: W / 2 - 100 },
-        { key: '2', label: 'Tank', cost: 40, x: W / 2 },
-        { key: '3', label: 'Bazooka', cost: 25, x: W / 2 + 100 },
-    ];
-    for (const btn of btnDefs) {
-        const canAfford = money >= btn.cost;
-        const bx = btn.x - 42;
-        // Button background
-        const btnGrad = ctx.createLinearGradient(bx, btnY, bx, btnY + 16);
-        if (canAfford) {
-            btnGrad.addColorStop(0, '#43a047');
-            btnGrad.addColorStop(1, '#2e7d32');
-        } else {
-            btnGrad.addColorStop(0, '#616161');
-            btnGrad.addColorStop(1, '#424242');
-        }
-        ctx.fillStyle = btnGrad;
-        roundRect(bx, btnY, 84, 16, 4);
-        ctx.fill();
-        ctx.strokeStyle = canAfford ? '#1b5e20' : '#333';
-        ctx.lineWidth = 1;
-        roundRect(bx, btnY, 84, 16, 4);
-        ctx.stroke();
-        // Button shine
-        ctx.fillStyle = 'rgba(255,255,255,0.1)';
-        ctx.fillRect(bx + 2, btnY + 1, 80, 6);
-        // Button text
-        ctx.fillStyle = canAfford ? '#fff' : '#999';
-        ctx.fillText(`[${btn.key}] ${btn.label} $${btn.cost}`, btn.x, btnY + 12);
-    }
-
-    // E key hint
-    ctx.font = '10px sans-serif';
-    ctx.fillStyle = '#aaa';
-    ctx.fillText('[E] Pick/Drop', W / 2 + 220, btnY + 12);
-
-    // Minimap — Boom Beach style with terrain
-    const mmW = 200;
-    const mmH = 24;
-    const mmX = W / 2 - mmW / 2;
-    const mmY = 4;
-    // Minimap border (wooden frame)
-    ctx.fillStyle = '#5d4037';
-    roundRect(mmX - 3, mmY - 3, mmW + 6, mmH + 6, 4);
-    ctx.fill();
-    ctx.fillStyle = '#8d6e63';
-    roundRect(mmX - 2, mmY - 2, mmW + 4, mmH + 4, 3);
-    ctx.fill();
-    // Minimap background with terrain colors
-    const mmTerrain = ctx.createLinearGradient(mmX, mmY, mmX, mmY + mmH);
-    mmTerrain.addColorStop(0, '#81d4fa');
-    mmTerrain.addColorStop(0.5, '#66bb6a');
-    mmTerrain.addColorStop(0.8, '#ffcc80');
-    mmTerrain.addColorStop(1, '#0288d1');
-    ctx.fillStyle = mmTerrain;
-    roundRect(mmX, mmY, mmW, mmH, 2);
-    ctx.fill();
-
-    // Units on minimap
-    for (const u of units) {
-        const mx = mmX + (u.x / WORLD_WIDTH) * mmW;
-        ctx.fillStyle = u.team === 'player' ? '#1565c0' : '#c62828';
-        const mh = u.type === 'tank' ? 10 : 6;
-        const mw = u.type === 'tank' ? 3 : 2;
-        ctx.fillRect(mx - mw / 2, mmY + (mmH - mh) / 2, mw, mh);
-    }
-
-    // Heli on minimap
-    const heliMX = mmX + (heli.x / WORLD_WIDTH) * mmW;
-    ctx.fillStyle = '#fff';
-    ctx.shadowBlur = 3;
-    ctx.shadowColor = '#fff';
-    ctx.fillRect(heliMX - 2, mmY + 3, 4, 4);
-    ctx.shadowBlur = 0;
-
-    // Bases on minimap
-    ctx.fillStyle = '#1e88e5';
-    ctx.fillRect(mmX + (playerBase.x / WORLD_WIDTH) * mmW - 3, mmY + 2, 6, mmH - 4);
-    ctx.fillStyle = '#c62828';
-    ctx.fillRect(mmX + (enemyBase.x / WORLD_WIDTH) * mmW - 3, mmY + 2, 6, mmH - 4);
-
-    // Camera viewport on minimap
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(mmX + (cameraX / WORLD_WIDTH) * mmW, mmY, (W / WORLD_WIDTH) * mmW, mmH);
-
+    // Outer border
+    ctx.strokeStyle = opts.border || 'rgba(0, 0, 0, 0.6)';
+    ctx.lineWidth = 2;
+    roundRect(x, y, w, h, r);
+    ctx.stroke();
     ctx.restore();
 }
 
-function drawHUDPanel(x, y, w, h) {
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    roundRect(x, y, w, h, 4);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(141,110,99,0.3)';
-    ctx.lineWidth = 1;
-    roundRect(x, y, w, h, 4);
+function iconCoin(cx, cy, r) {
+    ctx.save();
+    ctx.fillStyle = '#ffc107';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ff8f00'; ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.fillStyle = '#fff8e1';
+    ctx.beginPath(); ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff8f00';
+    ctx.font = `bold ${r * 1.3}px "Lilita One", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('$', cx, cy + 1);
+    ctx.restore();
+}
+
+function iconShield(cx, cy, r, color) {
+    ctx.save();
+    ctx.fillStyle = color || '#42a5f5';
+    ctx.strokeStyle = '#0d47a1';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r * 0.85, cy - r * 0.5);
+    ctx.quadraticCurveTo(cx + r * 0.85, cy + r * 0.6, cx, cy + r);
+    ctx.quadraticCurveTo(cx - r * 0.85, cy + r * 0.6, cx - r * 0.85, cy - r * 0.5);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // Inner highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 0.7);
+    ctx.lineTo(cx + r * 0.4, cy - r * 0.3);
+    ctx.lineTo(cx, cy + r * 0.2);
+    ctx.lineTo(cx - r * 0.4, cy - r * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+}
+
+function iconCross(cx, cy, r) {
+    // Green plus/medical cross
+    ctx.save();
+    const w = r * 0.45;
+    ctx.fillStyle = '#43a047';
+    ctx.strokeStyle = '#1b5e20';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(cx - r, cy - w, r * 2, w * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.rect(cx - w, cy - r, w * 2, r * 2);
+    ctx.fill(); ctx.stroke();
+    // Re-fill with no stroke to clean up overlap
+    ctx.strokeStyle = 'transparent';
+    ctx.fillStyle = '#43a047';
+    ctx.fillRect(cx - r + 1, cy - w + 1, r * 2 - 2, w * 2 - 2);
+    ctx.fillRect(cx - w + 1, cy - r + 1, w * 2 - 2, r * 2 - 2);
+    // Outline overall plus
+    ctx.strokeStyle = '#1b5e20';
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy - w); ctx.lineTo(cx - w, cy - w); ctx.lineTo(cx - w, cy - r);
+    ctx.lineTo(cx + w, cy - r); ctx.lineTo(cx + w, cy - w); ctx.lineTo(cx + r, cy - w);
+    ctx.lineTo(cx + r, cy + w); ctx.lineTo(cx + w, cy + w); ctx.lineTo(cx + w, cy + r);
+    ctx.lineTo(cx - w, cy + r); ctx.lineTo(cx - w, cy + w); ctx.lineTo(cx - r, cy + w);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+}
+
+function iconCastle(cx, cy, r) {
+    ctx.save();
+    ctx.fillStyle = '#c62828';
+    ctx.strokeStyle = '#4e0000';
+    ctx.lineWidth = 2;
+    // Crenellated top
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy + r);
+    ctx.lineTo(cx - r, cy - r * 0.4);
+    ctx.lineTo(cx - r * 0.6, cy - r * 0.4);
+    ctx.lineTo(cx - r * 0.6, cy - r);
+    ctx.lineTo(cx - r * 0.2, cy - r);
+    ctx.lineTo(cx - r * 0.2, cy - r * 0.4);
+    ctx.lineTo(cx + r * 0.2, cy - r * 0.4);
+    ctx.lineTo(cx + r * 0.2, cy - r);
+    ctx.lineTo(cx + r * 0.6, cy - r);
+    ctx.lineTo(cx + r * 0.6, cy - r * 0.4);
+    ctx.lineTo(cx + r, cy - r * 0.4);
+    ctx.lineTo(cx + r, cy + r);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // Door
+    ctx.fillStyle = '#4e0000';
+    ctx.fillRect(cx - r * 0.25, cy + r * 0.1, r * 0.5, r * 0.9);
+    ctx.restore();
+}
+
+function iconStar(cx, cy, r, color, outline) {
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+        const angle = (i * Math.PI) / 5 - Math.PI / 2;
+        const rad = i % 2 === 0 ? r : r * 0.45;
+        const x = cx + Math.cos(angle) * rad;
+        const y = cy + Math.sin(angle) * rad;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+}
+
+function iconPause(cx, cy, r) {
+    ctx.save();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(cx - r * 0.5, cy - r, r * 0.35, r * 2);
+    ctx.fillRect(cx + r * 0.15, cy - r, r * 0.35, r * 2);
+    ctx.restore();
+}
+
+function iconMissile(cx, cy, r) {
+    // 2 small red rockets
+    ctx.save();
+    for (let i = 0; i < 2; i++) {
+        const ox = i === 0 ? -r * 0.45 : r * 0.45;
+        const tilt = i === 0 ? -0.35 : 0.35;
+        ctx.save();
+        ctx.translate(cx + ox, cy);
+        ctx.rotate(tilt);
+        // Body
+        ctx.fillStyle = '#fafafa';
+        ctx.strokeStyle = '#212121';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.9);
+        ctx.lineTo(r * 0.25, -r * 0.6);
+        ctx.lineTo(r * 0.25, r * 0.6);
+        ctx.lineTo(-r * 0.25, r * 0.6);
+        ctx.lineTo(-r * 0.25, -r * 0.6);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // Red nose
+        ctx.fillStyle = '#e53935';
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.9);
+        ctx.lineTo(r * 0.25, -r * 0.6);
+        ctx.lineTo(-r * 0.25, -r * 0.6);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // Fins
+        ctx.fillStyle = '#e53935';
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.25, r * 0.4);
+        ctx.lineTo(-r * 0.5, r * 0.8);
+        ctx.lineTo(-r * 0.25, r * 0.8);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(r * 0.25, r * 0.4);
+        ctx.lineTo(r * 0.5, r * 0.8);
+        ctx.lineTo(r * 0.25, r * 0.8);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.restore();
+    }
+    ctx.restore();
+}
+
+function iconWrench(cx, cy, r) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = '#90a4ae';
+    ctx.strokeStyle = '#37474f';
+    ctx.lineWidth = 1.5;
+    // Handle
+    ctx.beginPath();
+    ctx.rect(-r * 0.18, -r * 0.4, r * 0.36, r * 1.2);
+    ctx.fill(); ctx.stroke();
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.55, r * 0.45, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#0a1628';
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.55, r * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+    // Notch (open end)
+    ctx.fillStyle = '#0a1628';
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.25, -r);
+    ctx.lineTo(0, -r * 0.65);
+    ctx.lineTo(r * 0.25, -r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+}
+
+// Tiny soldier silhouette icon for the wave bar
+function iconSoldier(cx, cy, h, color) {
+    ctx.save();
+    ctx.fillStyle = color;
+    // Helmet
+    ctx.beginPath();
+    ctx.arc(cx, cy - h * 0.3, h * 0.18, Math.PI, 0);
+    ctx.fill();
+    // Body
+    ctx.fillRect(cx - h * 0.12, cy - h * 0.15, h * 0.24, h * 0.4);
+    // Legs
+    ctx.fillRect(cx - h * 0.13, cy + h * 0.22, h * 0.08, h * 0.18);
+    ctx.fillRect(cx + h * 0.05, cy + h * 0.22, h * 0.08, h * 0.18);
+    ctx.restore();
+}
+
+// Round button background with bevel
+function bevelButton(x, y, w, h, opts = {}) {
+    const r = opts.radius || 10;
+    ctx.save();
+    // Drop shadow
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowOffsetY = 2;
+    const grad = ctx.createLinearGradient(x, y, x, y + h);
+    grad.addColorStop(0, opts.top || 'rgba(40, 55, 85, 0.95)');
+    grad.addColorStop(1, opts.bottom || 'rgba(15, 25, 50, 0.95)');
+    ctx.fillStyle = grad;
+    roundRect(x, y, w, h, r);
+    ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    // Inner highlight
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
+    roundRect(x + 1, y + 1, w - 2, h - 2, r - 1);
+    ctx.stroke();
+    ctx.strokeStyle = opts.border || 'rgba(0, 0, 0, 0.6)';
+    ctx.lineWidth = 2;
+    roundRect(x, y, w, h, r);
+    ctx.stroke();
+    ctx.restore();
+}
+
+// ---- Main HUD ----
+
+function drawHUD() {
+    hudHitRects = [];
+    pauseHitRect = null;
+
+    drawTopHUD();
+    drawDeployPanel();
+    drawIncomePowerupPanel();
+
+    // Pause overlay if game is paused
+    if (gameState === 'paused') {
+        ctx.save();
+        ctx.fillStyle = 'rgba(10, 22, 40, 0.7)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#ffd54f';
+        ctx.font = 'bold 80px "Lilita One", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.fillText('PAUSED', W / 2, H / 2 - 20);
+        ctx.font = '600 22px "Fredoka", sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 4;
+        ctx.fillText('Press P / Esc / click pause to resume', W / 2, H / 2 + 50);
+        ctx.restore();
+    }
+}
+
+// ----- Top HUD -----
+
+function drawTopHUD() {
+    // === LEFT — money / base hp / heli hp combined panel ===
+    const leftX = 12, leftY = 12;
+    const leftW = 460, leftH = 60;
+    hudPanel(leftX, leftY, leftW, leftH);
+
+    // Money cell
+    iconCoin(leftX + 32, leftY + leftH / 2, 16);
+    ctx.fillStyle = '#ffd54f';
+    ctx.font = 'bold 26px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.fillText(Math.floor(money).toString(), leftX + 56, leftY + leftH / 2 + 1);
+    ctx.shadowBlur = 0;
+
+    // Vertical separator
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(leftX + 145, leftY + 8); ctx.lineTo(leftX + 145, leftY + leftH - 8); ctx.stroke();
+
+    // Base HP cell
+    iconShield(leftX + 165, leftY + leftH / 2, 13, '#42a5f5');
+    ctx.fillStyle = '#90caf9';
+    ctx.font = 'bold 11px "Lilita One", sans-serif';
+    ctx.fillText('BASE HP', leftX + 188, leftY + 22);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.fillText(`${Math.max(0, Math.ceil(playerBase.hp))} / ${playerBase.maxHp}`, leftX + 188, leftY + 41);
+
+    // Vertical separator
+    ctx.beginPath(); ctx.moveTo(leftX + 305, leftY + 8); ctx.lineTo(leftX + 305, leftY + leftH - 8); ctx.stroke();
+
+    // Heli HP cell
+    iconCross(leftX + 325, leftY + leftH / 2, 11);
+    ctx.fillStyle = '#a5d6a7';
+    ctx.font = 'bold 11px "Lilita One", sans-serif';
+    ctx.fillText('HELI HP', leftX + 348, leftY + 22);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.fillText(`${Math.max(0, Math.ceil(heli.hp))} / ${heli.maxHp}`, leftX + 348, leftY + 41);
+
+    // === CENTER — wave progress bar ===
+    drawWaveBar();
+
+    // === RIGHT — enemy base panel ===
+    const rightW = 220, rightH = 60;
+    const rightX = W - rightW - 70 - 12;  // leave room for pause button
+    const rightY = 12;
+    hudPanel(rightX, rightY, rightW, rightH);
+
+    iconCastle(rightX + 30, rightY + rightH / 2, 16);
+    ctx.fillStyle = '#ef9a9a';
+    ctx.font = 'bold 11px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('ENEMY BASE HP', rightX + 56, rightY + 22);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.fillText(`${Math.max(0, Math.ceil(enemyBase.hp))} / ${enemyBase.maxHp}`,
+                 rightX + 56, rightY + 41);
+
+    // === Pause button ===
+    const pauseSize = 48;
+    const pauseX = W - pauseSize - 14;
+    const pauseY = 18;
+    bevelButton(pauseX, pauseY, pauseSize, pauseSize, { radius: 12 });
+    iconPause(pauseX + pauseSize / 2, pauseY + pauseSize / 2, 11);
+    pauseHitRect = { x: pauseX, y: pauseY, w: pauseSize, h: pauseSize };
+}
+
+function drawWaveBar() {
+    // Position centered below the top edge, between the left and right panels
+    const barY = 30;
+    const barH = 20;
+    const barX = 510;
+    const barW = W - 510 - 320;  // ~370 wide
+
+    // Wood/dark backdrop
+    hudPanel(barX - 20, barY - 14, barW + 40, barH + 30, { radius: 14 });
+
+    // Star icons at ends
+    iconStar(barX - 4, barY + barH / 2, 12, '#42a5f5', '#0d47a1');
+    iconStar(barX + barW + 4, barY + barH / 2, 12, '#e53935', '#4e0000');
+
+    // Bar background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    roundRect(barX + 10, barY, barW - 20, barH, 10);
+    ctx.fill();
+
+    // Player progress (blue) — fills based on enemy base HP destroyed
+    const enemyHpRatio = enemyBase.hp / enemyBase.maxHp;
+    const playerProgress = (1 - enemyHpRatio) * 0.5; // half the bar belongs to each side conceptually
+    // Enemy progress (red) — fills based on player base HP destroyed
+    const playerHpRatio = playerBase.hp / playerBase.maxHp;
+    const enemyProgress = (1 - playerHpRatio) * 0.5;
+
+    // We mostly visualise wave progress: blue from left up to current wave end,
+    // red from current wave to total. Like a tug-of-war progress bar.
+    const waveFrac = Math.min(1, ((currentWave - 1) + waveTimer / WAVE_DURATION_MS) / TOTAL_WAVES);
+    const blueW = (barW - 20) * waveFrac;
+
+    // Blue (player progress)
+    if (blueW > 0) {
+        const bg = ctx.createLinearGradient(0, barY, 0, barY + barH);
+        bg.addColorStop(0, '#42a5f5');
+        bg.addColorStop(1, '#1565c0');
+        ctx.fillStyle = bg;
+        roundRect(barX + 10, barY, blueW, barH, 10);
+        ctx.fill();
+    }
+    // Red (remaining waves)
+    const redW = (barW - 20) - blueW;
+    if (redW > 0) {
+        const rg = ctx.createLinearGradient(0, barY, 0, barY + barH);
+        rg.addColorStop(0, '#ef5350');
+        rg.addColorStop(1, '#c62828');
+        ctx.fillStyle = rg;
+        roundRect(barX + 10 + blueW, barY, redW, barH, 10);
+        ctx.fill();
+    }
+
+    // Soldier icons distributed along the red section to show upcoming waves
+    const upcomingCount = TOTAL_WAVES - currentWave;
+    const startSoldiers = barX + 10 + blueW + 18;
+    const endSoldiers = barX + barW - 12;
+    if (upcomingCount > 0) {
+        const span = Math.max(20, endSoldiers - startSoldiers);
+        for (let i = 0; i < upcomingCount; i++) {
+            const sx = startSoldiers + (i + 0.5) * (span / upcomingCount);
+            iconSoldier(sx, barY + barH / 2, 18, '#5d4037');
+        }
+    }
+
+    // Wave indicator triangle below the current wave boundary
+    const triX = barX + 10 + blueW;
+    ctx.fillStyle = '#69f0ae';
+    ctx.strokeStyle = '#1b5e20';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(triX, barY + barH + 2);
+    ctx.lineTo(triX - 6, barY + barH + 12);
+    ctx.lineTo(triX + 6, barY + barH + 12);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+
+    // Bar border
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.lineWidth = 2;
+    roundRect(barX + 10, barY, barW - 20, barH, 10);
+    ctx.stroke();
+
+    // "WAVE 3 / 5" text below the bar
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px "Lilita One", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.fillText(`WAVE ${currentWave} / ${TOTAL_WAVES}`, barX + barW / 2, barY + barH + 22);
+    ctx.shadowBlur = 0;
+}
+
+// ----- Bottom-left DEPLOY panel -----
+
+function drawDeployPanel() {
+    const panelX = 12;
+    const panelW = 360;
+    const panelH = 110;
+    const panelY = H - panelH - 12;
+    hudPanel(panelX, panelY, panelW, panelH);
+
+    // Header
+    ctx.fillStyle = '#90caf9';
+    ctx.font = 'bold 14px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.fillText('DEPLOY', panelX + 16, panelY + 10);
+    ctx.shadowBlur = 0;
+
+    // 3 unit cards
+    const cards = [
+        { key: '1', cost: 10, type: 'infantry', sprite: 'infantry_blue_1', action: () => { if (money >= 10) spawnPlayerUnit('infantry'); } },
+        { key: '2', cost: 40, type: 'tank',     sprite: 'tank_blue',       action: () => { if (money >= 40) spawnPlayerUnit('tank'); } },
+        { key: '3', cost: 25, type: 'bazooka',  sprite: 'bazooka_blue_1',  action: () => { if (money >= 25) spawnPlayerUnit('bazooka'); } },
+    ];
+    const cardW = 96, cardH = 76;
+    const cardY = panelY + 28;
+    const startX = panelX + 16;
+
+    for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        const cx = startX + i * (cardW + 8);
+        const canAfford = money >= card.cost;
+
+        // Card frame
+        bevelButton(cx, cardY, cardW, cardH, {
+            radius: 12,
+            top: canAfford ? 'rgba(35, 50, 85, 0.95)' : 'rgba(40, 40, 50, 0.85)',
+            bottom: canAfford ? 'rgba(15, 25, 55, 0.95)' : 'rgba(20, 20, 30, 0.85)',
+        });
+
+        // Number badge top-left
+        ctx.fillStyle = '#ffc107';
+        ctx.strokeStyle = '#0a1628';
+        ctx.lineWidth = 2;
+        const badgeR = 11;
+        ctx.beginPath();
+        ctx.arc(cx + 12, cardY + 12, badgeR, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#0a1628';
+        ctx.font = 'bold 14px "Lilita One", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(card.key, cx + 12, cardY + 13);
+
+        // Unit portrait (cropped sprite)
+        const img = SPRITES[card.sprite];
+        if (img && img.complete && img.naturalWidth > 0) {
+            const aspect = img.naturalWidth / img.naturalHeight;
+            const ph = 48;
+            const pw = ph * aspect;
+            ctx.save();
+            if (!canAfford) ctx.filter = 'grayscale(100%) brightness(0.7)';
+            ctx.drawImage(img, cx + cardW / 2 - pw / 2, cardY + 16, pw, ph);
+            ctx.restore();
+        }
+
+        // Cost label at bottom
+        ctx.fillStyle = canAfford ? '#69f0ae' : '#888';
+        ctx.font = 'bold 18px "Lilita One", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.fillText(`$${card.cost}`, cx + cardW / 2, cardY + cardH - 14);
+        ctx.shadowBlur = 0;
+
+        hudHitRects.push({ x: cx, y: cardY, w: cardW, h: cardH, action: card.action });
+    }
+}
+
+// ----- Bottom-right INCOME + POWERUPS panel -----
+
+function drawIncomePowerupPanel() {
+    const panelW = 460;
+    const panelH = 110;
+    const panelX = W - panelW - 12;
+    const panelY = H - panelH - 12;
+    hudPanel(panelX, panelY, panelW, panelH);
+
+    // Top row — money + income
+    ctx.fillStyle = '#69f0ae';
+    ctx.font = 'bold 22px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.fillText(`$${Math.floor(money)}`, panelX + 18, panelY + 22);
+
+    ctx.fillStyle = '#90caf9';
+    ctx.font = 'bold 11px "Lilita One", sans-serif';
+    ctx.fillText('INCOME', panelX + 220, panelY + 22);
+    ctx.fillStyle = '#69f0ae';
+    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    const incomePerSec = Math.round(INCOME_RATE * 60);
+    ctx.fillText(`+$${incomePerSec} /s`, panelX + 286, panelY + 22);
+    ctx.shadowBlur = 0;
+
+    // 3 powerup buttons
+    const btnW = 130, btnH = 56;
+    const btnY = panelY + 42;
+    const startX = panelX + 16;
+    const powerups = [
+        { id: 'airstrike', icon: iconMissile, cost: POWERUPS.airstrike.cost, action: activateAirstrike },
+        { id: 'shield',    icon: iconShield,  cost: POWERUPS.shield.cost,    action: activateShield },
+        { id: 'repair',    icon: iconWrench,  cost: POWERUPS.repair.cost,    action: activateRepair },
+    ];
+    for (let i = 0; i < powerups.length; i++) {
+        const p = powerups[i];
+        const bx = startX + i * (btnW + 8);
+        const canAfford = money >= p.cost;
+        bevelButton(bx, btnY, btnW, btnH, {
+            radius: 12,
+            top: canAfford ? 'rgba(35, 50, 85, 0.95)' : 'rgba(40, 40, 50, 0.85)',
+            bottom: canAfford ? 'rgba(15, 25, 55, 0.95)' : 'rgba(20, 20, 30, 0.85)',
+        });
+        // Icon
+        if (p.id === 'shield') {
+            iconShield(bx + btnW / 2, btnY + btnH / 2 - 4, 14, '#42a5f5');
+        } else {
+            p.icon(bx + btnW / 2, btnY + btnH / 2 - 4, 18);
+        }
+        // Cost
+        ctx.fillStyle = canAfford ? '#69f0ae' : '#888';
+        ctx.font = 'bold 16px "Lilita One", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.fillText(`$${p.cost}`, bx + btnW / 2, btnY + btnH - 12);
+        ctx.shadowBlur = 0;
+
+        hudHitRects.push({ x: bx, y: btnY, w: btnW, h: btnH, action: p.action });
+    }
+
+    // Active shield indicator
+    if (powerupShieldMs > 0) {
+        ctx.fillStyle = '#42a5f5';
+        ctx.font = 'bold 11px "Lilita One", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`SHIELD ${(powerupShieldMs / 1000).toFixed(1)}s`,
+                     panelX + panelW - 16, panelY + 22);
+    }
 }
 
 // ---- MAIN RENDER ----
