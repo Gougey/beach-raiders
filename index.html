@@ -223,10 +223,14 @@ const WALK_FRAME_ENDS = WALK_FRAME_MS.reduce((acc, d) => {
     return acc;
 }, []);
 
-// Per-frame VERTICAL OFFSET in pixels (positive = lower on screen).
-// Spec: lowest at F3/F7 (midstance, drop ~5px), highest at F4/F8 (push-off).
-// Indexed 0..7 for frames 1..8.
-const WALK_FRAME_Y_OFFSET = [0, 2, 5, -3, 0, 2, 5, -3];
+// Vertical body offset PER KEYFRAME (positive = lower on screen).
+// These are anchored to the START of each frame; we interpolate between
+// them smoothly so the body bobs continuously rather than teleporting at
+// each frame swap. Spec: lowest at F3/F7 (midstance), highest at F4/F8.
+const WALK_FRAME_Y_KEY = [0, 2, 5, -3, 0, 2, 5, -3];
+
+// Cumulative start times for each frame (i.e. WALK_FRAME_ENDS shifted right).
+const WALK_FRAME_STARTS = [0, ...WALK_FRAME_ENDS.slice(0, -1)];
 
 // Given a time in ms within the cycle, return frame number (1..8).
 function walkFrameAt(ms) {
@@ -235,6 +239,25 @@ function walkFrameAt(ms) {
         if (t < WALK_FRAME_ENDS[i]) return i + 1;
     }
     return 8;
+}
+
+// Smooth-interpolated vertical bob in pixels at time `ms` within the cycle.
+// Uses a smoothstep curve between adjacent keyframes for natural motion.
+function walkYAt(ms) {
+    const t = ((ms % WALK_CYCLE_MS) + WALK_CYCLE_MS) % WALK_CYCLE_MS;
+    for (let i = 0; i < 8; i++) {
+        if (t < WALK_FRAME_ENDS[i]) {
+            const segStart = WALK_FRAME_STARTS[i];
+            const segEnd = WALK_FRAME_ENDS[i];
+            const a = WALK_FRAME_Y_KEY[i];
+            const b = WALK_FRAME_Y_KEY[(i + 1) % 8];  // wrap so F8→F1 interpolates
+            const u = (t - segStart) / (segEnd - segStart);
+            // Smoothstep for ease-in/ease-out around the keyframe values
+            const s = u * u * (3 - 2 * u);
+            return a + (b - a) * s;
+        }
+    }
+    return 0;
 }
 let spritesLoaded = 0;
 let spritesTotal = Object.keys(SPRITE_FILES).length;
@@ -1987,10 +2010,11 @@ function drawUnit(u) {
         // Per-unit phase offset (deterministic, derived from spawn x) so units
         // don't all step in lockstep
         const phaseOffset = (u.x * 13) % WALK_CYCLE_MS;
-        const frame = u.state === 'march'
-            ? walkFrameAt(performance.now() + phaseOffset)
-            : 1;  // hold contact pose when fighting/idle
-        u._walkFrame = frame;  // stash for Y-offset lookup below
+        const cycleMs = performance.now() + phaseOffset;
+        const marching = u.state === 'march';
+        const frame = marching ? walkFrameAt(cycleMs) : 1;
+        // Smooth interpolated Y bob — continuous, not stepped per frame
+        u._walkY = marching ? walkYAt(cycleMs) : 0;
         const prefix = u.type === 'infantry'
             ? (isPlayer ? 'infantry_blue' : 'infantry_red')
             : (isPlayer ? 'bazooka_blue' : 'bazooka_red');
@@ -2008,11 +2032,10 @@ function drawUnit(u) {
         // Adjust y so the sprite's feet sit on the ground
         let drawY = sy - spriteHeight / 2 + u.h / 2;
 
-        // Soldier walk: per-frame vertical offset baked into the cycle.
-        // Spec: F3/F7 (midstance) = body lowest (+5px), F4/F8 (push-off) = body highest (-3px).
-        // Body bobs intrinsically with the 8-frame cycle.
+        // Soldier walk bob — smoothly interpolated through 8 keyframes.
+        // Lowest at midstance (F3/F7), highest at push-off (F4/F8).
         if ((u.type === 'infantry' || u.type === 'bazooka') && u.state === 'march') {
-            drawY += WALK_FRAME_Y_OFFSET[(u._walkFrame || 1) - 1];
+            drawY += u._walkY || 0;
         }
         // Tanks get a tiny rumble while moving.
         if (u.type === 'tank' && u.state === 'march') {
