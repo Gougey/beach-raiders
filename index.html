@@ -502,7 +502,7 @@ document.getElementById('restart-btn').addEventListener('click', () => {
 // ---- HELICOPTER ----
 let heli = {};
 const HELI_MAX_AMMO = 25;
-const HELI_RELOAD_MS = 8000;           // auto-reload after this delay when ammo hits 0
+const HELI_RELOAD_MS = 10000;          // auto-reload after this delay when ammo hits 0
 const RELOAD_COST = 30;                // gold deducted when the auto-reload completes
 const POWERUP_COOLDOWN_MS = 10000;     // 10 seconds for all powerup buttons
 const HELI_LANDING_Y = GROUND_Y - 50;  // heli must be at/below this y to drop troops
@@ -3871,7 +3871,8 @@ function drawTopHUD() {
     // Vertical separator
     ctx.beginPath(); ctx.moveTo(leftX + 445, leftY + 8); ctx.lineTo(leftX + 445, leftY + leftH - 8); ctx.stroke();
 
-    // Ammo cell — bullet icon + count (or auto-reload countdown when empty)
+    // Ammo cell — always show exact bullet count.
+    // While reloading, an additional orange bar fills back up under it.
     iconBullet(leftX + 465, leftY + leftH / 2, 9);
     const ammoLow = heli.ammo / heli.maxAmmo < 0.25;
     const isReloading = heli.ammo === 0;
@@ -3879,28 +3880,33 @@ function drawTopHUD() {
 
     ctx.fillStyle = '#ffd54f';
     ctx.font = 'bold 11px "Lilita One", sans-serif';
-    ctx.fillText(isReloading ? 'RELOADING' : 'AMMO', leftX + 488, leftY + 22);
+    ctx.fillText('AMMO', leftX + 488, leftY + 22);
 
+    // Always show "ammo / max" — never hide it
+    ctx.fillStyle = isReloading ? '#ef5350' : (ammoLow ? '#ff9800' : '#fff');
     ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.fillText(`${heli.ammo} / ${heli.maxAmmo}`, leftX + 488, leftY + 41);
+
+    // Reload status line ABOVE the bar (replaces the AMMO header info temporarily)
     if (isReloading) {
+        ctx.font = 'bold 10px "Lilita One", sans-serif';
+        ctx.textAlign = 'right';
         if (waitingForGold) {
             ctx.fillStyle = '#ef5350';
-            ctx.fillText('NEED $30', leftX + 488, leftY + 41);
+            ctx.fillText('NEED $30', leftX + 578, leftY + 22);
         } else {
             ctx.fillStyle = '#ff9800';
-            ctx.fillText(`${(heli.reloadMs / 1000).toFixed(1)}s`, leftX + 488, leftY + 41);
+            ctx.fillText(`RELOAD ${(heli.reloadMs / 1000).toFixed(1)}s`, leftX + 578, leftY + 22);
         }
-    } else {
-        ctx.fillStyle = ammoLow ? '#ff9800' : '#fff';
-        ctx.fillText(`${heli.ammo} / ${heli.maxAmmo}`, leftX + 488, leftY + 41);
+        ctx.textAlign = 'left';
     }
 
-    // Slim bar — ammo level OR reload progress
+    // Slim bar at bottom of cell — ammo level OR reload progress
     const aBarX = leftX + 488, aBarY = leftY + 50, aBarW = 90, aBarH = 4;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     roundRect(aBarX, aBarY, aBarW, aBarH, 2); ctx.fill();
     if (isReloading) {
-        // Fill from empty back to full as the timer counts down
+        // Reload progress fills empty → full as the 10s timer drains.
         const reloadFrac = 1 - (heli.reloadMs / HELI_RELOAD_MS);
         if (reloadFrac > 0) {
             ctx.fillStyle = waitingForGold ? '#ef5350' : '#ff9800';
