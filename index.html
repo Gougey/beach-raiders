@@ -190,11 +190,11 @@ canvas {
     <div id="tagline">Air Cavalry · Ground Assault</div>
     <div class="controls">
         <span class="key">WASD</span> Fly Helicopter<br>
-        <span class="key">SPACE</span> Fire Minigun<br>
-        <span class="key">E</span> Pick up / Drop soldiers<br>
-        <span class="key">1</span> Deploy Infantry ($10)<br>
-        <span class="key">2</span> Deploy Tank ($40)<br>
-        <span class="key">3</span> Deploy Bazooka ($25)
+        <span class="key">SPACE</span> Fire Minigun (limited ammo)<br>
+        <span class="key">E</span> Pick up troops &nbsp;·&nbsp; <span class="key">T</span> Drop troops<br>
+        <span class="key">1</span> Infantry &nbsp;·&nbsp; <span class="key">2</span> Tank &nbsp;·&nbsp; <span class="key">3</span> Bazooka<br>
+        <span class="key">Q</span> Airstrike &nbsp;·&nbsp; <span class="key">F</span> Shield &nbsp;·&nbsp; <span class="key">R</span> Repair &nbsp;·&nbsp; <span class="key">G</span> Reload<br>
+        <span class="key">P</span> / <span class="key">Esc</span> Pause
     </div>
     <button id="start-btn" class="game-btn">DEPLOY</button>
 </div>
@@ -451,10 +451,12 @@ document.addEventListener('keydown', e => {
         if (e.key === '1') spawnPlayerUnit('infantry');
         if (e.key === '2') spawnPlayerUnit('tank');
         if (e.key === '3') spawnPlayerUnit('bazooka');
-        if (e.key === 'e' || e.key === 'E') helicopterPickupDrop();
+        if (e.key === 'e' || e.key === 'E') helicopterPickup();
+        if (e.key === 't' || e.key === 'T') helicopterDrop();
         // Powerups
         if (e.key === 'q' || e.key === 'Q') activateAirstrike();
         if (e.key === 'r' || e.key === 'R') activateRepair();
+        if (e.key === 'g' || e.key === 'G') reloadHeli();
         if (e.key === 'f' || e.key === 'F') activateShield();
     }
     if (e.key === ' ') e.preventDefault();
@@ -497,6 +499,9 @@ document.getElementById('restart-btn').addEventListener('click', () => {
 
 // ---- HELICOPTER ----
 let heli = {};
+const HELI_MAX_AMMO = 80;
+const RELOAD_COST = 30;
+
 function resetHeli() {
     heli = {
         x: 200, y: 300,
@@ -505,10 +510,60 @@ function resetHeli() {
         facing: 1, // 1=right, -1=left
         bladeAngle: 0,
         shootCooldown: 0,
-        carrying: [], // soldiers being carried
+        carrying: [],
         maxCarry: 4,
         bobTimer: 0,
+        ammo: HELI_MAX_AMMO,
+        maxAmmo: HELI_MAX_AMMO,
+        emptyClickCooldown: 0,
     };
+}
+
+function reloadHeli() {
+    if (heli.ammo >= heli.maxAmmo) {
+        spawnFloatingText(heli.x, heli.y - 40, 'AMMO FULL', '#90a4ae');
+        return;
+    }
+    if (money < RELOAD_COST) {
+        spawnFloatingText(heli.x, heli.y - 40, 'NOT ENOUGH GOLD', '#ef5350');
+        return;
+    }
+    money -= RELOAD_COST;
+    heli.ammo = heli.maxAmmo;
+    spawnFloatingText(heli.x, heli.y - 40, `+${heli.maxAmmo} ROUNDS`, '#ffd54f');
+    // Quick yellow sparkle around the heli
+    for (let i = 0; i < 14; i++) {
+        spawnParticles(heli.x + (Math.random() - 0.5) * 50,
+                       heli.y + (Math.random() - 0.5) * 30,
+                       '#ffeb3b', 1, 1, 14);
+    }
+}
+
+// ---- AIR DEFENCES ----
+// Static enemy missile batteries on the right half of the map.
+// Damage the heli only. Heli minigun cannot harm them — must be killed
+// by ground troops (infantry / bazooka / tank).
+const AA_HP = 90;
+const AA_BOUNTY = 80;
+const AA_FIRE_INTERVAL = 240;     // ~4 seconds between launches
+const AA_RANGE = 800;             // wide engagement zone
+let airDefences = [];
+
+function resetAirDefences() {
+    airDefences = [];
+    // Place 3 batteries spread across the enemy half
+    const positions = [WORLD_WIDTH * 0.55, WORLD_WIDTH * 0.70, WORLD_WIDTH * 0.85];
+    for (const x of positions) {
+        airDefences.push({
+            x,
+            y: GROUND_Y - 20,
+            hp: AA_HP, maxHp: AA_HP,
+            fireTimer: Math.random() * AA_FIRE_INTERVAL,
+            team: 'enemy',
+            kind: 'aa',
+            w: 36, h: 40,
+        });
+    }
 }
 
 // ---- BASES ----
@@ -533,6 +588,7 @@ let birds = [];
 function initGame() {
     resetHeli();
     resetBases();
+    resetAirDefences();
     money = 30;
     enemyMoney = 50;
     commandPoints = CP_CAP_DEFAULT;
@@ -833,51 +889,72 @@ function spawnEnemyUnit(type) {
     });
 }
 
-// ---- HELICOPTER PICKUP/DROP ----
-function helicopterPickupDrop() {
-    if (heli.carrying.length > 0) {
-        // Drop soldiers at current position
-        for (let i = 0; i < heli.carrying.length; i++) {
-            const s = heli.carrying[i];
-            s.x = heli.x + (i - 1.5) * 20;
-            s.y = GROUND_Y - s.h / 2;
-            s.state = 'march';
-            units.push(s);
-        }
-        heli.carrying = [];
-    } else {
-        // Pick up nearby friendly soldiers (infantry and bazooka). Tanks are too heavy.
-        for (let i = units.length - 1; i >= 0; i--) {
-            const u = units[i];
-            const liftable = u.team === 'player' && (u.type === 'infantry' || u.type === 'bazooka');
-            if (liftable && heli.carrying.length < heli.maxCarry) {
-                const dx = u.x - heli.x;
-                const dy = u.y - heli.y;
-                if (Math.abs(dx) < 60 && Math.abs(dy) < 80) {
-                    u.state = 'carried';
-                    heli.carrying.push(u);
-                    units.splice(i, 1);
-                }
-            }
+// ---- HELICOPTER PICKUP / DROP ----
+// Split onto two keys (E and T) so picking up troops while already
+// carrying others doesn't accidentally drop the squad mid-flight.
+
+function helicopterPickup() {
+    if (heli.carrying.length >= heli.maxCarry) {
+        spawnFloatingText(heli.x, heli.y - 40, 'CARRY FULL', '#ffc107');
+        return;
+    }
+    let lifted = 0;
+    for (let i = units.length - 1; i >= 0; i--) {
+        const u = units[i];
+        const liftable = u.team === 'player' && (u.type === 'infantry' || u.type === 'bazooka');
+        if (!liftable) continue;
+        if (heli.carrying.length >= heli.maxCarry) break;
+        const dx = u.x - heli.x;
+        const dy = u.y - heli.y;
+        if (Math.abs(dx) < 60 && Math.abs(dy) < 80) {
+            u.state = 'carried';
+            heli.carrying.push(u);
+            units.splice(i, 1);
+            lifted++;
         }
     }
+    if (lifted === 0 && heli.carrying.length === 0) {
+        spawnFloatingText(heli.x, heli.y - 40, 'NO TROOPS NEARBY', '#90a4ae');
+    }
+}
+
+function helicopterDrop() {
+    if (heli.carrying.length === 0) {
+        spawnFloatingText(heli.x, heli.y - 40, 'CARGO HOLD EMPTY', '#90a4ae');
+        return;
+    }
+    for (let i = 0; i < heli.carrying.length; i++) {
+        const s = heli.carrying[i];
+        s.x = heli.x + (i - (heli.carrying.length - 1) / 2) * 24;
+        s.y = GROUND_Y - s.h / 2;
+        s.state = 'march';
+        units.push(s);
+    }
+    heli.carrying = [];
 }
 
 // ---- SHOOTING ----
 function heliShoot() {
     if (heli.shootCooldown > 0) return;
+    if (heli.ammo <= 0) {
+        // Click on empty — flash a warning periodically while trigger held
+        if (heli.emptyClickCooldown <= 0) {
+            spawnFloatingText(heli.x, heli.y - 40, 'OUT OF AMMO', '#ef5350');
+            spawnParticles(heli.x + heli.facing * 25, heli.y + 18, '#9e9e9e', 2, 0.5, 6);
+            heli.emptyClickCooldown = 90;
+        }
+        heli.shootCooldown = 6;
+        return;
+    }
     heli.shootCooldown = 8;
-    // Underslung minigun fires forward AND DOWN — bullets arc into ground troops.
-    // Slower forward speed + strong down velocity means rounds land close to the
-    // heli's position, like a real strafing run. Heli's own velocity is added
-    // so flying forward carries the rounds further.
+    heli.ammo--;
     const spreadX = (Math.random() - 0.5) * 1.5;
     const spreadY = (Math.random() - 0.5) * 1.5;
     bullets.push({
         x: heli.x + heli.facing * 25,
         y: heli.y + 18,
         vx: 5 * heli.facing + heli.vx + spreadX,
-        vy: 10 + heli.vy + spreadY,            // strong down — minigun strafe
+        vy: 10 + heli.vy + spreadY,
         team: 'player',
         damage: 10,
         life: 80,
@@ -1094,6 +1171,7 @@ function update() {
     heli.bladeAngle += 0.4;
     heli.bobTimer += 0.05;
     heli.shootCooldown = Math.max(0, heli.shootCooldown - 1);
+    heli.emptyClickCooldown = Math.max(0, heli.emptyClickCooldown - 1);
 
     // Camera follow
     const screenX = heli.x - cameraX;
@@ -1151,6 +1229,18 @@ function update() {
             if (d < nearestDist) { nearestDist = d; nearestEnemy = other; }
         }
 
+        // Player ground troops also target enemy AA structures
+        if (u.team === 'player') {
+            for (const aa of airDefences) {
+                if (aa.hp <= 0) continue;
+                const d = Math.abs(aa.x - u.x);
+                if (d < nearestDist) {
+                    nearestDist = d;
+                    nearestEnemy = aa;
+                }
+            }
+        }
+
         // Check enemy base
         const targetBase = u.team === 'player' ? enemyBase : playerBase;
         const baseDist = Math.abs(targetBase.x - u.x);
@@ -1198,6 +1288,22 @@ function update() {
     // Update bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
+        // Homing for AA missiles — gentle steering toward heli each frame
+        if (b.homing && b.type === 'aamissile') {
+            const tx = heli.x - b.x;
+            const ty = heli.y - 14 - b.y;
+            const td = Math.sqrt(tx * tx + ty * ty) || 1;
+            const desiredVx = (tx / td) * 5;
+            const desiredVy = (ty / td) * 5;
+            // Lerp current velocity toward desired (smooth turn)
+            b.vx += (desiredVx - b.vx) * 0.06;
+            b.vy += (desiredVy - b.vy) * 0.06;
+            // Smoke trail
+            if (frameCount % 2 === 0) {
+                spawnParticles(b.x, b.y, '#9e9e9e', 1, 0.3, 14);
+                spawnParticles(b.x, b.y, '#ff9800', 1, 0.3, 8);
+            }
+        }
         b.x += b.vx;
         b.y += b.vy;
         if (b.type === 'shell') b.vy += 0.05;
@@ -1240,11 +1346,40 @@ function update() {
             }
         }
 
-        // Hit detection — helicopter (enemy bullets)
+        // Hit detection — air defence batteries (player projectiles).
+        // ONLY ground-troop projectiles damage AA (b.shooterType is set).
+        // Heli minigun and airstrike missiles spark off harmlessly.
+        if (!hit && b.team === 'player') {
+            for (const aa of airDefences) {
+                if (aa.hp <= 0) continue;
+                if (Math.abs(b.x - aa.x) < 22 && Math.abs(b.y - (aa.y - 16)) < 24) {
+                    const fromGroundUnit = b.shooterType === 'infantry'
+                                         || b.shooterType === 'bazooka'
+                                         || b.shooterType === 'tank';
+                    if (fromGroundUnit) {
+                        let dmg = b.damage;
+                        // Treat AA roughly like a tank for RPS (so bazookas shred them)
+                        dmg = applyDamageModifier(b.shooterType, 'tank', dmg);
+                        aa.hp -= dmg;
+                        spawnParticles(b.x, b.y, C.explosion1, 4, 1, 8);
+                        if (b.type === 'shell') spawnExplosion(b.x, b.y, 2);
+                    } else {
+                        // Spark off — heli minigun / airstrike harmless to AA
+                        spawnParticles(b.x, b.y, '#9e9e9e', 3, 1, 6);
+                        spawnParticles(b.x, b.y, '#fff', 2, 1, 4);
+                    }
+                    hit = true;
+                    break;
+                }
+            }
+        }
+
+        // Hit detection — helicopter (enemy bullets, including AA missiles)
         if (!hit && b.team === 'enemy') {
             if (Math.abs(b.x - heli.x) < 25 && Math.abs(b.y - heli.y) < 15) {
                 heli.hp -= b.damage;
-                spawnParticles(b.x, b.y, C.explosion2, 4, 1, 8);
+                spawnParticles(b.x, b.y, C.explosion2, 6, 1, 10);
+                if (b.type === 'aamissile') spawnExplosion(b.x, b.y, 3);
                 hit = true;
             }
         }
@@ -1332,6 +1467,49 @@ function update() {
         l.y += l.vy;
         l.rot += l.rotSpeed;
         if (l.y > GROUND_Y) ambientParticles.splice(i, 1);
+    }
+
+    // Air defence batteries — fire homing missiles at the heli when in range
+    for (let i = airDefences.length - 1; i >= 0; i--) {
+        const aa = airDefences[i];
+        if (aa.hp <= 0) {
+            // Big death explosion + bounty
+            spawnExplosion(aa.x, aa.y - 10, 5);
+            triggerScreenShake(8, 18);
+            money += AA_BOUNTY;
+            spawnFloatingText(aa.x, aa.y - 50, `+$${AA_BOUNTY}`, '#69f0ae');
+            spawnFloatingText(aa.x, aa.y - 30, 'AA DESTROYED', '#ffd54f');
+            airDefences.splice(i, 1);
+            continue;
+        }
+        aa.fireTimer++;
+        const dxh = heli.x - aa.x;
+        const dyh = heli.y - aa.y;
+        const distH = Math.sqrt(dxh * dxh + dyh * dyh);
+        if (distH < AA_RANGE && aa.fireTimer > AA_FIRE_INTERVAL) {
+            aa.fireTimer = 0;
+            // Lead the target slightly using heli velocity
+            const leadFrames = 30;
+            const targetX = heli.x + heli.vx * leadFrames;
+            const targetY = heli.y + heli.vy * leadFrames;
+            const ldx = targetX - aa.x;
+            const ldy = (targetY - 14) - aa.y;
+            const ld = Math.sqrt(ldx * ldx + ldy * ldy) || 1;
+            const speed = 5;
+            bullets.push({
+                x: aa.x, y: aa.y - 18,
+                vx: (ldx / ld) * speed,
+                vy: (ldy / ld) * speed,
+                team: 'enemy',
+                damage: 18,
+                life: 120,
+                type: 'aamissile',
+                homing: true,
+            });
+            // Launch flash + smoke
+            spawnParticles(aa.x, aa.y - 20, '#ffeb3b', 5, 1, 12);
+            spawnParticles(aa.x, aa.y - 10, '#9e9e9e', 8, 1, 18);
+        }
     }
 
     // Wave state machine
@@ -2245,6 +2423,88 @@ function shadeColor(color, percent) {
     return `rgb(${r},${g},${b})`;
 }
 
+function drawAirDefence(aa) {
+    const sx = aa.x - cameraX;
+    if (sx < -60 || sx > W + 60) return;
+    const by = GROUND_Y - 4;
+
+    ctx.save();
+    // Aim the launcher tube toward the heli
+    const tx = heli.x - aa.x;
+    const ty = heli.y - (by - 28);
+    const aimAngle = Math.atan2(ty, tx);
+
+    // Sandbag base
+    ctx.fillStyle = '#a1887f';
+    ctx.strokeStyle = '#3e2723';
+    ctx.lineWidth = 2;
+    for (let bx = -22; bx <= 22; bx += 12) {
+        ctx.beginPath();
+        ctx.ellipse(sx + bx, by - 4, 8, 5, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+    }
+    for (let bx = -16; bx <= 16; bx += 12) {
+        ctx.beginPath();
+        ctx.ellipse(sx + bx, by - 13, 8, 5, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+    }
+
+    // Mount pedestal
+    ctx.fillStyle = '#37474f';
+    ctx.strokeStyle = '#0a1628';
+    ctx.lineWidth = 2;
+    ctx.fillRect(sx - 8, by - 24, 16, 12);
+    ctx.strokeRect(sx - 8, by - 24, 16, 12);
+    // Red panel detail
+    ctx.fillStyle = '#c62828';
+    ctx.fillRect(sx - 6, by - 22, 12, 3);
+
+    // Rotating launcher
+    ctx.save();
+    ctx.translate(sx, by - 24);
+    ctx.rotate(Math.max(-Math.PI * 0.55, Math.min(0, aimAngle)));
+    // Launcher body
+    ctx.fillStyle = '#455a64';
+    ctx.strokeStyle = '#0a1628';
+    ctx.lineWidth = 2;
+    ctx.fillRect(0, -7, 24, 14);
+    ctx.strokeRect(0, -7, 24, 14);
+    // Two missile tubes
+    ctx.fillStyle = '#fafafa';
+    ctx.fillRect(2, -5, 20, 4);
+    ctx.fillRect(2, 1, 20, 4);
+    // Red tips
+    ctx.fillStyle = '#e53935';
+    ctx.fillRect(20, -5, 4, 4);
+    ctx.fillRect(20, 1, 4, 4);
+    // Exhaust holes
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, -4, 2, 2);
+    ctx.fillRect(0, 2, 2, 2);
+    ctx.restore();
+
+    // HP bar above
+    if (aa.hp < aa.maxHp) {
+        const hbW = 40;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(sx - hbW / 2 - 1, by - 50, hbW + 2, 5);
+        const ratio = aa.hp / aa.maxHp;
+        ctx.fillStyle = ratio > 0.5 ? '#69f0ae' : ratio > 0.25 ? '#ff9800' : '#ef5350';
+        ctx.fillRect(sx - hbW / 2, by - 49, hbW * ratio, 3);
+    }
+
+    // Range warning indicator (subtle red glow if heli is in range)
+    const distH = Math.sqrt((heli.x - aa.x) ** 2 + (heli.y - aa.y) ** 2);
+    if (distH < AA_RANGE) {
+        ctx.fillStyle = 'rgba(244, 67, 54, 0.35)';
+        ctx.beginPath();
+        ctx.arc(sx, by - 22, 4 + Math.sin(frameCount * 0.2) * 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
 function drawHelicopter() {
     const sx = heli.x - cameraX;
     const sy = heli.y + Math.sin(heli.bobTimer) * 2;
@@ -3059,6 +3319,50 @@ function drawBullets() {
             // Smoke trail
             spawnParticles(b.x, b.y, '#aaa', 1, 0.3, 8);
             spawnParticles(b.x - b.vx, b.y - b.vy, '#ff9800', 1, 0.5, 5);
+        } else if (b.type === 'aamissile') {
+            // Long thin missile streaking toward the heli
+            const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
+            const ang = Math.atan2(b.vy, b.vx);
+            ctx.save();
+            ctx.translate(sx, b.y);
+            ctx.rotate(ang);
+            // Body
+            ctx.fillStyle = '#fafafa';
+            ctx.strokeStyle = '#212121';
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(-9, -2, 14, 4);
+            ctx.strokeRect(-9, -2, 14, 4);
+            // Red nose
+            ctx.fillStyle = '#e53935';
+            ctx.beginPath();
+            ctx.moveTo(5, -2);
+            ctx.lineTo(11, 0);
+            ctx.lineTo(5, 2);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            // Fins
+            ctx.fillStyle = '#e53935';
+            ctx.beginPath();
+            ctx.moveTo(-9, -2);
+            ctx.lineTo(-13, -5);
+            ctx.lineTo(-7, -2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-9, 2);
+            ctx.lineTo(-13, 5);
+            ctx.lineTo(-7, 2);
+            ctx.closePath();
+            ctx.fill();
+            // Flame at the back
+            ctx.fillStyle = '#ffeb3b';
+            ctx.beginPath();
+            ctx.moveTo(-9, -1);
+            ctx.lineTo(-14 - Math.random() * 4, 0);
+            ctx.lineTo(-9, 1);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
         }
     }
 }
@@ -3367,6 +3671,33 @@ function iconMissile(cx, cy, r) {
     ctx.restore();
 }
 
+function iconBullet(cx, cy, r) {
+    // Vertical brass cartridge silhouette
+    ctx.save();
+    ctx.translate(cx, cy);
+    // Casing (brass)
+    ctx.fillStyle = '#ffc107';
+    ctx.strokeStyle = '#bf8f00';
+    ctx.lineWidth = 1.2;
+    ctx.fillRect(-r * 0.5, -r * 0.3, r, r * 1.3);
+    ctx.strokeRect(-r * 0.5, -r * 0.3, r, r * 1.3);
+    // Rim
+    ctx.fillStyle = '#bf8f00';
+    ctx.fillRect(-r * 0.55, r, r * 1.1, r * 0.25);
+    // Tip (copper-jacketed bullet)
+    ctx.fillStyle = '#b87333';
+    ctx.strokeStyle = '#5d4037';
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.5, -r * 0.3);
+    ctx.lineTo(-r * 0.4, -r * 0.9);
+    ctx.lineTo(0,        -r * 1.05);
+    ctx.lineTo(r * 0.4,  -r * 0.9);
+    ctx.lineTo(r * 0.5,  -r * 0.3);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+}
+
 function iconWrench(cx, cy, r) {
     ctx.save();
     ctx.translate(cx, cy);
@@ -3475,9 +3806,9 @@ function drawHUD() {
 // ----- Top HUD -----
 
 function drawTopHUD() {
-    // === LEFT — money / base hp / heli hp combined panel ===
+    // === LEFT — money / base hp / heli hp / ammo combined panel ===
     const leftX = 12, leftY = 12;
-    const leftW = 460, leftH = 60;
+    const leftW = 590, leftH = 60;
     hudPanel(leftX, leftY, leftW, leftH);
 
     // Money cell
@@ -3515,6 +3846,28 @@ function drawTopHUD() {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 18px "Lilita One", sans-serif';
     ctx.fillText(`${Math.max(0, Math.ceil(heli.hp))} / ${heli.maxHp}`, leftX + 348, leftY + 41);
+
+    // Vertical separator
+    ctx.beginPath(); ctx.moveTo(leftX + 445, leftY + 8); ctx.lineTo(leftX + 445, leftY + leftH - 8); ctx.stroke();
+
+    // Ammo cell — bullet icon + count + thin bar
+    iconBullet(leftX + 465, leftY + leftH / 2, 9);
+    ctx.fillStyle = '#ffd54f';
+    ctx.font = 'bold 11px "Lilita One", sans-serif';
+    ctx.fillText('AMMO', leftX + 488, leftY + 22);
+    const ammoLow = heli.ammo / heli.maxAmmo < 0.25;
+    ctx.fillStyle = heli.ammo === 0 ? '#ef5350' : (ammoLow ? '#ff9800' : '#fff');
+    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.fillText(`${heli.ammo} / ${heli.maxAmmo}`, leftX + 488, leftY + 41);
+    // Slim ammo bar at the bottom of the cell
+    const aBarX = leftX + 488, aBarY = leftY + 50, aBarW = 90, aBarH = 4;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    roundRect(aBarX, aBarY, aBarW, aBarH, 2); ctx.fill();
+    const aRatio = heli.ammo / heli.maxAmmo;
+    if (aRatio > 0) {
+        ctx.fillStyle = heli.ammo === 0 ? '#ef5350' : (ammoLow ? '#ff9800' : '#ffeb3b');
+        roundRect(aBarX, aBarY, aBarW * aRatio, aBarH, 2); ctx.fill();
+    }
 
     // === CENTER — wave progress bar ===
     drawWaveBar();
@@ -3571,16 +3924,35 @@ function drawWaveBar() {
     drawMiniBase(playerMX, mapY + mapH - 10, '#1565c0', '#42a5f5');
     drawMiniBase(enemyMX,  mapY + mapH - 10, '#c62828', '#e53935');
 
-    // Units — distinct shape per type so it's easy to read at a glance:
-    //   infantry: small filled triangle (▴)
-    //   bazooka:  diamond (◆)
-    //   tank:     filled square (■) with turret nub
-    //   boss:     large square with pulsing star outline
+    // Units — distinct shape per type so it's easy to read at a glance.
     const groundLineY = mapY + mapH - 9;
     for (const u of units) {
         const ux = mapX + (u.x / WORLD_WIDTH) * mapW;
         if (ux < mapX - 6 || ux > mapX + mapW + 6) continue;
         drawMinimapUnit(ux, groundLineY, u);
+    }
+    // Air defence batteries — red triangle pointing up
+    for (const aa of airDefences) {
+        const ax = mapX + (aa.x / WORLD_WIDTH) * mapW;
+        if (ax < mapX || ax > mapX + mapW) continue;
+        ctx.fillStyle = '#ef5350';
+        ctx.strokeStyle = '#7f0000';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(ax, groundLineY - 8);
+        ctx.lineTo(ax + 4, groundLineY);
+        ctx.lineTo(ax - 4, groundLineY);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // Pulse dot if it's actively firing range of the heli
+        const dx = heli.x - aa.x, dy = heli.y - aa.y;
+        if (dx * dx + dy * dy < AA_RANGE * AA_RANGE) {
+            const pulse = 0.4 + Math.abs(Math.sin(frameCount * 0.15)) * 0.6;
+            ctx.fillStyle = `rgba(255, 100, 100, ${pulse})`;
+            ctx.beginPath();
+            ctx.arc(ax, groundLineY - 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     // Helicopter — white dot with glow
@@ -3924,14 +4296,15 @@ function drawIncomePowerupPanel() {
     ctx.fillText(`+$${incomePerSec} /s`, panelX + 286, panelY + 22);
     ctx.shadowBlur = 0;
 
-    // 3 powerup buttons
-    const btnW = 130, btnH = 56;
+    // 4 powerup buttons (airstrike, shield, repair, reload)
+    const btnW = 100, btnH = 56;
     const btnY = panelY + 42;
     const startX = panelX + 16;
     const powerups = [
         { id: 'airstrike', icon: iconMissile, cost: POWERUPS.airstrike.cost, action: activateAirstrike },
         { id: 'shield',    icon: iconShield,  cost: POWERUPS.shield.cost,    action: activateShield },
         { id: 'repair',    icon: iconWrench,  cost: POWERUPS.repair.cost,    action: activateRepair },
+        { id: 'reload',    icon: iconBullet,  cost: RELOAD_COST,             action: reloadHeli },
     ];
     for (let i = 0; i < powerups.length; i++) {
         const p = powerups[i];
@@ -4199,6 +4572,9 @@ function render() {
     // Bases
     drawBase(playerBase, 'player');
     drawBase(enemyBase, 'enemy');
+
+    // Air defence batteries
+    for (const aa of airDefences) drawAirDefence(aa);
 
     // Units
     for (const u of units) {
