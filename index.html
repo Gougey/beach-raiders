@@ -420,10 +420,13 @@ let bossSpawnedThisWave = false;
 // Active effect timers (ms remaining)
 let powerupShieldMs = 0;
 const POWERUPS = {
-    airstrike: { cost: 60, key: 'q' },
-    shield:    { cost: 50, key: 'w' },  // overlaps with W movement key — handled via click only
-    repair:    { cost: 30, key: 'r' },
+    airstrike: { cost: 180, key: 'q' },  // 3× original
+    shield:    { cost: 50,  key: 'f' },
+    repair:    { cost: 90,  key: 'r' },  // 3× original
 };
+
+// Cooldown timers (ms remaining) per powerup id, including reload.
+let powerupCooldowns = { airstrike: 0, shield: 0, repair: 0, reload: 0 };
 
 // Buttons hit-rects (filled in during draw, used by click handler)
 let hudHitRects = [];
@@ -499,8 +502,10 @@ document.getElementById('restart-btn').addEventListener('click', () => {
 
 // ---- HELICOPTER ----
 let heli = {};
-const HELI_MAX_AMMO = 80;
+const HELI_MAX_AMMO = 25;
 const RELOAD_COST = 30;
+const POWERUP_COOLDOWN_MS = 10000;     // 10 seconds for all powerup buttons
+const HELI_LANDING_Y = GROUND_Y - 50;  // heli must be at/below this y to drop troops
 
 function resetHeli() {
     heli = {
@@ -524,14 +529,20 @@ function reloadHeli() {
         spawnFloatingText(heli.x, heli.y - 40, 'AMMO FULL', '#90a4ae');
         return;
     }
+    if (powerupCooldowns.reload > 0) {
+        spawnFloatingText(heli.x, heli.y - 40,
+            `COOLING DOWN ${(powerupCooldowns.reload / 1000).toFixed(1)}s`,
+            '#ff9800');
+        return;
+    }
     if (money < RELOAD_COST) {
         spawnFloatingText(heli.x, heli.y - 40, 'NOT ENOUGH GOLD', '#ef5350');
         return;
     }
     money -= RELOAD_COST;
+    powerupCooldowns.reload = POWERUP_COOLDOWN_MS;
     heli.ammo = heli.maxAmmo;
     spawnFloatingText(heli.x, heli.y - 40, `+${heli.maxAmmo} ROUNDS`, '#ffd54f');
-    // Quick yellow sparkle around the heli
     for (let i = 0; i < 14; i++) {
         spawnParticles(heli.x + (Math.random() - 0.5) * 50,
                        heli.y + (Math.random() - 0.5) * 30,
@@ -601,6 +612,7 @@ function initGame() {
     waveState = 'warning';
     bossSpawnedThisWave = false;
     powerupShieldMs = 0;
+    powerupCooldowns = { airstrike: 0, shield: 0, repair: 0, reload: 0 };
     upgradeLevels = makeFreshUpgradeLevels();
     frameCount = 0;
     particles = [];
@@ -923,6 +935,11 @@ function helicopterDrop() {
         spawnFloatingText(heli.x, heli.y - 40, 'CARGO HOLD EMPTY', '#90a4ae');
         return;
     }
+    // Must be at low altitude (essentially landed) to drop troops.
+    if (heli.y < HELI_LANDING_Y) {
+        spawnFloatingText(heli.x, heli.y - 40, 'MUST LAND TO DROP', '#ff9800');
+        return;
+    }
     for (let i = 0; i < heli.carrying.length; i++) {
         const s = heli.carrying[i];
         s.x = heli.x + (i - (heli.carrying.length - 1) / 2) * 24;
@@ -1079,17 +1096,32 @@ function spawnDustCloud(x, y) {
 
 // ---- POWERUPS ----
 
-function activateAirstrike() {
-    const cost = POWERUPS.airstrike.cost;
-    if (money < cost) return;
+// Returns true and triggers the cooldown if the powerup is allowed to fire.
+// Returns false (with a hint) if it's still on cooldown or unaffordable.
+function tryStartPowerup(id, cost) {
+    if (powerupCooldowns[id] > 0) {
+        spawnFloatingText(heli.x, heli.y - 40,
+            `COOLING DOWN ${(powerupCooldowns[id] / 1000).toFixed(1)}s`,
+            '#ff9800');
+        return false;
+    }
+    if (money < cost) {
+        spawnFloatingText(heli.x, heli.y - 40, 'NOT ENOUGH GOLD', '#ef5350');
+        return false;
+    }
     money -= cost;
+    powerupCooldowns[id] = POWERUP_COOLDOWN_MS;
+    return true;
+}
+
+function activateAirstrike() {
+    if (!tryStartPowerup('airstrike', POWERUPS.airstrike.cost)) return;
     // Find the densest enemy cluster, drop 4 missiles on the area
     let targetX = enemyBase.x;  // default to enemy base
     if (units.some(u => u.team === 'enemy')) {
         const xs = units.filter(u => u.team === 'enemy').map(u => u.x);
         targetX = xs.reduce((a, b) => a + b, 0) / xs.length;
     }
-    // Spawn 4 missiles falling from off-screen top, landing in a spread around targetX
     for (let i = 0; i < 4; i++) {
         const lx = targetX + (i - 1.5) * 60;
         bullets.push({
@@ -1105,20 +1137,14 @@ function activateAirstrike() {
 }
 
 function activateShield() {
-    const cost = POWERUPS.shield.cost;
-    if (money < cost) return;
-    money -= cost;
-    powerupShieldMs = 8000;  // 8 seconds of base invulnerability
+    if (!tryStartPowerup('shield', POWERUPS.shield.cost)) return;
+    powerupShieldMs = 8000;
 }
 
 function activateRepair() {
-    const cost = POWERUPS.repair.cost;
-    if (money < cost) return;
-    money -= cost;
-    // Repair player base + heli for 30% of max
+    if (!tryStartPowerup('repair', POWERUPS.repair.cost)) return;
     playerBase.hp = Math.min(playerBase.maxHp, playerBase.hp + playerBase.maxHp * 0.3);
     heli.hp = Math.min(heli.maxHp, heli.hp + heli.maxHp * 0.3);
-    // Visual: green sparkle particles
     for (let i = 0; i < 12; i++) {
         spawnParticles(playerBase.x + (Math.random() - 0.5) * 80,
                        GROUND_Y - 30 - Math.random() * 60,
@@ -1566,6 +1592,10 @@ function update() {
     }
     // Decay shield powerup
     if (powerupShieldMs > 0) powerupShieldMs = Math.max(0, powerupShieldMs - 16.67);
+    // Tick down all powerup cooldowns
+    for (const k of Object.keys(powerupCooldowns)) {
+        if (powerupCooldowns[k] > 0) powerupCooldowns[k] = Math.max(0, powerupCooldowns[k] - 16.67);
+    }
 
     // Win/Lose conditions
     if (enemyBase.hp <= 0) {
@@ -4309,26 +4339,56 @@ function drawIncomePowerupPanel() {
     for (let i = 0; i < powerups.length; i++) {
         const p = powerups[i];
         const bx = startX + i * (btnW + 8);
+        const cdMs = powerupCooldowns[p.id] || 0;
+        const onCooldown = cdMs > 0;
         const canAfford = money >= p.cost;
+        const enabled = canAfford && !onCooldown;
+
         bevelButton(bx, btnY, btnW, btnH, {
             radius: 12,
-            top: canAfford ? 'rgba(35, 50, 85, 0.95)' : 'rgba(40, 40, 50, 0.85)',
-            bottom: canAfford ? 'rgba(15, 25, 55, 0.95)' : 'rgba(20, 20, 30, 0.85)',
+            top:    enabled ? 'rgba(35, 50, 85, 0.95)' : 'rgba(40, 40, 50, 0.85)',
+            bottom: enabled ? 'rgba(15, 25, 55, 0.95)' : 'rgba(20, 20, 30, 0.85)',
         });
+
         // Icon
+        ctx.save();
+        if (!enabled) ctx.globalAlpha = 0.45;
         if (p.id === 'shield') {
             iconShield(bx + btnW / 2, btnY + btnH / 2 - 4, 14, '#42a5f5');
         } else {
             p.icon(bx + btnW / 2, btnY + btnH / 2 - 4, 18);
         }
-        // Cost
-        ctx.fillStyle = canAfford ? '#69f0ae' : '#888';
+        ctx.restore();
+
+        // Cost or cooldown countdown
         ctx.font = 'bold 16px "Lilita One", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.fillText(`$${p.cost}`, bx + btnW / 2, btnY + btnH - 12);
+        if (onCooldown) {
+            ctx.fillStyle = '#ff9800';
+            ctx.fillText(`${(cdMs / 1000).toFixed(1)}s`, bx + btnW / 2, btnY + btnH - 12);
+        } else {
+            ctx.fillStyle = canAfford ? '#69f0ae' : '#888';
+            ctx.fillText(`$${p.cost}`, bx + btnW / 2, btnY + btnH - 12);
+        }
         ctx.shadowBlur = 0;
+
+        // Cooldown sweep arc — visualises cooldown as a clockwise sweep
+        if (onCooldown) {
+            const cx = bx + btnW / 2;
+            const cy = btnY + btnH / 2 - 4;
+            const r = 18;
+            const fraction = cdMs / POWERUP_COOLDOWN_MS;
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + fraction * Math.PI * 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
 
         hudHitRects.push({ x: bx, y: btnY, w: btnW, h: btnH, action: p.action });
     }
