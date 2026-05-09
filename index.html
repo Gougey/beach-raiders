@@ -190,10 +190,10 @@ canvas {
     <div id="tagline">Air Cavalry · Ground Assault</div>
     <div class="controls">
         <span class="key">WASD</span> Fly Helicopter<br>
-        <span class="key">SPACE</span> Fire Minigun (limited ammo)<br>
-        <span class="key">E</span> Pick up troops &nbsp;·&nbsp; <span class="key">T</span> Drop troops<br>
+        <span class="key">SPACE</span> Fire Minigun (auto-reloads when empty)<br>
+        <span class="key">E</span> Pick up troops &nbsp;·&nbsp; <span class="key">T</span> Drop troops (must land)<br>
         <span class="key">1</span> Infantry &nbsp;·&nbsp; <span class="key">2</span> Tank &nbsp;·&nbsp; <span class="key">3</span> Bazooka<br>
-        <span class="key">Q</span> Airstrike &nbsp;·&nbsp; <span class="key">F</span> Shield &nbsp;·&nbsp; <span class="key">R</span> Repair &nbsp;·&nbsp; <span class="key">G</span> Reload<br>
+        <span class="key">Q</span> Airstrike &nbsp;·&nbsp; <span class="key">F</span> Shield &nbsp;·&nbsp; <span class="key">R</span> Repair<br>
         <span class="key">P</span> / <span class="key">Esc</span> Pause
     </div>
     <button id="start-btn" class="game-btn">DEPLOY</button>
@@ -459,7 +459,6 @@ document.addEventListener('keydown', e => {
         // Powerups
         if (e.key === 'q' || e.key === 'Q') activateAirstrike();
         if (e.key === 'r' || e.key === 'R') activateRepair();
-        if (e.key === 'g' || e.key === 'G') reloadHeli();
         if (e.key === 'f' || e.key === 'F') activateShield();
     }
     if (e.key === ' ') e.preventDefault();
@@ -503,7 +502,8 @@ document.getElementById('restart-btn').addEventListener('click', () => {
 // ---- HELICOPTER ----
 let heli = {};
 const HELI_MAX_AMMO = 25;
-const RELOAD_COST = 30;
+const HELI_RELOAD_MS = 8000;           // auto-reload after this delay when ammo hits 0
+const RELOAD_COST = 30;                // gold deducted when the auto-reload completes
 const POWERUP_COOLDOWN_MS = 10000;     // 10 seconds for all powerup buttons
 const HELI_LANDING_Y = GROUND_Y - 50;  // heli must be at/below this y to drop troops
 
@@ -520,34 +520,9 @@ function resetHeli() {
         bobTimer: 0,
         ammo: HELI_MAX_AMMO,
         maxAmmo: HELI_MAX_AMMO,
+        reloadMs: 0,            // > 0 while waiting for the auto-reload to complete
         emptyClickCooldown: 0,
     };
-}
-
-function reloadHeli() {
-    if (heli.ammo >= heli.maxAmmo) {
-        spawnFloatingText(heli.x, heli.y - 40, 'AMMO FULL', '#90a4ae');
-        return;
-    }
-    if (powerupCooldowns.reload > 0) {
-        spawnFloatingText(heli.x, heli.y - 40,
-            `COOLING DOWN ${(powerupCooldowns.reload / 1000).toFixed(1)}s`,
-            '#ff9800');
-        return;
-    }
-    if (money < RELOAD_COST) {
-        spawnFloatingText(heli.x, heli.y - 40, 'NOT ENOUGH GOLD', '#ef5350');
-        return;
-    }
-    money -= RELOAD_COST;
-    powerupCooldowns.reload = POWERUP_COOLDOWN_MS;
-    heli.ammo = heli.maxAmmo;
-    spawnFloatingText(heli.x, heli.y - 40, `+${heli.maxAmmo} ROUNDS`, '#ffd54f');
-    for (let i = 0; i < 14; i++) {
-        spawnParticles(heli.x + (Math.random() - 0.5) * 50,
-                       heli.y + (Math.random() - 0.5) * 30,
-                       '#ffeb3b', 1, 1, 14);
-    }
 }
 
 // ---- AIR DEFENCES ----
@@ -612,7 +587,7 @@ function initGame() {
     waveState = 'warning';
     bossSpawnedThisWave = false;
     powerupShieldMs = 0;
-    powerupCooldowns = { airstrike: 0, shield: 0, repair: 0, reload: 0 };
+    powerupCooldowns = { airstrike: 0, shield: 0, repair: 0 };
     upgradeLevels = makeFreshUpgradeLevels();
     frameCount = 0;
     particles = [];
@@ -954,17 +929,20 @@ function helicopterDrop() {
 function heliShoot() {
     if (heli.shootCooldown > 0) return;
     if (heli.ammo <= 0) {
-        // Click on empty — flash a warning periodically while trigger held
+        // Click on empty — quietly fail; the HUD already shows the reload timer
         if (heli.emptyClickCooldown <= 0) {
-            spawnFloatingText(heli.x, heli.y - 40, 'OUT OF AMMO', '#ef5350');
             spawnParticles(heli.x + heli.facing * 25, heli.y + 18, '#9e9e9e', 2, 0.5, 6);
-            heli.emptyClickCooldown = 90;
+            heli.emptyClickCooldown = 30;
         }
         heli.shootCooldown = 6;
         return;
     }
     heli.shootCooldown = 8;
     heli.ammo--;
+    // When the magazine empties, kick off the auto-reload cooldown
+    if (heli.ammo === 0 && heli.reloadMs <= 0) {
+        heli.reloadMs = HELI_RELOAD_MS;
+    }
     const spreadX = (Math.random() - 0.5) * 1.5;
     const spreadY = (Math.random() - 0.5) * 1.5;
     bullets.push({
@@ -1595,6 +1573,19 @@ function update() {
     // Tick down all powerup cooldowns
     for (const k of Object.keys(powerupCooldowns)) {
         if (powerupCooldowns[k] > 0) powerupCooldowns[k] = Math.max(0, powerupCooldowns[k] - 16.67);
+    }
+    // Helicopter auto-reload — when timer hits 0 AND gold is available, refill.
+    // If gold is short the timer just waits at 0 until the player can pay.
+    if (heli.reloadMs > 0) heli.reloadMs = Math.max(0, heli.reloadMs - 16.67);
+    if (heli.ammo === 0 && heli.reloadMs === 0 && money >= RELOAD_COST) {
+        money -= RELOAD_COST;
+        heli.ammo = heli.maxAmmo;
+        spawnFloatingText(heli.x, heli.y - 40, 'RELOADED', '#ffd54f');
+        for (let i = 0; i < 14; i++) {
+            spawnParticles(heli.x + (Math.random() - 0.5) * 50,
+                           heli.y + (Math.random() - 0.5) * 30,
+                           '#ffeb3b', 1, 1, 14);
+        }
     }
 
     // Win/Lose conditions
@@ -3880,22 +3871,44 @@ function drawTopHUD() {
     // Vertical separator
     ctx.beginPath(); ctx.moveTo(leftX + 445, leftY + 8); ctx.lineTo(leftX + 445, leftY + leftH - 8); ctx.stroke();
 
-    // Ammo cell — bullet icon + count + thin bar
+    // Ammo cell — bullet icon + count (or auto-reload countdown when empty)
     iconBullet(leftX + 465, leftY + leftH / 2, 9);
+    const ammoLow = heli.ammo / heli.maxAmmo < 0.25;
+    const isReloading = heli.ammo === 0;
+    const waitingForGold = isReloading && heli.reloadMs <= 0 && money < RELOAD_COST;
+
     ctx.fillStyle = '#ffd54f';
     ctx.font = 'bold 11px "Lilita One", sans-serif';
-    ctx.fillText('AMMO', leftX + 488, leftY + 22);
-    const ammoLow = heli.ammo / heli.maxAmmo < 0.25;
-    ctx.fillStyle = heli.ammo === 0 ? '#ef5350' : (ammoLow ? '#ff9800' : '#fff');
+    ctx.fillText(isReloading ? 'RELOADING' : 'AMMO', leftX + 488, leftY + 22);
+
     ctx.font = 'bold 18px "Lilita One", sans-serif';
-    ctx.fillText(`${heli.ammo} / ${heli.maxAmmo}`, leftX + 488, leftY + 41);
-    // Slim ammo bar at the bottom of the cell
+    if (isReloading) {
+        if (waitingForGold) {
+            ctx.fillStyle = '#ef5350';
+            ctx.fillText('NEED $30', leftX + 488, leftY + 41);
+        } else {
+            ctx.fillStyle = '#ff9800';
+            ctx.fillText(`${(heli.reloadMs / 1000).toFixed(1)}s`, leftX + 488, leftY + 41);
+        }
+    } else {
+        ctx.fillStyle = ammoLow ? '#ff9800' : '#fff';
+        ctx.fillText(`${heli.ammo} / ${heli.maxAmmo}`, leftX + 488, leftY + 41);
+    }
+
+    // Slim bar — ammo level OR reload progress
     const aBarX = leftX + 488, aBarY = leftY + 50, aBarW = 90, aBarH = 4;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     roundRect(aBarX, aBarY, aBarW, aBarH, 2); ctx.fill();
-    const aRatio = heli.ammo / heli.maxAmmo;
-    if (aRatio > 0) {
-        ctx.fillStyle = heli.ammo === 0 ? '#ef5350' : (ammoLow ? '#ff9800' : '#ffeb3b');
+    if (isReloading) {
+        // Fill from empty back to full as the timer counts down
+        const reloadFrac = 1 - (heli.reloadMs / HELI_RELOAD_MS);
+        if (reloadFrac > 0) {
+            ctx.fillStyle = waitingForGold ? '#ef5350' : '#ff9800';
+            roundRect(aBarX, aBarY, aBarW * reloadFrac, aBarH, 2); ctx.fill();
+        }
+    } else if (heli.ammo > 0) {
+        const aRatio = heli.ammo / heli.maxAmmo;
+        ctx.fillStyle = ammoLow ? '#ff9800' : '#ffeb3b';
         roundRect(aBarX, aBarY, aBarW * aRatio, aBarH, 2); ctx.fill();
     }
 
@@ -4326,15 +4339,16 @@ function drawIncomePowerupPanel() {
     ctx.fillText(`+$${incomePerSec} /s`, panelX + 286, panelY + 22);
     ctx.shadowBlur = 0;
 
-    // 4 powerup buttons (airstrike, shield, repair, reload)
-    const btnW = 100, btnH = 56;
+    // 3 powerup buttons (airstrike, shield, repair). Reload is automatic now.
+    const btnW = 130, btnH = 56;
     const btnY = panelY + 42;
-    const startX = panelX + 16;
+    // Right-align the trio in the panel so they sit under the income readout
+    const totalBtnW = 3 * btnW + 2 * 8;
+    const startX = panelX + panelW - totalBtnW - 16;
     const powerups = [
         { id: 'airstrike', icon: iconMissile, cost: POWERUPS.airstrike.cost, action: activateAirstrike },
         { id: 'shield',    icon: iconShield,  cost: POWERUPS.shield.cost,    action: activateShield },
         { id: 'repair',    icon: iconWrench,  cost: POWERUPS.repair.cost,    action: activateRepair },
-        { id: 'reload',    icon: iconBullet,  cost: RELOAD_COST,             action: reloadHeli },
     ];
     for (let i = 0; i < powerups.length; i++) {
         const p = powerups[i];
