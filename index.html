@@ -846,10 +846,11 @@ function helicopterPickupDrop() {
         }
         heli.carrying = [];
     } else {
-        // Pick up nearby friendly infantry
+        // Pick up nearby friendly soldiers (infantry and bazooka). Tanks are too heavy.
         for (let i = units.length - 1; i >= 0; i--) {
             const u = units[i];
-            if (u.team === 'player' && u.type === 'infantry' && heli.carrying.length < heli.maxCarry) {
+            const liftable = u.team === 'player' && (u.type === 'infantry' || u.type === 'bazooka');
+            if (liftable && heli.carrying.length < heli.maxCarry) {
                 const dx = u.x - heli.x;
                 const dy = u.y - heli.y;
                 if (Math.abs(dx) < 60 && Math.abs(dy) < 80) {
