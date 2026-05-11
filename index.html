@@ -3990,11 +3990,11 @@ function drawTopHUD() {
 }
 
 function drawWaveBar() {
-    // Battlefield minimap — shows the full world so the player can see waves
-    // approaching from the right.
+    // Battlefield minimap — fits in the gap between the top-left stats panel
+    // (ends ~x=602) and the top-right enemy/pause panel (starts ~x=898).
     const mapH = 50;
-    const mapX = 510;
-    const mapW = W - 510 - 320;
+    const mapX = 614;
+    const mapW = 272;
     const mapY = 16;
 
     // Backing panel
