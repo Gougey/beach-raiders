@@ -190,10 +190,10 @@ canvas {
     <div id="tagline">Air Cavalry · Ground Assault</div>
     <div class="controls">
         <span class="key">WASD</span> Fly Helicopter<br>
-        <span class="key">SPACE</span> Fire Minigun (auto-reloads when empty)<br>
+        <span class="key">SPACE</span> Fire Minigun / Missiles<br>
         <span class="key">E</span> Pick up troops &nbsp;·&nbsp; <span class="key">T</span> Drop troops (must land)<br>
         <span class="key">1</span> Infantry &nbsp;·&nbsp; <span class="key">2</span> Tank &nbsp;·&nbsp; <span class="key">3</span> Bazooka<br>
-        <span class="key">Q</span> Airstrike &nbsp;·&nbsp; <span class="key">F</span> Shield &nbsp;·&nbsp; <span class="key">R</span> Repair<br>
+        <span class="key">M</span> Buy 2 missiles ($750) — shoot crates for repair/shield<br>
         <span class="key">P</span> / <span class="key">Esc</span> Pause
     </div>
     <button id="start-btn" class="game-btn">DEPLOY</button>
@@ -222,7 +222,7 @@ const GRAVITY = 0.15;
 const HELI_SPEED = 4;
 const BULLET_SPEED = 10;
 const SCROLL_MARGIN = 350;
-const INCOME_RATE = 0.05;          // gold per frame (3 gold/sec passive)
+const INCOME_RATE = 0;             // no passive income — kills + wave clears only
 const CP_REGEN_PER_FRAME = 1 / 90; // 1 Command Point every 1.5 seconds @ 60fps
 const CP_CAP_DEFAULT = 10;
 const FRIENDLY_SPACING = 28;       // min centre-to-centre gap between same-team units
@@ -416,17 +416,40 @@ const WAVE_COMPOSITIONS = [
 ];
 let bossSpawnedThisWave = false;
 
-// ---- POWERUPS ----
-// Active effect timers (ms remaining)
+// ---- MISSILES & SHIELDS ----
+// Shield is still a time-limited base invulnerability, but can only be
+// triggered by destroying a shield crate, not bought from a button.
 let powerupShieldMs = 0;
-const POWERUPS = {
-    airstrike: { cost: 180, key: 'q' },  // 3× original
-    shield:    { cost: 50,  key: 'f' },
-    repair:    { cost: 90,  key: 'r' },  // 3× original
-};
 
-// Cooldown timers (ms remaining) per powerup id, including reload.
-let powerupCooldowns = { airstrike: 0, shield: 0, repair: 0, reload: 0 };
+// Missile purchase: $750 buys 2 missiles loaded into the heli. While missiles
+// are loaded, the minigun trigger fires a missile instead of bullets.
+const MISSILE_PAIR_COST = 750;
+const MISSILES_PER_PURCHASE = 2;
+const MISSILE_DAMAGE = 80;        // damage vs units / heli / bases
+const MISSILE_VS_AA_DAMAGE = 25;  // 4 hits to destroy a 100-HP AA
+
+// ---- CRATES (collectible powerups parachuted onto the map) ----
+const CRATE_HP = 3;               // 3 heli bullets to "open"
+const CRATE_RESPAWN_MS = 20000;   // 20s respawn from same slot
+const CRATE_PARACHUTE_MS = 4000;  // parachute descent duration
+const CRATE_SLOTS = [
+    { type: 'medi',   x: 700 },                       // near home base
+    { type: 'medi',   x: WORLD_WIDTH / 2 },            // centre
+    { type: 'medi',   x: WORLD_WIDTH - 700 },          // near enemy base
+    { type: 'shield', x: 400 },                       // by the player base
+];
+let crates = [];
+
+function resetCrates() {
+    crates = CRATE_SLOTS.map(s => ({
+        ...s,
+        hp: CRATE_HP,
+        state: 'landed',     // 'landed' (interactable) | 'parachuting' (falling) | 'respawning' (invisible)
+        respawnTimer: 0,
+        parachuteMs: 0,
+        y: GROUND_Y - 22,
+    }));
+}
 
 // Buttons hit-rects (filled in during draw, used by click handler)
 let hudHitRects = [];
@@ -456,10 +479,7 @@ document.addEventListener('keydown', e => {
         if (e.key === '3') spawnPlayerUnit('bazooka');
         if (e.key === 'e' || e.key === 'E') helicopterPickup();
         if (e.key === 't' || e.key === 'T') helicopterDrop();
-        // Powerups
-        if (e.key === 'q' || e.key === 'Q') activateAirstrike();
-        if (e.key === 'r' || e.key === 'R') activateRepair();
-        if (e.key === 'f' || e.key === 'F') activateShield();
+        if (e.key === 'm' || e.key === 'M') buyMissiles();
     }
     if (e.key === ' ') e.preventDefault();
 });
@@ -520,9 +540,29 @@ function resetHeli() {
         bobTimer: 0,
         ammo: HELI_MAX_AMMO,
         maxAmmo: HELI_MAX_AMMO,
-        reloadMs: 0,            // > 0 while waiting for the auto-reload to complete
+        reloadMs: 0,
         emptyClickCooldown: 0,
+        missiles: 0,            // loaded missiles; trigger fires these instead of bullets
     };
+}
+
+function buyMissiles() {
+    if (heli.missiles >= MISSILES_PER_PURCHASE) {
+        spawnFloatingText(heli.x, heli.y - 40, 'MISSILES LOADED', '#90a4ae');
+        return;
+    }
+    if (money < MISSILE_PAIR_COST) {
+        spawnFloatingText(heli.x, heli.y - 40, 'NOT ENOUGH GOLD', '#ef5350');
+        return;
+    }
+    money -= MISSILE_PAIR_COST;
+    heli.missiles = MISSILES_PER_PURCHASE;
+    spawnFloatingText(heli.x, heli.y - 40, `+${MISSILES_PER_PURCHASE} MISSILES`, '#ff5722');
+    for (let i = 0; i < 18; i++) {
+        spawnParticles(heli.x + (Math.random() - 0.5) * 60,
+                       heli.y + (Math.random() - 0.5) * 36,
+                       '#ff7043', 1, 1, 16);
+    }
 }
 
 // ---- AIR DEFENCES ----
@@ -575,6 +615,7 @@ function initGame() {
     resetHeli();
     resetBases();
     resetAirDefences();
+    resetCrates();
     money = 30;
     enemyMoney = 50;
     commandPoints = CP_CAP_DEFAULT;
@@ -587,7 +628,6 @@ function initGame() {
     waveState = 'warning';
     bossSpawnedThisWave = false;
     powerupShieldMs = 0;
-    powerupCooldowns = { airstrike: 0, shield: 0, repair: 0 };
     upgradeLevels = makeFreshUpgradeLevels();
     frameCount = 0;
     particles = [];
@@ -928,8 +968,30 @@ function helicopterDrop() {
 // ---- SHOOTING ----
 function heliShoot() {
     if (heli.shootCooldown > 0) return;
+
+    // Missiles take priority — they replace the minigun trigger until used up.
+    if (heli.missiles > 0) {
+        heli.shootCooldown = 28;       // slower fire cadence than minigun
+        heli.missiles--;
+        bullets.push({
+            x: heli.x + heli.facing * 28,
+            y: heli.y + 8,
+            vx: 8 * heli.facing + heli.vx,
+            vy: 0.5 + heli.vy,         // very slight droop so it arcs lazily downward
+            team: 'player',
+            damage: MISSILE_DAMAGE,
+            aaDamage: MISSILE_VS_AA_DAMAGE,
+            life: 140,
+            type: 'heliMissile',
+        });
+        // Launch flash + smoke
+        spawnParticles(heli.x + heli.facing * 28, heli.y + 8, '#ffeb3b', 6, 1, 10);
+        spawnParticles(heli.x + heli.facing * 18, heli.y + 8, '#9e9e9e', 8, 1, 16);
+        triggerScreenShake(3, 8);
+        return;
+    }
+
     if (heli.ammo <= 0) {
-        // Click on empty — quietly fail; the HUD already shows the reload timer
         if (heli.emptyClickCooldown <= 0) {
             spawnParticles(heli.x + heli.facing * 25, heli.y + 18, '#9e9e9e', 2, 0.5, 6);
             heli.emptyClickCooldown = 30;
@@ -939,7 +1001,6 @@ function heliShoot() {
     }
     heli.shootCooldown = 8;
     heli.ammo--;
-    // When the magazine empties, kick off the auto-reload cooldown
     if (heli.ammo === 0 && heli.reloadMs <= 0) {
         heli.reloadMs = HELI_RELOAD_MS;
     }
@@ -1074,62 +1135,8 @@ function spawnDustCloud(x, y) {
 
 // ---- POWERUPS ----
 
-// Returns true and triggers the cooldown if the powerup is allowed to fire.
-// Returns false (with a hint) if it's still on cooldown or unaffordable.
-function tryStartPowerup(id, cost) {
-    if (powerupCooldowns[id] > 0) {
-        spawnFloatingText(heli.x, heli.y - 40,
-            `COOLING DOWN ${(powerupCooldowns[id] / 1000).toFixed(1)}s`,
-            '#ff9800');
-        return false;
-    }
-    if (money < cost) {
-        spawnFloatingText(heli.x, heli.y - 40, 'NOT ENOUGH GOLD', '#ef5350');
-        return false;
-    }
-    money -= cost;
-    powerupCooldowns[id] = POWERUP_COOLDOWN_MS;
-    return true;
-}
-
-function activateAirstrike() {
-    if (!tryStartPowerup('airstrike', POWERUPS.airstrike.cost)) return;
-    // Find the densest enemy cluster, drop 4 missiles on the area
-    let targetX = enemyBase.x;  // default to enemy base
-    if (units.some(u => u.team === 'enemy')) {
-        const xs = units.filter(u => u.team === 'enemy').map(u => u.x);
-        targetX = xs.reduce((a, b) => a + b, 0) / xs.length;
-    }
-    for (let i = 0; i < 4; i++) {
-        const lx = targetX + (i - 1.5) * 60;
-        bullets.push({
-            x: lx, y: -50,
-            vx: 0, vy: 8,
-            team: 'player',
-            damage: 60,
-            life: 200,
-            type: 'rocket',
-            airstrike: true,
-        });
-    }
-}
-
-function activateShield() {
-    if (!tryStartPowerup('shield', POWERUPS.shield.cost)) return;
-    powerupShieldMs = 8000;
-}
-
-function activateRepair() {
-    if (!tryStartPowerup('repair', POWERUPS.repair.cost)) return;
-    playerBase.hp = Math.min(playerBase.maxHp, playerBase.hp + playerBase.maxHp * 0.3);
-    heli.hp = Math.min(heli.maxHp, heli.hp + heli.maxHp * 0.3);
-    for (let i = 0; i < 12; i++) {
-        spawnParticles(playerBase.x + (Math.random() - 0.5) * 80,
-                       GROUND_Y - 30 - Math.random() * 60,
-                       '#69f0ae', 2, 1, 20);
-    }
-    spawnParticles(heli.x, heli.y, '#69f0ae', 8, 1, 18);
-}
+// (Airstrike / shield / repair button-powerups removed — replaced by
+//  collectible map crates and the missile purchase system.)
 
 // ---- UPDATE ----
 function update() {
@@ -1312,7 +1319,13 @@ function update() {
         b.y += b.vy;
         if (b.type === 'shell') b.vy += 0.05;
         if (b.type === 'rocket') b.vy += 0.03;
-        if (b.type === 'heli') b.vy += 0.35;     // arc into ground troops
+        if (b.type === 'heli') b.vy += 0.35;        // arc into ground troops
+        if (b.type === 'heliMissile') {
+            b.vy += 0.06;                          // gentle droop
+            // Thick smoke + fire trail every frame
+            spawnParticles(b.x - b.vx * 0.2, b.y - b.vy * 0.2, '#ff9800', 1, 0.3, 12);
+            spawnParticles(b.x - b.vx * 0.4, b.y - b.vy * 0.4, '#9e9e9e', 1, 0.3, 18);
+        }
         b.life--;
 
         if (b.life <= 0) { bullets.splice(i, 1); continue; }
@@ -1331,6 +1344,10 @@ function update() {
                 let dmg = b.damage;
                 if (b.shooterType) dmg = applyDamageModifier(b.shooterType, u.type, dmg);
                 u.hp -= dmg;
+                if (b.type === 'heliMissile') {
+                    spawnExplosion(b.x, b.y, 4);
+                    triggerScreenShake(4, 10);
+                }
                 // Tank shells splash — small AoE damage to nearby same-side enemies
                 if (b.type === 'shell') {
                     for (const other of units) {
@@ -1350,9 +1367,48 @@ function update() {
             }
         }
 
+        // Hit detection — crates. Only player heli rounds (minigun + missile)
+        // can damage crates; ground troops can't reach them mechanically.
+        if (!hit && b.team === 'player' && (b.type === 'heli' || b.type === 'heliMissile')) {
+            for (const c of crates) {
+                if (c.state !== 'landed') continue;
+                if (Math.abs(b.x - c.x) < 20 && Math.abs(b.y - (c.y - 6)) < 22) {
+                    c.hp--;
+                    spawnParticles(b.x, b.y, c.type === 'medi' ? '#ef5350' : '#42a5f5',
+                                   4, 1, 8);
+                    if (c.hp <= 0) {
+                        // Crate consumed — apply effect + start respawn
+                        if (c.type === 'medi') {
+                            heli.hp = Math.min(heli.maxHp, heli.hp + heli.maxHp * 0.3);
+                            spawnFloatingText(c.x, c.y - 30, '+30% HELI HP', '#69f0ae');
+                            for (let i = 0; i < 14; i++) {
+                                spawnParticles(c.x + (Math.random() - 0.5) * 30,
+                                               c.y + (Math.random() - 0.5) * 20,
+                                               '#69f0ae', 1, 1, 18);
+                            }
+                        } else if (c.type === 'shield') {
+                            powerupShieldMs = 8000;
+                            spawnFloatingText(c.x, c.y - 30, 'BASE SHIELD 8s', '#42a5f5');
+                            for (let i = 0; i < 18; i++) {
+                                spawnParticles(c.x + (Math.random() - 0.5) * 40,
+                                               c.y + (Math.random() - 0.5) * 30,
+                                               '#42a5f5', 1, 1, 18);
+                            }
+                        }
+                        spawnExplosion(c.x, c.y, 2);
+                        c.state = 'respawning';
+                        c.respawnTimer = CRATE_RESPAWN_MS;
+                    }
+                    hit = true;
+                    break;
+                }
+            }
+        }
+
         // Hit detection — air defence batteries (player projectiles).
-        // ONLY ground-troop projectiles damage AA (b.shooterType is set).
-        // Heli minigun and airstrike missiles spark off harmlessly.
+        // Ground troop bullets damage AA (RPS modifier applies).
+        // Heli MISSILES damage AA at a fixed rate (4 hits to kill).
+        // Heli MINIGUN sparks off harmlessly.
         if (!hit && b.team === 'player') {
             for (const aa of airDefences) {
                 if (aa.hp <= 0) continue;
@@ -1361,14 +1417,16 @@ function update() {
                                          || b.shooterType === 'bazooka'
                                          || b.shooterType === 'tank';
                     if (fromGroundUnit) {
-                        let dmg = b.damage;
-                        // Treat AA roughly like a tank for RPS (so bazookas shred them)
-                        dmg = applyDamageModifier(b.shooterType, 'tank', dmg);
+                        let dmg = applyDamageModifier(b.shooterType, 'tank', b.damage);
                         aa.hp -= dmg;
                         spawnParticles(b.x, b.y, C.explosion1, 4, 1, 8);
                         if (b.type === 'shell') spawnExplosion(b.x, b.y, 2);
+                    } else if (b.type === 'heliMissile') {
+                        aa.hp -= b.aaDamage || MISSILE_VS_AA_DAMAGE;
+                        spawnExplosion(b.x, b.y, 4);
+                        triggerScreenShake(4, 10);
                     } else {
-                        // Spark off — heli minigun / airstrike harmless to AA
+                        // Spark off — heli minigun harmless to AA
                         spawnParticles(b.x, b.y, '#9e9e9e', 3, 1, 6);
                         spawnParticles(b.x, b.y, '#fff', 2, 1, 4);
                     }
@@ -1473,6 +1531,28 @@ function update() {
         if (l.y > GROUND_Y) ambientParticles.splice(i, 1);
     }
 
+    // Crates — tick respawn timers and parachute descents
+    for (const c of crates) {
+        if (c.state === 'respawning') {
+            c.respawnTimer -= 16.67;
+            if (c.respawnTimer <= 0) {
+                c.state = 'parachuting';
+                c.parachuteMs = CRATE_PARACHUTE_MS;
+                c.y = 40;  // start near top of screen
+            }
+        } else if (c.state === 'parachuting') {
+            c.parachuteMs -= 16.67;
+            const fall = (1 - c.parachuteMs / CRATE_PARACHUTE_MS);
+            c.y = 40 + fall * (GROUND_Y - 22 - 40);
+            if (c.parachuteMs <= 0) {
+                c.state = 'landed';
+                c.y = GROUND_Y - 22;
+                c.hp = CRATE_HP;
+                spawnParticles(c.x, c.y + 8, '#9e9e9e', 6, 1, 14);  // dust on landing
+            }
+        }
+    }
+
     // Air defence batteries — fire homing missiles at the heli when in range
     for (let i = airDefences.length - 1; i >= 0; i--) {
         const aa = airDefences[i];
@@ -1570,10 +1650,6 @@ function update() {
     }
     // Decay shield powerup
     if (powerupShieldMs > 0) powerupShieldMs = Math.max(0, powerupShieldMs - 16.67);
-    // Tick down all powerup cooldowns
-    for (const k of Object.keys(powerupCooldowns)) {
-        if (powerupCooldowns[k] > 0) powerupCooldowns[k] = Math.max(0, powerupCooldowns[k] - 16.67);
-    }
     // Helicopter auto-reload — when timer hits 0 AND gold is available, refill.
     // If gold is short the timer just waits at 0 until the player can pay.
     if (heli.reloadMs > 0) heli.reloadMs = Math.max(0, heli.reloadMs - 16.67);
@@ -2442,6 +2518,113 @@ function shadeColor(color, percent) {
     const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + percent));
     const b = Math.min(255, Math.max(0, (num & 0xff) + percent));
     return `rgb(${r},${g},${b})`;
+}
+
+function drawCrate(c) {
+    if (c.state === 'respawning') {
+        // Invisible while waiting to redrop. Show a small ghost marker so
+        // the player can see WHERE it'll respawn.
+        const sx = c.x - cameraX;
+        if (sx < -30 || sx > W + 30) return;
+        const pulse = 0.4 + 0.3 * Math.sin(frameCount * 0.12);
+        ctx.save();
+        ctx.globalAlpha = pulse;
+        ctx.strokeStyle = c.type === 'medi' ? '#ef5350' : '#42a5f5';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(sx - 14, GROUND_Y - 22, 28, 22);
+        ctx.setLineDash([]);
+        // Countdown
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px "Lilita One", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${(c.respawnTimer / 1000).toFixed(0)}s`, sx, GROUND_Y - 8);
+        ctx.restore();
+        return;
+    }
+
+    const sx = c.x - cameraX;
+    if (sx < -60 || sx > W + 60) return;
+    const sy = c.y;
+
+    // Parachute (only while descending)
+    if (c.state === 'parachuting') {
+        ctx.save();
+        // Strings
+        ctx.strokeStyle = '#3e2723';
+        ctx.lineWidth = 1.2;
+        for (let dx of [-12, -4, 4, 12]) {
+            ctx.beginPath();
+            ctx.moveTo(sx + dx, sy - 8);
+            ctx.lineTo(sx + dx * 1.6, sy - 32);
+            ctx.stroke();
+        }
+        // Canopy
+        ctx.fillStyle = c.type === 'medi' ? '#ef5350' : '#42a5f5';
+        ctx.strokeStyle = '#0a1628';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(sx, sy - 32, 24, Math.PI, 0);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        // White stripe centre on the canopy
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(sx - 3, sy - 32 - 24, 6, 24);
+        ctx.restore();
+    }
+
+    // Crate body — wooden chest with metal bands
+    ctx.save();
+    ctx.fillStyle = '#6d4c41';
+    ctx.strokeStyle = '#3e2723';
+    ctx.lineWidth = 2;
+    ctx.fillRect(sx - 14, sy - 16, 28, 22);
+    ctx.strokeRect(sx - 14, sy - 16, 28, 22);
+    // Plank seams
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx - 14, sy - 4); ctx.lineTo(sx + 14, sy - 4); ctx.stroke();
+    // Metal corner brackets
+    ctx.strokeStyle = '#9e9e9e';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx - 13, sy - 15, 4, 4);
+    ctx.strokeRect(sx + 9, sy - 15, 4, 4);
+    ctx.strokeRect(sx - 13, sy + 1, 4, 4);
+    ctx.strokeRect(sx + 9, sy + 1, 4, 4);
+
+    // Symbol on the lid
+    if (c.type === 'medi') {
+        // Red cross
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(sx - 8, sy - 12, 16, 14);
+        ctx.fillStyle = '#e53935';
+        ctx.fillRect(sx - 2, sy - 11, 4, 12);
+        ctx.fillRect(sx - 7, sy - 7, 14, 4);
+    } else if (c.type === 'shield') {
+        // Blue shield
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(sx - 8, sy - 12, 16, 14);
+        ctx.fillStyle = '#1976d2';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - 11);
+        ctx.lineTo(sx + 6, sy - 8);
+        ctx.quadraticCurveTo(sx + 6, sy + 1, sx, sy + 2);
+        ctx.quadraticCurveTo(sx - 6, sy + 1, sx - 6, sy - 8);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // HP pips above the crate when damaged
+    if (c.state === 'landed' && c.hp < CRATE_HP) {
+        for (let i = 0; i < CRATE_HP; i++) {
+            ctx.fillStyle = i < c.hp ? '#69f0ae' : 'rgba(255,255,255,0.2)';
+            ctx.beginPath();
+            ctx.arc(sx - 8 + i * 8, sy - 24, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    ctx.restore();
 }
 
 function drawAirDefence(aa) {
@@ -3340,6 +3523,42 @@ function drawBullets() {
             // Smoke trail
             spawnParticles(b.x, b.y, '#aaa', 1, 0.3, 8);
             spawnParticles(b.x - b.vx, b.y - b.vy, '#ff9800', 1, 0.5, 5);
+        } else if (b.type === 'heliMissile') {
+            // Player's bought missile — fat red rocket streaking forward
+            const ang = Math.atan2(b.vy, b.vx);
+            ctx.save();
+            ctx.translate(sx, b.y);
+            ctx.rotate(ang);
+            ctx.fillStyle = '#fafafa';
+            ctx.strokeStyle = '#0a1628';
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(-12, -3, 18, 6);
+            ctx.strokeRect(-12, -3, 18, 6);
+            // Red nose
+            ctx.fillStyle = '#e53935';
+            ctx.beginPath();
+            ctx.moveTo(6, -3);
+            ctx.lineTo(14, 0);
+            ctx.lineTo(6, 3);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            // Fins
+            ctx.fillStyle = '#e53935';
+            ctx.beginPath();
+            ctx.moveTo(-12, -3); ctx.lineTo(-16, -7); ctx.lineTo(-9, -3);
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-12, 3); ctx.lineTo(-16, 7); ctx.lineTo(-9, 3);
+            ctx.closePath(); ctx.fill();
+            // Flame at the back
+            ctx.fillStyle = '#ffeb3b';
+            ctx.beginPath();
+            ctx.moveTo(-12, -2);
+            ctx.lineTo(-18 - Math.random() * 4, 0);
+            ctx.lineTo(-12, 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
         } else if (b.type === 'aamissile') {
             // Long thin missile streaking toward the heli
             const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
@@ -4381,82 +4600,51 @@ function drawIncomePowerupPanel() {
 
     ctx.fillStyle = '#90caf9';
     ctx.font = 'bold 11px "Lilita One", sans-serif';
-    ctx.fillText('INCOME', panelX + 220, panelY + 22);
-    ctx.fillStyle = '#69f0ae';
-    ctx.font = 'bold 18px "Lilita One", sans-serif';
-    const incomePerSec = Math.round(INCOME_RATE * 60);
-    ctx.fillText(`+$${incomePerSec} /s`, panelX + 286, panelY + 22);
+    ctx.fillText('FROM KILLS', panelX + 220, panelY + 22);
     ctx.shadowBlur = 0;
 
-    // 3 powerup buttons (airstrike, shield, repair). Reload is automatic now.
-    const btnW = 130, btnH = 56;
+    // Single big button: buy missiles. Crates are picked up on the map, no
+    // longer buttons. Right-aligned under the income readout.
+    const btnW = 200, btnH = 56;
     const btnY = panelY + 42;
-    // Right-align the trio in the panel so they sit under the income readout
-    const totalBtnW = 3 * btnW + 2 * 8;
-    const startX = panelX + panelW - totalBtnW - 16;
-    const powerups = [
-        { id: 'airstrike', icon: iconMissile, cost: POWERUPS.airstrike.cost, action: activateAirstrike },
-        { id: 'shield',    icon: iconShield,  cost: POWERUPS.shield.cost,    action: activateShield },
-        { id: 'repair',    icon: iconWrench,  cost: POWERUPS.repair.cost,    action: activateRepair },
-    ];
-    for (let i = 0; i < powerups.length; i++) {
-        const p = powerups[i];
-        const bx = startX + i * (btnW + 8);
-        const cdMs = powerupCooldowns[p.id] || 0;
-        const onCooldown = cdMs > 0;
-        const canAfford = money >= p.cost;
-        const enabled = canAfford && !onCooldown;
+    const bx = panelX + panelW - btnW - 16;
+    const loaded = heli.missiles > 0;
+    const canAfford = money >= MISSILE_PAIR_COST;
+    const enabled = canAfford && !loaded;
 
-        bevelButton(bx, btnY, btnW, btnH, {
-            radius: 12,
-            top:    enabled ? 'rgba(35, 50, 85, 0.95)' : 'rgba(40, 40, 50, 0.85)',
-            bottom: enabled ? 'rgba(15, 25, 55, 0.95)' : 'rgba(20, 20, 30, 0.85)',
-        });
+    bevelButton(bx, btnY, btnW, btnH, {
+        radius: 12,
+        top:    enabled ? 'rgba(35, 50, 85, 0.95)' : 'rgba(40, 40, 50, 0.85)',
+        bottom: enabled ? 'rgba(15, 25, 55, 0.95)' : 'rgba(20, 20, 30, 0.85)',
+    });
 
-        // Icon
-        ctx.save();
-        if (!enabled) ctx.globalAlpha = 0.45;
-        if (p.id === 'shield') {
-            iconShield(bx + btnW / 2, btnY + btnH / 2 - 4, 14, '#42a5f5');
-        } else {
-            p.icon(bx + btnW / 2, btnY + btnH / 2 - 4, 18);
-        }
-        ctx.restore();
+    // Missile icon (paired rockets)
+    ctx.save();
+    if (!enabled) ctx.globalAlpha = 0.45;
+    iconMissile(bx + 40, btnY + btnH / 2 - 4, 20);
+    ctx.restore();
 
-        // Cost or cooldown countdown
-        ctx.font = 'bold 16px "Lilita One", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        if (onCooldown) {
-            ctx.fillStyle = '#ff9800';
-            ctx.fillText(`${(cdMs / 1000).toFixed(1)}s`, bx + btnW / 2, btnY + btnH - 12);
-        } else {
-            ctx.fillStyle = canAfford ? '#69f0ae' : '#888';
-            ctx.fillText(`$${p.cost}`, bx + btnW / 2, btnY + btnH - 12);
-        }
-        ctx.shadowBlur = 0;
-
-        // Cooldown sweep arc — visualises cooldown as a clockwise sweep
-        if (onCooldown) {
-            const cx = bx + btnW / 2;
-            const cy = btnY + btnH / 2 - 4;
-            const r = 18;
-            const fraction = cdMs / POWERUP_COOLDOWN_MS;
-            ctx.save();
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + fraction * Math.PI * 2);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-        }
-
-        hudHitRects.push({ x: bx, y: btnY, w: btnW, h: btnH, action: p.action });
+    // Label + cost
+    ctx.font = 'bold 13px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('MISSILES ×2', bx + 76, btnY + 20);
+    ctx.font = 'bold 22px "Lilita One", sans-serif';
+    if (loaded) {
+        ctx.fillStyle = '#ff5722';
+        ctx.fillText(`LOADED ${heli.missiles}/${MISSILES_PER_PURCHASE}`,
+                     bx + 76, btnY + 42);
+    } else {
+        ctx.fillStyle = canAfford ? '#69f0ae' : '#888';
+        ctx.fillText(`$${MISSILE_PAIR_COST}`, bx + 76, btnY + 42);
     }
+    ctx.shadowBlur = 0;
 
-    // Active shield indicator
+    hudHitRects.push({ x: bx, y: btnY, w: btnW, h: btnH, action: buyMissiles });
+
+    // Active shield indicator (top-right of panel, set by destroying a crate)
     if (powerupShieldMs > 0) {
         ctx.fillStyle = '#42a5f5';
         ctx.font = 'bold 11px "Lilita One", sans-serif';
@@ -4698,6 +4886,9 @@ function render() {
 
     // Air defence batteries
     for (const aa of airDefences) drawAirDefence(aa);
+
+    // Crates (drawn after structures so they sit on top of the beach)
+    for (const c of crates) drawCrate(c);
 
     // Units
     for (const u of units) {
