@@ -190,10 +190,10 @@ canvas {
     <div id="tagline">Air Cavalry · Ground Assault</div>
     <div class="controls">
         <span class="key">WASD</span> Fly Helicopter<br>
-        <span class="key">SPACE</span> Fire Minigun / Missiles<br>
+        <span class="key">SPACE</span> Fire Minigun / Missiles &nbsp;(ammo trickles back +1/sec)<br>
         <span class="key">E</span> Pick up troops &nbsp;·&nbsp; <span class="key">T</span> Drop troops (must land)<br>
-        <span class="key">1</span> Infantry &nbsp;·&nbsp; <span class="key">2</span> Tank &nbsp;·&nbsp; <span class="key">3</span> Bazooka<br>
-        <span class="key">M</span> Buy 2 missiles ($750) — shoot crates for repair/shield<br>
+        <span class="key">1</span> Infantry &nbsp;·&nbsp; <span class="key">2</span> Bazooka &nbsp;·&nbsp; <span class="key">3</span> Tank<br>
+        <span class="key">4</span> / <span class="key">M</span> Buy 2 missiles ($100) &nbsp;·&nbsp; Shoot crates for repair/shield<br>
         <span class="key">P</span> / <span class="key">Esc</span> Pause
     </div>
     <button id="start-btn" class="game-btn">DEPLOY</button>
@@ -423,7 +423,7 @@ let powerupShieldMs = 0;
 
 // Missile purchase: $750 buys 2 missiles loaded into the heli. While missiles
 // are loaded, the minigun trigger fires a missile instead of bullets.
-const MISSILE_PAIR_COST = 750;
+const MISSILE_PAIR_COST = 100;
 const MISSILES_PER_PURCHASE = 2;
 const MISSILE_DAMAGE = 80;        // damage vs units / heli / bases
 const MISSILE_VS_AA_DAMAGE = 25;  // 4 hits to destroy a 100-HP AA
@@ -475,8 +475,9 @@ document.addEventListener('keydown', e => {
     }
     if (gameState === 'playing') {
         if (e.key === '1') spawnPlayerUnit('infantry');
-        if (e.key === '2') spawnPlayerUnit('tank');
-        if (e.key === '3') spawnPlayerUnit('bazooka');
+        if (e.key === '2') spawnPlayerUnit('bazooka');
+        if (e.key === '3') spawnPlayerUnit('tank');
+        if (e.key === '4') buyMissiles();
         if (e.key === 'e' || e.key === 'E') helicopterPickup();
         if (e.key === 't' || e.key === 'T') helicopterDrop();
         if (e.key === 'm' || e.key === 'M') buyMissiles();
@@ -521,10 +522,8 @@ document.getElementById('restart-btn').addEventListener('click', () => {
 
 // ---- HELICOPTER ----
 let heli = {};
-const HELI_MAX_AMMO = 25;
-const HELI_RELOAD_MS = 10000;          // auto-reload after this delay when ammo hits 0
-const RELOAD_COST = 30;                // gold deducted when the auto-reload completes
-const POWERUP_COOLDOWN_MS = 10000;     // 10 seconds for all powerup buttons
+const HELI_MAX_AMMO = 30;
+const HELI_AMMO_REGEN_MS = 1000;       // +1 bullet per second, up to HELI_MAX_AMMO
 const HELI_LANDING_Y = GROUND_Y - 50;  // heli must be at/below this y to drop troops
 
 function resetHeli() {
@@ -540,9 +539,9 @@ function resetHeli() {
         bobTimer: 0,
         ammo: HELI_MAX_AMMO,
         maxAmmo: HELI_MAX_AMMO,
-        reloadMs: 0,
+        ammoRegenMs: 0,        // accumulator — when it crosses 1000ms, +1 bullet
         emptyClickCooldown: 0,
-        missiles: 0,            // loaded missiles; trigger fires these instead of bullets
+        missiles: 0,           // loaded missiles; trigger fires these instead of bullets
     };
 }
 
@@ -1001,9 +1000,6 @@ function heliShoot() {
     }
     heli.shootCooldown = 8;
     heli.ammo--;
-    if (heli.ammo === 0 && heli.reloadMs <= 0) {
-        heli.reloadMs = HELI_RELOAD_MS;
-    }
     const spreadX = (Math.random() - 0.5) * 1.5;
     const spreadY = (Math.random() - 0.5) * 1.5;
     bullets.push({
@@ -1650,18 +1646,15 @@ function update() {
     }
     // Decay shield powerup
     if (powerupShieldMs > 0) powerupShieldMs = Math.max(0, powerupShieldMs - 16.67);
-    // Helicopter auto-reload — when timer hits 0 AND gold is available, refill.
-    // If gold is short the timer just waits at 0 until the player can pay.
-    if (heli.reloadMs > 0) heli.reloadMs = Math.max(0, heli.reloadMs - 16.67);
-    if (heli.ammo === 0 && heli.reloadMs === 0 && money >= RELOAD_COST) {
-        money -= RELOAD_COST;
-        heli.ammo = heli.maxAmmo;
-        spawnFloatingText(heli.x, heli.y - 40, 'RELOADED', '#ffd54f');
-        for (let i = 0; i < 14; i++) {
-            spawnParticles(heli.x + (Math.random() - 0.5) * 50,
-                           heli.y + (Math.random() - 0.5) * 30,
-                           '#ffeb3b', 1, 1, 14);
+    // Helicopter ammo trickles back: +1 bullet per second up to max.
+    if (heli.ammo < heli.maxAmmo) {
+        heli.ammoRegenMs += 16.67;
+        while (heli.ammoRegenMs >= HELI_AMMO_REGEN_MS && heli.ammo < heli.maxAmmo) {
+            heli.ammoRegenMs -= HELI_AMMO_REGEN_MS;
+            heli.ammo++;
         }
+    } else {
+        heli.ammoRegenMs = 0;
     }
 
     // Win/Lose conditions
@@ -4046,65 +4039,41 @@ function drawHUD() {
 // ----- Top HUD -----
 
 function drawTopHUD() {
-    // === LEFT — money / base hp / heli hp / ammo combined panel ===
+    // === LEFT — compact heli status (HP + ammo only) ===
     const leftX = 12, leftY = 12;
-    const leftW = 590, leftH = 60;
+    const leftW = 290, leftH = 60;
     hudPanel(leftX, leftY, leftW, leftH);
 
-    // Money cell
-    iconCoin(leftX + 32, leftY + leftH / 2, 16);
-    ctx.fillStyle = '#ffd54f';
-    ctx.font = 'bold 26px "Lilita One", sans-serif';
+    // Heli HP cell
+    iconCross(leftX + 22, leftY + leftH / 2, 11);
+    ctx.fillStyle = '#a5d6a7';
+    ctx.font = 'bold 11px "Lilita One", sans-serif';
     ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'alphabetic';
     ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.fillText(Math.floor(money).toString(), leftX + 56, leftY + leftH / 2 + 1);
-    ctx.shadowBlur = 0;
+    ctx.fillText('HELI HP', leftX + 44, leftY + 22);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.fillText(`${Math.max(0, Math.ceil(heli.hp))} / ${heli.maxHp}`,
+                 leftX + 44, leftY + 41);
 
     // Vertical separator
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(leftX + 145, leftY + 8); ctx.lineTo(leftX + 145, leftY + leftH - 8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(leftX + 150, leftY + 8);
+    ctx.lineTo(leftX + 150, leftY + leftH - 8);
+    ctx.stroke();
 
-    // Base HP cell
-    iconShield(leftX + 165, leftY + leftH / 2, 13, '#42a5f5');
-    ctx.fillStyle = '#90caf9';
-    ctx.font = 'bold 11px "Lilita One", sans-serif';
-    ctx.fillText('BASE HP', leftX + 188, leftY + 22);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 18px "Lilita One", sans-serif';
-    ctx.fillText(`${Math.max(0, Math.ceil(playerBase.hp))} / ${playerBase.maxHp}`, leftX + 188, leftY + 41);
-
-    // Vertical separator
-    ctx.beginPath(); ctx.moveTo(leftX + 305, leftY + 8); ctx.lineTo(leftX + 305, leftY + leftH - 8); ctx.stroke();
-
-    // Heli HP cell
-    iconCross(leftX + 325, leftY + leftH / 2, 11);
-    ctx.fillStyle = '#a5d6a7';
-    ctx.font = 'bold 11px "Lilita One", sans-serif';
-    ctx.fillText('HELI HP', leftX + 348, leftY + 22);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 18px "Lilita One", sans-serif';
-    ctx.fillText(`${Math.max(0, Math.ceil(heli.hp))} / ${heli.maxHp}`, leftX + 348, leftY + 41);
-
-    // Vertical separator
-    ctx.beginPath(); ctx.moveTo(leftX + 445, leftY + 8); ctx.lineTo(leftX + 445, leftY + leftH - 8); ctx.stroke();
-
-    // === Ammo cell ===
-    // Layout matches the other cells (Base HP, Heli HP):
-    //   icon | label "AMMO" | big number "X / 25"
-    // While reloading: dim the icon and draw a sweep-arc cooldown around it
-    // (same visual language as the powerup buttons), and switch the big
-    // number to the timer countdown so it stays as prominent as the count.
+    // === Ammo cell — trickle reload, no purchase needed ===
     const ammoLow = heli.ammo / heli.maxAmmo < 0.25;
-    const isReloading = heli.ammo === 0;
-    const waitingForGold = isReloading && heli.reloadMs <= 0 && money < RELOAD_COST;
+    const ammoEmpty = heli.ammo === 0;
 
-    const ammoIconX = leftX + 470;
+    const ammoIconX = leftX + 172;
     const ammoIconY = leftY + leftH / 2;
     const ammoArcR = 19;
 
-    // Soft circular backing — makes the icon read as a distinct element
+    // Soft circular backing
     ctx.save();
     ctx.fillStyle = 'rgba(255, 193, 7, 0.10)';
     ctx.beginPath();
@@ -4112,94 +4081,41 @@ function drawTopHUD() {
     ctx.fill();
     ctx.restore();
 
-    ctx.save();
-    if (isReloading) ctx.globalAlpha = 0.45;
     iconBullet(ammoIconX, ammoIconY, 12);
-    ctx.restore();
 
-    // Sweep-arc cooldown around the bullet icon (matches powerup button style)
-    if (isReloading && !waitingForGold) {
-        const fraction = heli.reloadMs / HELI_RELOAD_MS;
-        ctx.save();
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    // Steady gold ring — and a thin yellow sweep showing the next-bullet
+    // regen progress so the player can see ammo ticking back up.
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 193, 7, 0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(ammoIconX, ammoIconY, ammoArcR, 0, Math.PI * 2);
+    ctx.stroke();
+    if (heli.ammo < heli.maxAmmo) {
+        const frac = Math.min(1, heli.ammoRegenMs / HELI_AMMO_REGEN_MS);
+        ctx.strokeStyle = '#ffeb3b';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.moveTo(ammoIconX, ammoIconY);
         ctx.arc(ammoIconX, ammoIconY, ammoArcR,
                 -Math.PI / 2,
-                -Math.PI / 2 + fraction * Math.PI * 2);
-        ctx.closePath();
-        ctx.fill();
-        // Bright outline ring so it pops
-        ctx.strokeStyle = '#ff9800';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(ammoIconX, ammoIconY, ammoArcR, 0, Math.PI * 2);
+                -Math.PI / 2 + frac * Math.PI * 2);
         ctx.stroke();
-        ctx.restore();
-    } else if (waitingForGold) {
-        // Pulsing red ring when stuck waiting for gold
-        const pulse = 0.5 + 0.5 * Math.sin(frameCount * 0.18);
-        ctx.save();
-        ctx.strokeStyle = `rgba(239, 83, 80, ${0.6 + pulse * 0.4})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(ammoIconX, ammoIconY, ammoArcR, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-    } else {
-        // Steady gold ring when ammo present, helps the cell read as a unit
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255, 193, 7, 0.55)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(ammoIconX, ammoIconY, ammoArcR, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
     }
+    ctx.restore();
 
-    // Header label
-    ctx.fillStyle = isReloading ? '#ff9800' : '#ffd54f';
+    // Label + count
+    ctx.fillStyle = '#ffd54f';
     ctx.font = 'bold 11px "Lilita One", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(isReloading ? (waitingForGold ? 'NEED $30' : 'RELOADING') : 'AMMO',
-                 leftX + 488, leftY + 22);
-
-    // Big number — always shows exact bullet count.
-    // While reloading we add the timer alongside so both are visible.
+    ctx.fillText('AMMO', leftX + 195, leftY + 22);
     ctx.font = 'bold 18px "Lilita One", sans-serif';
-    ctx.fillStyle = isReloading ? '#ef5350' : (ammoLow ? '#ff9800' : '#fff');
-    ctx.fillText(`${heli.ammo} / ${heli.maxAmmo}`, leftX + 488, leftY + 41);
+    ctx.fillStyle = ammoEmpty ? '#ef5350' : (ammoLow ? '#ff9800' : '#fff');
+    ctx.fillText(`${heli.ammo} / ${heli.maxAmmo}`, leftX + 195, leftY + 41);
+    ctx.shadowBlur = 0;
 
-    // While reloading, show the countdown on the same line, right-aligned
-    if (isReloading && !waitingForGold) {
-        ctx.fillStyle = '#ff9800';
-        ctx.font = 'bold 16px "Lilita One", sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText(`${(heli.reloadMs / 1000).toFixed(1)}s`,
-                     leftX + 580, leftY + 41);
-        ctx.textAlign = 'left';
-    }
-
-    // === CENTER — wave progress bar ===
+    // === CENTER — battlefield minimap (much wider now) ===
     drawWaveBar();
 
-    // === RIGHT — enemy base panel ===
-    const rightW = 220, rightH = 60;
-    const rightX = W - rightW - 70 - 12;  // leave room for pause button
-    const rightY = 12;
-    hudPanel(rightX, rightY, rightW, rightH);
-
-    iconCastle(rightX + 30, rightY + rightH / 2, 16);
-    ctx.fillStyle = '#ef9a9a';
-    ctx.font = 'bold 11px "Lilita One", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('ENEMY BASE HP', rightX + 56, rightY + 22);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 18px "Lilita One", sans-serif';
-    ctx.fillText(`${Math.max(0, Math.ceil(enemyBase.hp))} / ${enemyBase.maxHp}`,
-                 rightX + 56, rightY + 41);
-
-    // === Pause button ===
+    // === Pause button (top right) ===
     const pauseSize = 48;
     const pauseX = W - pauseSize - 14;
     const pauseY = 18;
@@ -4209,11 +4125,12 @@ function drawTopHUD() {
 }
 
 function drawWaveBar() {
-    // Battlefield minimap — fits in the gap between the top-left stats panel
-    // (ends ~x=602) and the top-right enemy/pause panel (starts ~x=898).
+    // Battlefield minimap — fills the space between the compact heli/ammo
+    // panel on the left (ends ~x=302) and the pause button on the right
+    // (starts ~x=1138). Much wider now that base HP cells are gone.
     const mapH = 50;
-    const mapX = 614;
-    const mapW = 272;
+    const mapX = 320;
+    const mapW = 808;
     const mapY = 16;
 
     // Backing panel
@@ -4471,8 +4388,8 @@ function drawDeployPanel() {
     // 3 unit cards (cost = Command Points, not gold)
     const cards = [
         { key: '1', cpCost: UNIT_DEFS.infantry.cpCost, type: 'infantry', sprite: 'infantry_blue_1', action: () => spawnPlayerUnit('infantry') },
-        { key: '2', cpCost: UNIT_DEFS.tank.cpCost,     type: 'tank',     sprite: 'tank_blue',       action: () => spawnPlayerUnit('tank') },
-        { key: '3', cpCost: UNIT_DEFS.bazooka.cpCost,  type: 'bazooka',  sprite: 'bazooka_blue_1',  action: () => spawnPlayerUnit('bazooka') },
+        { key: '2', cpCost: UNIT_DEFS.bazooka.cpCost,  type: 'bazooka',  sprite: 'bazooka_blue_1',  action: () => spawnPlayerUnit('bazooka') },
+        { key: '3', cpCost: UNIT_DEFS.tank.cpCost,     type: 'tank',     sprite: 'tank_blue',       action: () => spawnPlayerUnit('tank') },
     ];
     const cardW = 96, cardH = 76;
     const cardY = panelY + 28;
@@ -4584,73 +4501,101 @@ function drawDeployPanel() {
 // ----- Bottom-right INCOME + POWERUPS panel -----
 
 function drawIncomePowerupPanel() {
-    const panelW = 460;
+    // Compact panel: just a missile card (same size as a deploy card) and
+    // the gold tally beside it. No more big buttons.
+    const cardW = 96, cardH = 76;
+    const goldW = 110;
+    const innerPad = 12;
+    const panelW = innerPad + cardW + 16 + goldW + innerPad;
     const panelH = 110;
     const panelX = W - panelW - 12;
     const panelY = H - panelH - 12;
     hudPanel(panelX, panelY, panelW, panelH);
 
-    // Top row — money + income
-    ctx.fillStyle = '#69f0ae';
-    ctx.font = 'bold 22px "Lilita One", sans-serif';
+    // Header
+    ctx.fillStyle = '#ff7043';
+    ctx.font = 'bold 14px "Lilita One", sans-serif';
     ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'top';
     ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.fillText(`$${Math.floor(money)}`, panelX + 18, panelY + 22);
-
-    ctx.fillStyle = '#90caf9';
-    ctx.font = 'bold 11px "Lilita One", sans-serif';
-    ctx.fillText('FROM KILLS', panelX + 220, panelY + 22);
+    ctx.fillText('WEAPONS', panelX + innerPad, panelY + 10);
     ctx.shadowBlur = 0;
 
-    // Single big button: buy missiles. Crates are picked up on the map, no
-    // longer buttons. Right-aligned under the income readout.
-    const btnW = 200, btnH = 56;
-    const btnY = panelY + 42;
-    const bx = panelX + panelW - btnW - 16;
+    // === Missile card ===
+    const cardX = panelX + innerPad;
+    const cardY = panelY + 28;
     const loaded = heli.missiles > 0;
     const canAfford = money >= MISSILE_PAIR_COST;
     const enabled = canAfford && !loaded;
-
-    bevelButton(bx, btnY, btnW, btnH, {
+    bevelButton(cardX, cardY, cardW, cardH, {
         radius: 12,
         top:    enabled ? 'rgba(35, 50, 85, 0.95)' : 'rgba(40, 40, 50, 0.85)',
         bottom: enabled ? 'rgba(15, 25, 55, 0.95)' : 'rgba(20, 20, 30, 0.85)',
     });
 
-    // Missile icon (paired rockets)
+    // Number badge (matches deploy cards) — shows [4] keybind
+    ctx.fillStyle = '#ffc107';
+    ctx.strokeStyle = '#0a1628';
+    ctx.lineWidth = 2;
+    const badgeR = 11;
+    ctx.beginPath();
+    ctx.arc(cardX + 12, cardY + 12, badgeR, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#0a1628';
+    ctx.font = 'bold 14px "Lilita One", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('4', cardX + 12, cardY + 13);
+
+    // Missile icon
     ctx.save();
-    if (!enabled) ctx.globalAlpha = 0.45;
-    iconMissile(bx + 40, btnY + btnH / 2 - 4, 20);
+    if (!enabled) ctx.filter = 'grayscale(100%) brightness(0.7)';
+    iconMissile(cardX + cardW / 2, cardY + 32, 18);
     ctx.restore();
 
-    // Label + cost
-    ctx.font = 'bold 13px "Lilita One", sans-serif';
-    ctx.textAlign = 'left';
+    // Cost / loaded indicator
+    ctx.font = 'bold 16px "Lilita One", sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.fillStyle = '#fff';
-    ctx.fillText('MISSILES ×2', bx + 76, btnY + 20);
-    ctx.font = 'bold 22px "Lilita One", sans-serif';
     if (loaded) {
         ctx.fillStyle = '#ff5722';
-        ctx.fillText(`LOADED ${heli.missiles}/${MISSILES_PER_PURCHASE}`,
-                     bx + 76, btnY + 42);
+        ctx.fillText(`${heli.missiles}×`, cardX + cardW / 2, cardY + cardH - 14);
     } else {
         ctx.fillStyle = canAfford ? '#69f0ae' : '#888';
-        ctx.fillText(`$${MISSILE_PAIR_COST}`, bx + 76, btnY + 42);
+        ctx.fillText(`$${MISSILE_PAIR_COST}`, cardX + cardW / 2, cardY + cardH - 14);
     }
     ctx.shadowBlur = 0;
 
-    hudHitRects.push({ x: bx, y: btnY, w: btnW, h: btnH, action: buyMissiles });
+    hudHitRects.push({ x: cardX, y: cardY, w: cardW, h: cardH, action: buyMissiles });
 
-    // Active shield indicator (top-right of panel, set by destroying a crate)
+    // === Gold tally next to the missile card ===
+    const goldX = cardX + cardW + 16;
+    const goldCY = cardY + cardH / 2;
+    iconCoin(goldX + 22, goldCY - 6, 16);
+    ctx.fillStyle = '#90caf9';
+    ctx.font = 'bold 11px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('GOLD', goldX, cardY + 4);
+    ctx.fillStyle = '#ffd54f';
+    ctx.font = 'bold 26px "Lilita One", sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.fillText(Math.floor(money).toString(), goldX + 44, goldCY - 4);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#90caf9';
+    ctx.font = 'bold 9px "Lilita One", sans-serif';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('FROM KILLS', goldX, cardY + cardH - 4);
+
+    // Active shield indicator (subtle, top-right of panel)
     if (powerupShieldMs > 0) {
         ctx.fillStyle = '#42a5f5';
         ctx.font = 'bold 11px "Lilita One", sans-serif';
         ctx.textAlign = 'right';
+        ctx.textBaseline = 'alphabetic';
         ctx.fillText(`SHIELD ${(powerupShieldMs / 1000).toFixed(1)}s`,
-                     panelX + panelW - 16, panelY + 22);
+                     panelX + panelW - 12, panelY + 22);
     }
 }
 
