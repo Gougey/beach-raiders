@@ -438,9 +438,9 @@ const CRATE_SLOTS = [
 ];
 let crates = [];
 
-// y so the BOTTOM of the crate body (sy + 6) sits a bit inside the sand,
-// matching how trees and bases anchor (~GROUND_Y + 16).
-const CRATE_LANDED_Y = GROUND_Y + 10;
+// Sit the crate further up the beach so the box's bottom edge meets the
+// grass/sand boundary — same kind of "planted" look as the palm trunks.
+const CRATE_LANDED_Y = GROUND_Y;
 
 function resetCrates() {
     crates = CRATE_SLOTS.map(s => ({
