@@ -2,8 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rescue Raiders - Beach Assault</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a1628">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<title>Frontline Extraction</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
@@ -35,6 +41,20 @@ body {
     overflow: hidden;
     font-family: var(--body-font);
     color: #fff;
+    /* Stop touch gestures from scrolling/zooming the page */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Holder wraps the canvas + touch overlay so they scale as a unit */
+#game-stage {
+    position: relative;
+    width: 1200px;
+    height: 700px;
+    transform-origin: center center;
+    flex-shrink: 0;
 }
 canvas {
     border: 4px solid var(--wood-dark);
@@ -43,7 +63,114 @@ canvas {
         inset 0 0 0 2px var(--wood-light),
         0 8px 40px rgba(0, 0, 0, 0.7),
         0 0 80px rgba(255, 193, 7, 0.08);
+    display: block;
 }
+
+/* ---- Touch overlay ---- */
+/* Sits on top of the canvas at the same scaled size. Only visible on
+   touch-capable devices, so desktop play is unchanged. */
+#touch-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: none;
+    z-index: 5;
+}
+body.touch #touch-overlay { display: block; }
+#touch-overlay .control {
+    position: absolute;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
+}
+#joystick {
+    left: 60px;
+    bottom: 140px;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%,
+                                rgba(255, 255, 255, 0.10) 0%,
+                                rgba(255, 255, 255, 0.04) 60%,
+                                rgba(0, 0, 0, 0.35) 100%);
+    border: 3px solid rgba(255, 255, 255, 0.25);
+}
+#joystick-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 70px;
+    height: 70px;
+    margin-left: -35px;
+    margin-top: -35px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #5dade2 0%, #1565c0 70%, #0a1628 100%);
+    border: 3px solid #0a1628;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    transition: transform 0.05s ease-out;
+}
+.touch-btn {
+    border-radius: 50%;
+    border: 3px solid #0a1628;
+    color: #fff;
+    font-family: var(--headline-font);
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+}
+.touch-btn:active { transform: translateY(2px); filter: brightness(1.2); }
+#btn-fire {
+    right: 60px;
+    bottom: 140px;
+    width: 130px;
+    height: 130px;
+    background: radial-gradient(circle at 35% 35%, #ff8a65 0%, #c62828 70%, #4e0000 100%);
+    font-size: 22px;
+}
+#btn-pickup {
+    right: 200px;
+    bottom: 220px;
+    width: 70px;
+    height: 70px;
+    background: radial-gradient(circle at 35% 35%, #81d4fa 0%, #1565c0 70%, #0a1628 100%);
+}
+#btn-drop {
+    right: 200px;
+    bottom: 140px;
+    width: 70px;
+    height: 70px;
+    background: radial-gradient(circle at 35% 35%, #a5d6a7 0%, #2e7d32 70%, #0a1628 100%);
+}
+
+/* Portrait warning overlay */
+#rotate-warning {
+    position: fixed;
+    inset: 0;
+    background: #0a1628;
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #ffd54f;
+    font-family: var(--headline-font);
+    text-align: center;
+    padding: 40px;
+}
+#rotate-warning .icon {
+    font-size: 96px;
+    margin-bottom: 20px;
+    animation: rotate-hint 2s ease-in-out infinite;
+}
+@keyframes rotate-hint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+}
+body.touch.portrait #rotate-warning { display: flex; }
 
 /* ---- Start screen ---- */
 #start-screen, #game-over-screen {
@@ -179,7 +306,24 @@ canvas {
 </head>
 <body>
 
+<div id="game-stage">
 <canvas id="game" width="1200" height="700"></canvas>
+
+<!-- Touch controls overlay — only visible on touch devices -->
+<div id="touch-overlay">
+    <div id="joystick" class="control"><div id="joystick-knob"></div></div>
+    <div id="btn-fire"   class="control touch-btn">FIRE</div>
+    <div id="btn-pickup" class="control touch-btn">E ↑</div>
+    <div id="btn-drop"   class="control touch-btn">T ↓</div>
+</div>
+</div>
+
+<!-- Rotate-to-landscape hint -->
+<div id="rotate-warning">
+    <div class="icon">📱</div>
+    <div style="font-size: 28px;">ROTATE YOUR DEVICE</div>
+    <div style="font-size: 18px; margin-top: 8px; color: #fff;">Frontline Extraction is played in landscape.</div>
+</div>
 
 <div id="start-screen">
     <img id="logo-img" src="assets/logo.png" alt="Frontline Extraction" onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
@@ -4825,6 +4969,165 @@ function gameLoop() {
     render();
     requestAnimationFrame(gameLoop);
 }
+
+// =====================================================================
+// MOBILE / TOUCH SUPPORT
+// =====================================================================
+
+// Detect touch capability
+const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+if (IS_TOUCH) document.body.classList.add('touch');
+
+// Fit the canvas-sized stage to the viewport while preserving aspect.
+function fitStage() {
+    const stage = document.getElementById('game-stage');
+    if (!stage) return;
+    const sw = window.innerWidth;
+    const sh = window.innerHeight;
+    const scale = Math.min(sw / 1200, sh / 700);
+    stage.style.transform = `scale(${scale})`;
+    // Update portrait warning class
+    const portrait = sh > sw;
+    document.body.classList.toggle('portrait', portrait);
+}
+window.addEventListener('resize', fitStage);
+window.addEventListener('orientationchange', fitStage);
+fitStage();
+
+// Try to lock to landscape when the user enters fullscreen (PWA / installed).
+async function tryLockLandscape() {
+    try {
+        if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+        }
+    } catch (e) { /* not allowed in some contexts — silent */ }
+}
+
+// ---- Virtual joystick ----
+// Translates touch position on the joystick into WASD key state.
+(function initJoystick() {
+    const stick = document.getElementById('joystick');
+    const knob  = document.getElementById('joystick-knob');
+    if (!stick || !knob) return;
+
+    const maxRadius = 60;            // knob travel limit
+    const deadZone  = 0.18;          // joystick neutral zone fraction
+    let activeId = null;
+    let centerX = 0, centerY = 0;
+
+    function clearKeys() {
+        keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
+        keys['arrowup'] = keys['arrowleft'] = keys['arrowdown'] = keys['arrowright'] = false;
+    }
+
+    function applyVector(nx, ny) {
+        clearKeys();
+        const mag = Math.sqrt(nx * nx + ny * ny);
+        if (mag < deadZone) return;
+        // 8-way mapping
+        const ang = Math.atan2(ny, nx); // -pi..pi
+        const deg = ang * 180 / Math.PI;
+        if (deg >= -112.5 && deg < -67.5)  keys['w'] = true;       // up
+        if (deg >= 67.5   && deg < 112.5)  keys['s'] = true;       // down
+        if (deg >= -22.5  && deg < 22.5)   keys['d'] = true;       // right
+        if (deg >= 157.5  || deg < -157.5) keys['a'] = true;       // left
+        // Diagonals
+        if (deg >= -157.5 && deg < -112.5) { keys['w'] = true; keys['a'] = true; }
+        if (deg >= -67.5  && deg < -22.5)  { keys['w'] = true; keys['d'] = true; }
+        if (deg >= 22.5   && deg < 67.5)   { keys['s'] = true; keys['d'] = true; }
+        if (deg >= 112.5  && deg < 157.5)  { keys['s'] = true; keys['a'] = true; }
+    }
+
+    function update(touch) {
+        const dx = touch.clientX - centerX;
+        const dy = touch.clientY - centerY;
+        const dist = Math.min(maxRadius, Math.sqrt(dx * dx + dy * dy));
+        const ang = Math.atan2(dy, dx);
+        const kx = Math.cos(ang) * dist;
+        const ky = Math.sin(ang) * dist;
+        knob.style.transform = `translate(${kx}px, ${ky}px)`;
+        applyVector(kx / maxRadius, ky / maxRadius);
+    }
+
+    stick.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (activeId !== null) return;
+        const t = e.changedTouches[0];
+        activeId = t.identifier;
+        const rect = stick.getBoundingClientRect();
+        centerX = rect.left + rect.width / 2;
+        centerY = rect.top + rect.height / 2;
+        update(t);
+    }, { passive: false });
+
+    stick.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        for (const t of e.changedTouches) {
+            if (t.identifier === activeId) { update(t); break; }
+        }
+    }, { passive: false });
+
+    function endTouch(e) {
+        for (const t of e.changedTouches) {
+            if (t.identifier === activeId) {
+                activeId = null;
+                knob.style.transform = '';
+                clearKeys();
+                break;
+            }
+        }
+    }
+    stick.addEventListener('touchend', endTouch, { passive: false });
+    stick.addEventListener('touchcancel', endTouch, { passive: false });
+})();
+
+// ---- Action buttons: FIRE held = space, PICKUP/DROP = tap once ----
+(function initActionButtons() {
+    const fire   = document.getElementById('btn-fire');
+    const pickup = document.getElementById('btn-pickup');
+    const drop   = document.getElementById('btn-drop');
+
+    function hold(elem, keyName) {
+        if (!elem) return;
+        elem.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true;  }, { passive: false });
+        const release = (e) => { e.preventDefault(); keys[keyName] = false; };
+        elem.addEventListener('touchend',    release, { passive: false });
+        elem.addEventListener('touchcancel', release, { passive: false });
+    }
+    function tap(elem, fn) {
+        if (!elem) return;
+        elem.addEventListener('touchstart', (e) => { e.preventDefault(); fn(); }, { passive: false });
+    }
+
+    hold(fire, ' ');
+    tap(pickup, () => helicopterPickup());
+    tap(drop,   () => helicopterDrop());
+})();
+
+// Translate touch taps on the canvas into the same click event the
+// existing canvas click handler already handles (deploy cards,
+// missile button, pause, READY etc).
+canvas.addEventListener('touchstart', (e) => {
+    if (e.target !== canvas) return;
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    // Dispatch a synthetic click so the existing handler fires
+    canvas.dispatchEvent(new MouseEvent('click', {
+        bubbles: true, clientX: t.clientX, clientY: t.clientY,
+    }));
+}, { passive: false });
+
+// Request landscape lock when the player taps DEPLOY
+document.getElementById('start-btn').addEventListener('click', tryLockLandscape, { once: false });
+
+// Register service worker for PWA install-to-home-screen
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+}
+
+// =====================================================================
 
 // Start the loop (rendering menu background)
 loadSprites();
