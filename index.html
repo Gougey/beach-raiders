@@ -88,7 +88,7 @@ body.touch #touch-overlay { display: block; }
    keeps the playfield visible underneath. */
 #joystick {
     right: 60px;
-    bottom: 140px;
+    bottom: 260px;        /* vertically centred in 700-tall stage */
     width: 180px;
     height: 180px;
     border-radius: 50%;
@@ -124,7 +124,7 @@ body.touch #touch-overlay { display: block; }
 /* FIRE button — left thumb. Mostly transparent with a red glow outline. */
 #btn-fire {
     left: 60px;
-    bottom: 140px;
+    bottom: 285px;        /* vertically centred in 700-tall stage */
     width: 130px;
     height: 130px;
     background: radial-gradient(circle at 50% 50%,
@@ -136,8 +136,9 @@ body.touch #touch-overlay { display: block; }
     font-size: 22px;
 }
 #btn-pickup {
-    left: 200px;
-    bottom: 220px;
+    /* Just above the FIRE button so the left thumb can swap between them */
+    left: 90px;
+    bottom: 435px;
     width: 70px;
     height: 70px;
     background: radial-gradient(circle at 50% 50%,
