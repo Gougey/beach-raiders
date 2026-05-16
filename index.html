@@ -84,17 +84,17 @@ body.touch #touch-overlay { display: block; }
     -webkit-touch-callout: none;
     touch-action: none;
 }
+/* Joystick — right thumb. Transparent ring with a transparent inner knob,
+   keeps the playfield visible underneath. */
 #joystick {
-    left: 60px;
+    right: 60px;
     bottom: 140px;
     width: 180px;
     height: 180px;
     border-radius: 50%;
-    background: radial-gradient(circle at 50% 50%,
-                                rgba(255, 255, 255, 0.10) 0%,
-                                rgba(255, 255, 255, 0.04) 60%,
-                                rgba(0, 0, 0, 0.35) 100%);
-    border: 3px solid rgba(255, 255, 255, 0.25);
+    background: rgba(0, 0, 0, 0.08);
+    border: 3px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 18px rgba(0, 0, 0, 0.35);
 }
 #joystick-knob {
     position: absolute;
@@ -105,45 +105,46 @@ body.touch #touch-overlay { display: block; }
     margin-left: -35px;
     margin-top: -35px;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, #5dade2 0%, #1565c0 70%, #0a1628 100%);
-    border: 3px solid #0a1628;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    background: rgba(255, 255, 255, 0.10);
+    border: 3px solid rgba(255, 255, 255, 0.75);
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
     transition: transform 0.05s ease-out;
 }
 .touch-btn {
     border-radius: 50%;
-    border: 3px solid #0a1628;
     color: #fff;
     font-family: var(--headline-font);
     font-size: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
 }
 .touch-btn:active { transform: translateY(2px); filter: brightness(1.2); }
+/* FIRE button — left thumb. Mostly transparent with a red glow outline. */
 #btn-fire {
-    right: 60px;
+    left: 60px;
     bottom: 140px;
     width: 130px;
     height: 130px;
-    background: radial-gradient(circle at 35% 35%, #ff8a65 0%, #c62828 70%, #4e0000 100%);
+    background: radial-gradient(circle at 50% 50%,
+                                rgba(255, 100, 100, 0.10) 0%,
+                                rgba(198, 40, 40, 0.22) 60%,
+                                rgba(78, 0, 0, 0.30) 100%);
+    border: 3px solid rgba(255, 100, 100, 0.75);
+    box-shadow: 0 0 16px rgba(244, 67, 54, 0.4);
     font-size: 22px;
 }
 #btn-pickup {
-    right: 200px;
+    left: 200px;
     bottom: 220px;
     width: 70px;
     height: 70px;
-    background: radial-gradient(circle at 35% 35%, #81d4fa 0%, #1565c0 70%, #0a1628 100%);
-}
-#btn-drop {
-    right: 200px;
-    bottom: 140px;
-    width: 70px;
-    height: 70px;
-    background: radial-gradient(circle at 35% 35%, #a5d6a7 0%, #2e7d32 70%, #0a1628 100%);
+    background: radial-gradient(circle at 50% 50%,
+                                rgba(129, 212, 250, 0.10) 0%,
+                                rgba(21, 101, 192, 0.20) 100%);
+    border: 3px solid rgba(129, 212, 250, 0.75);
+    box-shadow: 0 0 12px rgba(33, 150, 243, 0.35);
 }
 
 /* Portrait warning overlay */
@@ -313,8 +314,7 @@ body.touch.portrait #rotate-warning { display: flex; }
 <div id="touch-overlay">
     <div id="joystick" class="control"><div id="joystick-knob"></div></div>
     <div id="btn-fire"   class="control touch-btn">FIRE</div>
-    <div id="btn-pickup" class="control touch-btn">E ↑</div>
-    <div id="btn-drop"   class="control touch-btn">T ↓</div>
+    <div id="btn-pickup" class="control touch-btn">PICK</div>
 </div>
 </div>
 
@@ -617,7 +617,6 @@ document.addEventListener('keydown', e => {
         if (e.key === '3') spawnPlayerUnit('tank');
         if (e.key === '4') buyMissiles();
         if (e.key === 'e' || e.key === 'E') helicopterPickup();
-        if (e.key === 't' || e.key === 'T') helicopterDrop();
         if (e.key === 'm' || e.key === 'M') buyMissiles();
     }
     if (e.key === ' ') e.preventDefault();
@@ -1321,6 +1320,16 @@ function update() {
     heli.bladeAngle += 0.4;
     heli.bobTimer += 0.05;
     heli.shootCooldown = Math.max(0, heli.shootCooldown - 1);
+
+    // Auto-drop troops on landing — fires on the airborne -> landed transition
+    // so a heli that just lands with cargo immediately disembarks. The state
+    // resets when the heli leaves the ground, so picking up + flying away +
+    // landing again drops the new batch.
+    const isLanded = heli.y >= HELI_LANDING_Y;
+    if (isLanded && !heli._wasLanded && heli.carrying.length > 0) {
+        helicopterDrop();
+    }
+    heli._wasLanded = isLanded;
     heli.emptyClickCooldown = Math.max(0, heli.emptyClickCooldown - 1);
 
     // Camera follow
@@ -5073,11 +5082,11 @@ async function tryLockLandscape() {
     stick.addEventListener('touchcancel', endTouch, { passive: false });
 })();
 
-// ---- Action buttons: FIRE held = space, PICKUP/DROP = tap once ----
+// ---- Action buttons: FIRE held = space, PICKUP = tap once ----
+// Drop is automatic — see auto-drop on landing in the update loop.
 (function initActionButtons() {
     const fire   = document.getElementById('btn-fire');
     const pickup = document.getElementById('btn-pickup');
-    const drop   = document.getElementById('btn-drop');
 
     function hold(elem, keyName) {
         if (!elem) return;
@@ -5093,7 +5102,6 @@ async function tryLockLandscape() {
 
     hold(fire, ' ');
     tap(pickup, () => helicopterPickup());
-    tap(drop,   () => helicopterDrop());
 })();
 
 // Translate touch taps on the canvas into the same click event the
