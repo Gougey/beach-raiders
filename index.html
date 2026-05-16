@@ -282,6 +282,11 @@ body.touch.portrait #rotate-warning { display: flex; }
     background: linear-gradient(180deg, #66bb6a 0%, #2e7d32 50%, #1b5e20 100%);
 }
 .game-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.game-btn:disabled {
+    filter: grayscale(0.6) brightness(0.7);
+    cursor: progress;
+    pointer-events: none;
+}
 .game-btn:active {
     transform: translateY(4px);
     box-shadow:
@@ -482,19 +487,28 @@ let spritesTotal = Object.keys(SPRITE_FILES).length;
 let allSpritesReady = false;
 
 function loadSprites() {
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.textContent = 'LOADING…';
+    }
+    const onReady = () => {
+        allSpritesReady = true;
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.textContent = 'START GAME';
+        }
+    };
     Object.entries(SPRITE_FILES).forEach(([key, src]) => {
         const img = new Image();
         img.onload = () => {
             spritesLoaded++;
-            if (spritesLoaded === spritesTotal) {
-                allSpritesReady = true;
-                console.log('All sprites loaded');
-            }
+            if (spritesLoaded === spritesTotal) onReady();
         };
         img.onerror = () => {
             console.warn('Failed to load sprite:', src);
             spritesLoaded++;
-            if (spritesLoaded === spritesTotal) allSpritesReady = true;
+            if (spritesLoaded === spritesTotal) onReady();
         };
         img.src = src;
         SPRITES[key] = img;
@@ -525,7 +539,7 @@ function drawSprite(key, x, y, height, flipH = false) {
 let gameState = 'menu'; // menu, playing, paused, gameover
 let cameraX = 0;
 let money = 30;
-let enemyMoney = 50;
+// enemyMoney removed — enemy AI spawns from CP only.
 let enemySpawnTimer = 0;
 
 // Command Points (tactical resource for deploying units)
@@ -653,6 +667,8 @@ document.getElementById('start-btn').addEventListener('click', () => {
     initGame();
 });
 document.getElementById('restart-btn').addEventListener('click', () => {
+    // Guard against rapid double-tap restarting initGame() twice.
+    if (gameState !== 'gameover') return;
     document.getElementById('game-over-screen').style.display = 'none';
     gameState = 'playing';
     initGame();
@@ -754,7 +770,6 @@ function initGame() {
     resetAirDefences();
     resetCrates();
     money = 30;
-    enemyMoney = 50;
     commandPoints = CP_CAP_DEFAULT;
     cpCap = CP_CAP_DEFAULT;
     enemyCommandPoints = CP_CAP_DEFAULT;
@@ -999,7 +1014,9 @@ function buyUpgrade(id) {
     if (lvl >= up.tiers.length) return;
     const tier = up.tiers[lvl];
     if (money < tier.cost) {
-        spawnFloatingText(W / 2 + cameraX, H / 2 - 100, 'NOT ENOUGH GOLD', '#ef5350');
+        // Shop is screen-space — spawn the warning at the heli so it follows the
+        // camera (floatingTexts are world-space and drawn at t.x - cameraX).
+        spawnFloatingText(heli.x, heli.y - 60, 'NOT ENOUGH GOLD', '#ef5350');
         return;
     }
     money -= tier.cost;
@@ -1077,7 +1094,7 @@ function helicopterPickup() {
             lifted++;
         }
     }
-    if (lifted === 0 && heli.carrying.length === 0) {
+    if (lifted === 0) {
         spawnFloatingText(heli.x, heli.y - 40, 'NO TROOPS NEARBY', '#90a4ae');
     }
 }
@@ -1282,9 +1299,8 @@ function update() {
     if (gameState !== 'playing') return;
     frameCount++;
 
-    // Gold income (slow drip — defending well is meant to be the main earner)
-    money += INCOME_RATE;
-    enemyMoney += INCOME_RATE * 1.1;
+    // Money is earned only from kills + wave clears now — no passive income.
+    // (INCOME_RATE is 0 and the variable is preserved for HUD compatibility.)
 
     // Command Points regenerate up to the cap
     commandPoints = Math.min(cpCap, commandPoints + CP_REGEN_PER_FRAME);
@@ -1467,7 +1483,13 @@ function update() {
         b.x += b.vx;
         b.y += b.vy;
         if (b.type === 'shell') b.vy += 0.05;
-        if (b.type === 'rocket') b.vy += 0.03;
+        if (b.type === 'rocket') {
+            b.vy += 0.03;
+            if (frameCount % 2 === 0) {
+                spawnParticles(b.x, b.y, '#aaa', 1, 0.3, 8);
+                spawnParticles(b.x - b.vx, b.y - b.vy, '#ff9800', 1, 0.5, 5);
+            }
+        }
         if (b.type === 'heli') b.vy += 0.35;        // arc into ground troops
         if (b.type === 'heliMissile') {
             b.vy += 0.35;                           // identical arc to bullets
@@ -1483,11 +1505,12 @@ function update() {
         // (which is just the logical size used for combat ranges and formation).
         let hit = false;
         for (const u of units) {
-            if (u.team === b.team) continue;
+            if (u.team === b.team || u.hp <= 0) continue;
             const isTank = u.type === 'tank';
-            const hbHalfW = isTank ? 28 : 16;     // body width
-            const hbHalfH = isTank ? 18 : 28;     // body height
-            const hbCenterY = isTank ? u.y : u.y - 14;  // soldiers anchor near feet, hitbox is above
+            const scale = u.bossScale || 1;            // boss tanks render bigger, hitbox should too
+            const hbHalfW = (isTank ? 28 : 16) * scale;
+            const hbHalfH = (isTank ? 18 : 28) * scale;
+            const hbCenterY = isTank ? u.y : u.y - 14;
             if (Math.abs(b.x - u.x) < hbHalfW && Math.abs(b.y - hbCenterY) < hbHalfH) {
                 // Apply RPS damage modifier when the bullet originates from a unit
                 let dmg = b.damage;
@@ -3654,9 +3677,7 @@ function drawBullets() {
             ctx.beginPath();
             ctx.arc(sx + b.vx * 0.3, b.y + b.vy * 0.3, 1.5, 0, Math.PI * 2);
             ctx.fill();
-            // Smoke trail
-            spawnParticles(b.x, b.y, '#aaa', 1, 0.3, 8);
-            spawnParticles(b.x - b.vx, b.y - b.vy, '#ff9800', 1, 0.5, 5);
+            // Smoke trail is spawned in update() so render stays side-effect-free
         } else if (b.type === 'heliMissile') {
             // Player's bought missile — fat red rocket streaking forward
             const ang = Math.atan2(b.vy, b.vx);
@@ -3788,14 +3809,17 @@ function drawParticles() {
             continue;
         }
 
-        ctx.globalAlpha = alpha;
+        // Generic particle — no shadowBlur (huge perf hit at high counts).
+        // Compensate the lost glow with a faint second pass at larger radius.
+        ctx.globalAlpha = alpha * 0.35;
         ctx.fillStyle = p.color;
-        ctx.shadowBlur = p.size * alpha * 2;
-        ctx.shadowColor = p.color;
+        ctx.beginPath();
+        ctx.arc(sx, p.y, p.size * alpha * 1.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = alpha;
         ctx.beginPath();
         ctx.arc(sx, p.y, p.size * alpha, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
     }
     ctx.globalAlpha = 1;
 }
@@ -4996,13 +5020,20 @@ window.addEventListener('resize', fitStage);
 window.addEventListener('orientationchange', fitStage);
 fitStage();
 
-// Try to lock to landscape when the user enters fullscreen (PWA / installed).
+// Try to enter fullscreen + lock to landscape on touch devices. The lock
+// only works inside fullscreen on most browsers, and even then iOS Safari
+// refuses, so failures are silently swallowed.
 async function tryLockLandscape() {
+    if (!IS_TOUCH) return;
     try {
-        if (screen.orientation && screen.orientation.lock) {
-            await screen.orientation.lock('landscape');
+        const el = document.documentElement;
+        if (el.requestFullscreen && !document.fullscreenElement) {
+            await el.requestFullscreen().catch(() => {});
         }
-    } catch (e) { /* not allowed in some contexts — silent */ }
+        if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape').catch(() => {});
+        }
+    } catch (e) { /* silent */ }
 }
 
 // ---- Virtual joystick ----
@@ -5016,28 +5047,32 @@ async function tryLockLandscape() {
     const deadZone  = 0.18;          // joystick neutral zone fraction
     let activeId = null;
     let centerX = 0, centerY = 0;
+    // Track keys the joystick has set so release only clears its own state —
+    // hybrid devices with both touch and a physical keyboard keep their other keys.
+    const jsKeys = new Set();
 
+    function jsSet(key) {
+        if (!keys[key]) { keys[key] = true; jsKeys.add(key); }
+    }
     function clearKeys() {
-        keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
-        keys['arrowup'] = keys['arrowleft'] = keys['arrowdown'] = keys['arrowright'] = false;
+        for (const k of jsKeys) keys[k] = false;
+        jsKeys.clear();
     }
 
     function applyVector(nx, ny) {
         clearKeys();
         const mag = Math.sqrt(nx * nx + ny * ny);
         if (mag < deadZone) return;
-        // 8-way mapping
-        const ang = Math.atan2(ny, nx); // -pi..pi
+        const ang = Math.atan2(ny, nx);
         const deg = ang * 180 / Math.PI;
-        if (deg >= -112.5 && deg < -67.5)  keys['w'] = true;       // up
-        if (deg >= 67.5   && deg < 112.5)  keys['s'] = true;       // down
-        if (deg >= -22.5  && deg < 22.5)   keys['d'] = true;       // right
-        if (deg >= 157.5  || deg < -157.5) keys['a'] = true;       // left
-        // Diagonals
-        if (deg >= -157.5 && deg < -112.5) { keys['w'] = true; keys['a'] = true; }
-        if (deg >= -67.5  && deg < -22.5)  { keys['w'] = true; keys['d'] = true; }
-        if (deg >= 22.5   && deg < 67.5)   { keys['s'] = true; keys['d'] = true; }
-        if (deg >= 112.5  && deg < 157.5)  { keys['s'] = true; keys['a'] = true; }
+        if (deg >= -112.5 && deg < -67.5)  jsSet('w');
+        if (deg >= 67.5   && deg < 112.5)  jsSet('s');
+        if (deg >= -22.5  && deg < 22.5)   jsSet('d');
+        if (deg >= 157.5  || deg < -157.5) jsSet('a');
+        if (deg >= -157.5 && deg < -112.5) { jsSet('w'); jsSet('a'); }
+        if (deg >= -67.5  && deg < -22.5)  { jsSet('w'); jsSet('d'); }
+        if (deg >= 22.5   && deg < 67.5)   { jsSet('s'); jsSet('d'); }
+        if (deg >= 112.5  && deg < 157.5)  { jsSet('s'); jsSet('a'); }
     }
 
     function update(touch) {
