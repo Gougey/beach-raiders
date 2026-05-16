@@ -895,9 +895,12 @@ const UNIT_DEFS = {
     // hp/speed/damage/range/attackRate are intrinsic combat stats.
     // cpCost is what the player spends from their Command Points pool.
     // bounty is gold awarded when this unit is killed.
-    infantry: { hp: 32,  speed: 0.85, damage: 5,  range: 65,  attackRate: 30, cpCost: 2, bounty: 4,  w: 14, h: 22 },
-    bazooka:  { hp: 35,  speed: 0.70, damage: 28, range: 160, attackRate: 90, cpCost: 4, bounty: 10, w: 14, h: 22 },
-    tank:     { hp: 160, speed: 0.50, damage: 22, range: 130, attackRate: 80, cpCost: 7, bounty: 25, w: 36, h: 20 },
+    // engageDist: preferred firing distance. Units advance INTO their range
+    //   until they reach this distance, so a queue of troops bunches close
+    //   enough that multiple of them can fire at once.
+    infantry: { hp: 32,  speed: 0.85, damage: 5,  range: 65,  attackRate: 30, cpCost: 2, bounty: 4,  w: 14, h: 22, engageDist: 30 },
+    bazooka:  { hp: 35,  speed: 0.70, damage: 28, range: 160, attackRate: 90, cpCost: 4, bounty: 10, w: 14, h: 22, engageDist: 110 },
+    tank:     { hp: 160, speed: 0.50, damage: 22, range: 130, attackRate: 80, cpCost: 7, bounty: 25, w: 36, h: 20, engageDist: 75 },
 };
 
 // Damage multiplier matrix (attacker -> target). Bullets hitting bases ignore this.
@@ -1434,23 +1437,32 @@ function update() {
             }
         }
 
-        if (nearestEnemy && nearestDist <= u.range) {
+        // Combat AI: a unit fires whenever it has an in-range target, AND
+        // keeps marching forward until it reaches its preferred engagement
+        // distance. That way a queue of friendly troops bunches close
+        // enough to the front line for everyone in range to fire — not
+        // just the leader.
+        const inRange = !!nearestEnemy && nearestDist <= u.range;
+        const def = UNIT_DEFS[u.type];
+        const engageDist = (def && def.engageDist) || 40;
+        const shouldHold = inRange && nearestDist <= engageDist;
+
+        if (inRange) {
             u.state = 'fight';
             unitShoot(u, nearestEnemy);
-        } else {
-            u.state = 'march';
+        }
+
+        if (!shouldHold) {
+            if (!inRange) u.state = 'march';
             const dir = u.team === 'player' ? 1 : -1;
 
-            // Friendly spacing — don't bunch up. Find the closest same-team unit
-            // ahead of us (in our marching direction) and stop short of it so we
-            // form a marching line instead of stacking on top.
+            // Friendly spacing — line up behind the unit in front.
             let blocked = false;
             for (const other of units) {
                 if (other === u || other.team !== u.team) continue;
-                const aheadDx = (other.x - u.x) * dir;  // positive if other is in front
+                const aheadDx = (other.x - u.x) * dir;
                 if (aheadDx > 0 && aheadDx < FRIENDLY_SPACING) {
                     blocked = true;
-                    // Snap to spacing so faster units catch up smoothly
                     u.x = other.x - dir * FRIENDLY_SPACING;
                     break;
                 }
