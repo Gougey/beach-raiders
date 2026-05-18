@@ -88,7 +88,7 @@ body.touch #touch-overlay { display: block; }
    keeps the playfield visible underneath. */
 #joystick {
     right: 60px;
-    bottom: 260px;        /* vertically centred in 700-tall stage */
+    bottom: 320px;        /* lifted to clear the beach + match FIRE height */
     width: 180px;
     height: 180px;
     border-radius: 50%;
@@ -110,108 +110,185 @@ body.touch #touch-overlay { display: block; }
     box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
     transition: transform 0.05s ease-out;
 }
+/* ---- Touch buttons — chunky gold-rim style per UI_STYLE_GUIDE ---- */
+/* Triple-ring construction via inset box-shadow: thin black liner →
+   thick gold ring → darker gold shadow → recessed dark plate. Drop
+   shadow + outer glow ground the button visually.                  */
 .touch-btn {
     border-radius: 50%;
     color: #fff;
     font-family: var(--headline-font);
-    font-size: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    background:
+        radial-gradient(circle at 50% 35%,
+            rgba(255, 255, 255, 0.10) 0%,
+            rgba(10, 22, 40, 0.65) 70%,
+            rgba(0, 0, 0, 0.75) 100%);
+    box-shadow:
+        inset 0 0 0 2px rgba(0, 0, 0, 0.9),         /* inner dark liner */
+        inset 0 0 0 5px #ffd54f,                    /* hero gold ring */
+        inset 0 0 0 8px #b8860b,                    /* deeper gold shadow */
+        inset 0 4px 6px rgba(255, 255, 255, 0.18),  /* top bevel highlight */
+        inset 0 -4px 6px rgba(0, 0, 0, 0.45),       /* bottom bevel shadow */
+        0 6px 14px rgba(0, 0, 0, 0.55),             /* drop shadow */
+        0 0 18px rgba(255, 193, 7, 0.30);           /* outer glow */
+    background-size: 62% 62%;
+    background-repeat: no-repeat;
+    background-position: center;
 }
-.touch-btn:active { transform: translateY(2px); filter: brightness(1.2); }
-/* FIRE button — left thumb. Mostly transparent with a red glow outline. */
+.touch-btn:active {
+    transform: translateY(2px);
+    filter: brightness(1.18);
+    box-shadow:
+        inset 0 0 0 2px rgba(0, 0, 0, 0.9),
+        inset 0 0 0 5px #ffd54f,
+        inset 0 0 0 8px #b8860b,
+        inset 0 -2px 4px rgba(0, 0, 0, 0.55),
+        0 2px 6px rgba(0, 0, 0, 0.55),
+        0 0 26px rgba(255, 193, 7, 0.50);
+}
+
+/* FIRE — bigger, RED-rimmed variant of the same chunky button */
 #btn-fire {
     left: 60px;
-    bottom: 285px;        /* vertically centred in 700-tall stage */
-    width: 130px;
-    height: 130px;
-    background: radial-gradient(circle at 50% 50%,
-                                rgba(255, 100, 100, 0.10) 0%,
-                                rgba(198, 40, 40, 0.22) 60%,
-                                rgba(78, 0, 0, 0.30) 100%);
-    border: 3px solid rgba(255, 100, 100, 0.75);
-    box-shadow: 0 0 16px rgba(244, 67, 54, 0.4);
-    font-size: 22px;
+    bottom: 350px;
+    width: 140px;
+    height: 140px;
+    background:
+        radial-gradient(circle at 50% 35%,
+            rgba(255, 200, 180, 0.18) 0%,
+            rgba(80, 0, 0, 0.55) 70%,
+            rgba(0, 0, 0, 0.85) 100%);
+    box-shadow:
+        inset 0 0 0 2px rgba(0, 0, 0, 0.9),
+        inset 0 0 0 5px #ef5350,
+        inset 0 0 0 8px #8e0000,
+        inset 0 4px 6px rgba(255, 255, 255, 0.18),
+        inset 0 -4px 6px rgba(0, 0, 0, 0.45),
+        0 6px 16px rgba(0, 0, 0, 0.55),
+        0 0 22px rgba(244, 67, 54, 0.55);
+    background-size: 60% 60%;
+    background-repeat: no-repeat;
+    background-position: center;
 }
+#btn-fire:active {
+    box-shadow:
+        inset 0 0 0 2px rgba(0, 0, 0, 0.9),
+        inset 0 0 0 5px #ef5350,
+        inset 0 0 0 8px #8e0000,
+        inset 0 -2px 4px rgba(0, 0, 0, 0.55),
+        0 2px 8px rgba(0, 0, 0, 0.55),
+        0 0 36px rgba(244, 67, 54, 0.85);
+}
+
+/* PICK — small variant with BLUE rim */
 #btn-pickup {
-    /* Below FIRE — left thumb pulls down for pickup. (Drops are automatic.) */
-    left: 90px;
-    bottom: 135px;
-    width: 70px;
-    height: 70px;
-    background: radial-gradient(circle at 50% 50%,
-                                rgba(129, 212, 250, 0.10) 0%,
-                                rgba(21, 101, 192, 0.20) 100%);
-    border: 3px solid rgba(129, 212, 250, 0.75);
-    box-shadow: 0 0 12px rgba(33, 150, 243, 0.35);
-    font-size: 16px;
+    left: 88px;
+    bottom: 210px;
+    width: 80px;
+    height: 80px;
+    background:
+        radial-gradient(circle at 50% 35%,
+            rgba(187, 222, 251, 0.18) 0%,
+            rgba(13, 71, 161, 0.45) 70%,
+            rgba(0, 0, 0, 0.80) 100%);
+    box-shadow:
+        inset 0 0 0 2px rgba(0, 0, 0, 0.9),
+        inset 0 0 0 4px #42a5f5,
+        inset 0 0 0 7px #0d47a1,
+        inset 0 4px 5px rgba(255, 255, 255, 0.20),
+        inset 0 -4px 5px rgba(0, 0, 0, 0.45),
+        0 5px 12px rgba(0, 0, 0, 0.55),
+        0 0 18px rgba(33, 150, 243, 0.45);
+    background-size: 62% 62%;
 }
 
 /* ---- Deploy orbit ---- */
-/* FIRE is centred at (125, 350) in the 1200x700 stage. Buttons orbit
-   clockwise on the right-hand semicircle at radius ~115 so the left
-   thumb can flick from FIRE to any of them. */
+/* FIRE centre = (130, 280) in the 1200x700 stage (moved up so PICK clears the beach).
+   Orbit radius 120, four buttons at 12 / 1:30 / 3 / 4:30 o'clock.
+   Button size 86×86 (centre offset 43).
+   CSS bottom = 700 - canvas_y - 86. */
 .deploy-orbit {
-    width: 78px;
-    height: 78px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
+    width: 86px;
+    height: 86px;
+    font-size: 12px;
     line-height: 1;
     color: #fff;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
-    background: radial-gradient(circle at 50% 50%,
-                                rgba(255, 193, 7, 0.10) 0%,
-                                rgba(0, 0, 0, 0.45) 100%);
-    border: 3px solid rgba(255, 213, 79, 0.75);
-    box-shadow: 0 0 12px rgba(255, 193, 7, 0.35);
-    background-size: 68% 68%;
-    background-position: center;
-    background-repeat: no-repeat;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    background-size: 60% 60%;
+}
+.deploy-orbit::before {
+    /* CP-fill ring rendered as a conic gradient + circular mask.
+       --cp-fill is 0..100; clipped to the rim band of the button.    */
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    background: conic-gradient(
+        from -90deg,
+        #69f0ae 0deg,
+        #69f0ae calc(var(--cp-fill, 0) * 3.6deg),
+        rgba(0, 0, 0, 0.45) calc(var(--cp-fill, 0) * 3.6deg)
+    );
+    -webkit-mask: radial-gradient(circle,
+        transparent 0,
+        transparent 41px,
+        black 41px,
+        black 48px,
+        transparent 48px);
+            mask: radial-gradient(circle,
+        transparent 0,
+        transparent 41px,
+        black 41px,
+        black 48px,
+        transparent 48px);
+    pointer-events: none;
+    transition: filter 0.15s;
+}
+.deploy-orbit.ready::before {
+    filter: drop-shadow(0 0 6px rgba(105, 240, 174, 0.9));
 }
 .deploy-orbit .num {
     position: absolute;
-    top: -6px;
-    right: -6px;
+    top: -4px;
+    right: -4px;
     width: 22px;
     height: 22px;
     border-radius: 50%;
     background: #ffc107;
     color: #0a1628;
     font-size: 13px;
+    font-family: var(--headline-font);
     display: flex;
     align-items: center;
     justify-content: center;
     border: 2px solid #0a1628;
     text-shadow: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+    z-index: 2;
 }
 .deploy-orbit .lbl {
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, 0.6);
     border-radius: 6px;
     padding: 1px 5px;
-    font-size: 11px;
+    font-size: 10px;
     letter-spacing: 1px;
+    z-index: 2;
 }
-/* When the matching icon sprite is available, use it as the background
-   and hide the text label. Hooked up in JS once icons load. */
 .deploy-orbit.has-icon .lbl { display: none; }
 
-/* Positions: angles 270°, 315°, 0°, 45° at radius 115 from FIRE centre.
-   FIRE centre = (125, 350) in stage coords. Buttons 78×78 (centre offset 39).
-   In CSS coords (left + bottom), bottom = 700 - canvas_y - 78.
-
-     1 (Infantry, 12 o'clock):     centre (125, 235)
-     2 (Bazooka,  1:30):           centre (206, 269)
-     3 (Tank,     3 o'clock):      centre (240, 350)
-     4 (Missile,  4:30):           centre (206, 431) */
-#btn-deploy-1 { left:  86px; bottom: 387px; }
-#btn-deploy-2 { left: 167px; bottom: 353px; }
-#btn-deploy-3 { left: 201px; bottom: 272px; }
-#btn-deploy-4 { left: 167px; bottom: 191px; }
+/* Orbit positions — centres in stage coords, then translated to CSS.
+     1 (Infantry, 12 o'clock): canvas (130, 160) → bottom 454, left 87
+     2 (Bazooka,  1:30):       canvas (215, 195) → bottom 419, left 172
+     3 (Tank,     3 o'clock):  canvas (250, 280) → bottom 334, left 207
+     4 (Missile,  4:30):       canvas (215, 365) → bottom 249, left 172  */
+#btn-deploy-1 { left:  87px; bottom: 454px; }
+#btn-deploy-2 { left: 172px; bottom: 419px; }
+#btn-deploy-3 { left: 207px; bottom: 334px; }
+#btn-deploy-4 { left: 172px; bottom: 249px; }
 
 /* Portrait warning overlay */
 #rotate-warning {
@@ -504,6 +581,8 @@ const SPRITE_FILES = (() => {
         hud_missile:  'assets/hud_missile.png',
         hud_coin:     'assets/hud_coin.png',
         hud_ammo:     'assets/hud_ammo.png',
+        hud_fire:     'assets/hud_fire.png',
+        hud_pickup:   'assets/hud_pickup.png',
     };
     // 8-frame walk cycles per soldier type
     for (const soldier of ['infantry_blue', 'infantry_red', 'bazooka_blue', 'bazooka_red']) {
@@ -5301,16 +5380,16 @@ async function tryLockLandscape() {
     });
 })();
 
-// When the icon sprites finish loading, swap them onto the orbit buttons.
-function applyHudIconsToOrbit() {
-    const mapping = {
+// When the icon sprites finish loading, swap them onto each touch button.
+function applyHudIconsToButtons() {
+    const orbitMapping = {
         '1': 'assets/hud_infantry.png',
         '2': 'assets/hud_bazooka.png',
         '3': 'assets/hud_tank.png',
         '4': 'assets/hud_missile.png',
     };
     document.querySelectorAll('.deploy-orbit').forEach((el) => {
-        const src = mapping[el.dataset.keynum];
+        const src = orbitMapping[el.dataset.keynum];
         if (!src) return;
         const img = new Image();
         img.onload = () => {
@@ -5319,8 +5398,51 @@ function applyHudIconsToOrbit() {
         };
         img.src = src;
     });
+    // FIRE and PICK swap from text to icon once loaded.
+    const swap = (btnId, src, clearText) => {
+        const el = document.getElementById(btnId);
+        if (!el) return;
+        const img = new Image();
+        img.onload = () => {
+            el.style.backgroundImage = `url(${src})`;
+            if (clearText) el.textContent = '';
+        };
+        img.src = src;
+    };
+    swap('btn-fire',   'assets/hud_fire.png',   true);
+    swap('btn-pickup', 'assets/hud_pickup.png', true);
 }
-applyHudIconsToOrbit();
+applyHudIconsToButtons();
+
+// Live CP-fill update for the deploy orbit. Runs every animation frame
+// so the green ring tracks Command Points smoothly. Cost per type comes
+// straight from UNIT_DEFS so it stays in sync with balance changes.
+function updateDeployFills() {
+    const costs = {
+        '1': UNIT_DEFS.infantry.cpCost,
+        '2': UNIT_DEFS.bazooka.cpCost,
+        '3': UNIT_DEFS.tank.cpCost,
+        // missile is gold-gated, not CP — we fill it from gold/cost instead
+    };
+    document.querySelectorAll('.deploy-orbit').forEach((el) => {
+        const k = el.dataset.keynum;
+        let pct = 0;
+        let ready = false;
+        if (k === '4') {
+            pct = Math.min(100, (money / MISSILE_PAIR_COST) * 100);
+            ready = money >= MISSILE_PAIR_COST && heli.missiles === 0;
+            if (heli.missiles > 0) { pct = 100; ready = true; }
+        } else {
+            const cost = costs[k];
+            pct = Math.min(100, (commandPoints / cost) * 100);
+            ready = commandPoints >= cost;
+        }
+        el.style.setProperty('--cp-fill', pct.toFixed(1));
+        el.classList.toggle('ready', ready);
+    });
+    requestAnimationFrame(updateDeployFills);
+}
+requestAnimationFrame(updateDeployFills);
 
 // Translate touch taps on the canvas into the same click event the
 // existing canvas click handler already handles (deploy cards,

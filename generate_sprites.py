@@ -286,6 +286,40 @@ Royal-Match-style polish, chunky cartoony proportions.
 True alpha-channel transparent background, no text, no shadow plate, centred
 composition with 12% padding."""
     },
+    {
+        "name": "hud_fire.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI fire-button icon — a CHUNKY TARGETING CROSSHAIR /
+RETICLE. Round metal frame in dark gunmetal with a glowing red ring on the inner
+edge, four short red crosshair bars at 12/3/6/9 o'clock pointing toward the
+centre, and a small bright red dot in the very middle. Slight 3/4 isometric tilt
+showing depth on the gunmetal frame.
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), warm key light upper-left, cool fill
+lower-right. Crisp specular streaks along the gunmetal rim, fierce red inner
+glow, faint sparkle accents. Soft contact shadow. Royal-Match-style polish,
+chunky cartoony proportions, military-action vibe.
+
+True alpha-channel transparent background, no text, centred composition with
+10% padding."""
+    },
+    {
+        "name": "hud_pickup.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI pickup-button icon — a CHUNKY METAL CLAW / GRABBER
+(like a crane claw or skyhook). Two or three curved gunmetal claw fingers gently
+closing inward in a "ready to grab" pose, attached to a small mechanical pivot
+joint at the top. Polished metal surface with brass accents at the pivot and
+finger tips.
+
+3/4 isometric tilt, THICK SOLID BLACK OUTLINE (4-6 px stroke), warm key light
+upper-left, cool fill lower-right. Crisp specular highlights on the claw
+fingers, deep gunmetal shadow underneath. Soft contact shadow. Royal-Match-style
+polish, chunky cartoony proportions.
+
+True alpha-channel transparent background, no text, no rope or cable, centred
+composition with 12% padding."""
+    },
 ]
 
 # ---- Base assets (helicopter, tanks, bases) ------------------------------

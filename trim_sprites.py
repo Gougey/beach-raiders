@@ -35,6 +35,8 @@ TRIM = [
     "hud_missile.png",
     "hud_coin.png",
     "hud_ammo.png",
+    "hud_fire.png",
+    "hud_pickup.png",
 ]
 
 ALPHA_SOLID = 200   # consider only nearly-opaque pixels as "real content"
