@@ -280,15 +280,21 @@ body.touch #touch-overlay { display: block; }
 }
 .deploy-orbit.has-icon .lbl { display: none; }
 
-/* Orbit positions — centres in stage coords, then translated to CSS.
-     1 (Infantry, 12 o'clock): canvas (130, 160) → bottom 454, left 87
-     2 (Bazooka,  1:30):       canvas (215, 195) → bottom 419, left 172
-     3 (Tank,     3 o'clock):  canvas (250, 280) → bottom 334, left 207
-     4 (Missile,  4:30):       canvas (215, 365) → bottom 249, left 172  */
-#btn-deploy-1 { left:  87px; bottom: 454px; }
-#btn-deploy-2 { left: 172px; bottom: 419px; }
-#btn-deploy-3 { left: 207px; bottom: 334px; }
-#btn-deploy-4 { left: 172px; bottom: 249px; }
+/* Orbit positions — each centre sits exactly on a circle of radius 130
+   around the FIRE button centre at canvas (130, 280). Compass angles
+   270° / 315° / 0° / 45° (12 / 1:30 / 3 / 4:30 o'clock).
+   Button is 86×86 (centre offset 43); CSS bottom = 700 - cy - 43, left = cx - 43.
+
+       angle    cx   cy   left  bottom
+     1  270°   130  150     87     507
+     2  315°   222  188    179     469
+     3    0°   260  280    217     377
+     4   45°   222  372    179     285
+*/
+#btn-deploy-1 { left:  87px; bottom: 507px; }
+#btn-deploy-2 { left: 179px; bottom: 469px; }
+#btn-deploy-3 { left: 217px; bottom: 377px; }
+#btn-deploy-4 { left: 179px; bottom: 285px; }
 
 /* Portrait warning overlay */
 #rotate-warning {
@@ -582,6 +588,7 @@ const SPRITE_FILES = (() => {
         hud_coin:     'assets/hud_coin.png',
         hud_ammo:     'assets/hud_ammo.png',
         hud_fire:     'assets/hud_fire.png',
+        hud_flame:    'assets/hud_flame.png',
         hud_pickup:   'assets/hud_pickup.png',
     };
     // 8-frame walk cycles per soldier type
@@ -5409,7 +5416,7 @@ function applyHudIconsToButtons() {
         };
         img.src = src;
     };
-    swap('btn-fire',   'assets/hud_fire.png',   true);
+    swap('btn-fire',   'assets/hud_flame.png',  true);
     swap('btn-pickup', 'assets/hud_pickup.png', true);
 }
 applyHudIconsToButtons();

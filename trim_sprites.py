@@ -36,6 +36,7 @@ TRIM = [
     "hud_coin.png",
     "hud_ammo.png",
     "hud_fire.png",
+    "hud_flame.png",
     "hud_pickup.png",
 ]
 

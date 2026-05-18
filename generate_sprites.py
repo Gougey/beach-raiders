@@ -287,21 +287,20 @@ True alpha-channel transparent background, no text, no shadow plate, centred
 composition with 12% padding."""
     },
     {
-        "name": "hud_fire.png",
+        "name": "hud_flame.png",
         "size": "1024x1024",
-        "prompt": """Mobile game UI fire-button icon — a CHUNKY TARGETING CROSSHAIR /
-RETICLE. Round metal frame in dark gunmetal with a glowing red ring on the inner
-edge, four short red crosshair bars at 12/3/6/9 o'clock pointing toward the
-centre, and a small bright red dot in the very middle. Slight 3/4 isometric tilt
-showing depth on the gunmetal frame.
+        "prompt": """Mobile game UI FIRE-BUTTON ICON — a CHUNKY STYLIZED CARTOON FLAME
+leaping upward. Multiple flame tongues with peaked tips, layered gradient:
+hot white-yellow core, fiery orange mid layer, deep red outer edge. A few
+small ember/spark dots floating around the flame. Slight 3/4 perspective
+giving the flame a sense of depth.
 
-THICK SOLID BLACK OUTLINE (4-6 px stroke), warm key light upper-left, cool fill
-lower-right. Crisp specular streaks along the gunmetal rim, fierce red inner
-glow, faint sparkle accents. Soft contact shadow. Royal-Match-style polish,
-chunky cartoony proportions, military-action vibe.
+THICK SOLID BLACK OUTLINE (4-6 px stroke), warm key light upper-left. The
+flame is energetic and dynamic, like a bright fireball about to launch.
+Royal-Match-style polish, chunky cartoony proportions, no realism.
 
-True alpha-channel transparent background, no text, centred composition with
-10% padding."""
+True alpha-channel transparent background, no fuel source, no torch, no text,
+centred composition with 10% padding."""
     },
     {
         "name": "hud_pickup.png",
