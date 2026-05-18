@@ -120,6 +120,13 @@ body.touch #touch-overlay { display: block; }
     --hud-cyan-soft: rgba(132, 232, 255, 0.55);
     --hud-cyan-glow: rgba(132, 232, 255, 0.45);
     --hud-back:      rgba(0, 30, 60, 0.18);
+
+    /* Ring colours — red while recharging / not affordable, green when ready */
+    --ring-red:        rgba(255,  78,  78, 0.95);
+    --ring-red-soft:   rgba(255,  78,  78, 0.18);
+    --ring-red-glow:   rgba(255,  78,  78, 0.55);
+    --ring-green:      rgba( 80, 240, 130, 0.95);
+    --ring-green-glow: rgba( 80, 240, 130, 0.55);
 }
 
 .touch-btn {
@@ -145,30 +152,40 @@ body.touch #touch-overlay { display: block; }
 /* Icon layer inside each button. Sits above the conic fill rings. */
 .touch-btn .icon {
     position: absolute;
-    inset: 22%;
+    inset: 18%;
     color: var(--hud-cyan);
     pointer-events: none;
     z-index: 1;
 }
-/* PNG-backed icons use mask-image so the icon's alpha shape gets
-   recoloured to cyan. JS sets --icon-mask to the asset url. */
+/* PNG-backed icons render the full image, then a CSS filter chain
+   converts the source to a 2-tone cyan duotone — light areas become
+   bright cyan, dark areas become deep teal, preserving the shading
+   detail in the original sprite. JS sets --icon-src to the asset url. */
 .touch-btn .icon[data-icon] {
-    background-color: var(--hud-cyan);
-    -webkit-mask-image: var(--icon-mask, none);
-            mask-image: var(--icon-mask, none);
-    -webkit-mask-size: contain;
-            mask-size: contain;
-    -webkit-mask-position: center;
-            mask-position: center;
-    -webkit-mask-repeat: no-repeat;
-            mask-repeat: no-repeat;
-    filter: drop-shadow(0 0 4px var(--hud-cyan-glow));
+    background-image: var(--icon-src, none);
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter:
+        grayscale(1)
+        brightness(1.05)
+        sepia(1)
+        hue-rotate(160deg)
+        saturate(3)
+        drop-shadow(0 0 4px var(--hud-cyan-glow));
 }
+/* PICK arrow — SVG drawn with a cyan fill and a darker teal stroke so
+   it picks up the same 2-tone look as the PNG icons. */
 .touch-btn .icon svg {
     width: 100%;
     height: 100%;
-    fill: currentColor;
     filter: drop-shadow(0 0 4px var(--hud-cyan-glow));
+}
+.touch-btn .icon svg path {
+    fill: var(--hud-cyan);
+    stroke: rgba(20, 70, 95, 0.9);
+    stroke-width: 0.9;
+    stroke-linejoin: round;
 }
 
 /* ---- FIRE button ---- */
@@ -178,33 +195,36 @@ body.touch #touch-overlay { display: block; }
     width: 140px;
     height: 140px;
 }
-#btn-fire .icon { inset: 18%; }
+#btn-fire .icon { inset: 14%; }
 #btn-fire::before {
-    /* Ammo recharge ring — same construction as the deploy CP ring.
-       --ammo-fill is 0..100 (current ammo / max, OR reload progress). */
+    /* Ammo recharge ring. Red fill draws up while reloading
+       (--ammo-fill 0..100). When .ready is set, the ring switches
+       to a solid green band — magazine is loaded, free to fire. */
     content: '';
     position: absolute;
-    inset: -5px;
+    inset: -8px;
     border-radius: 50%;
     background: conic-gradient(
         from -90deg,
-        var(--hud-cyan) 0deg,
-        var(--hud-cyan) calc(var(--ammo-fill, 0) * 3.6deg),
-        rgba(0, 0, 0, 0.30) calc(var(--ammo-fill, 0) * 3.6deg)
+        var(--ring-red) 0deg,
+        var(--ring-red) calc(var(--ammo-fill, 0) * 3.6deg),
+        var(--ring-red-soft) calc(var(--ammo-fill, 0) * 3.6deg)
     );
     -webkit-mask: radial-gradient(circle,
-        transparent 0, transparent 68px,
-        black 68px, black 75px,
-        transparent 75px);
+        transparent 0, transparent 65px,
+        black 65px, black 79px,
+        transparent 79px);
             mask: radial-gradient(circle,
-        transparent 0, transparent 68px,
-        black 68px, black 75px,
-        transparent 75px);
+        transparent 0, transparent 65px,
+        black 65px, black 79px,
+        transparent 79px);
+    filter: drop-shadow(0 0 6px var(--ring-red-glow));
     pointer-events: none;
     transition: filter 0.15s;
 }
 #btn-fire.ready::before {
-    filter: drop-shadow(0 0 6px var(--hud-cyan));
+    background: var(--ring-green);
+    filter: drop-shadow(0 0 8px var(--ring-green-glow));
 }
 
 /* ---- Deploy orbit (5 buttons evenly spaced) ---- */
@@ -221,50 +241,35 @@ body.touch #touch-overlay { display: block; }
 .deploy-orbit {
     width: 86px;
     height: 86px;
-    font-size: 12px;
-    line-height: 1;
 }
 .deploy-orbit::before {
+    /* CP / cost fill ring. Red fill grows as resource accumulates,
+       then .ready flips it to a solid green band. */
     content: '';
     position: absolute;
-    inset: -5px;
+    inset: -8px;
     border-radius: 50%;
     background: conic-gradient(
         from -90deg,
-        var(--hud-cyan) 0deg,
-        var(--hud-cyan) calc(var(--cp-fill, 0) * 3.6deg),
-        rgba(0, 0, 0, 0.30) calc(var(--cp-fill, 0) * 3.6deg)
+        var(--ring-red) 0deg,
+        var(--ring-red) calc(var(--cp-fill, 0) * 3.6deg),
+        var(--ring-red-soft) calc(var(--cp-fill, 0) * 3.6deg)
     );
     -webkit-mask: radial-gradient(circle,
-        transparent 0, transparent 41px,
-        black 41px, black 48px,
-        transparent 48px);
+        transparent 0, transparent 38px,
+        black 38px, black 52px,
+        transparent 52px);
             mask: radial-gradient(circle,
-        transparent 0, transparent 41px,
-        black 41px, black 48px,
-        transparent 48px);
+        transparent 0, transparent 38px,
+        black 38px, black 52px,
+        transparent 52px);
+    filter: drop-shadow(0 0 5px var(--ring-red-glow));
     pointer-events: none;
     transition: filter 0.15s;
 }
 .deploy-orbit.ready::before {
-    filter: drop-shadow(0 0 6px var(--hud-cyan));
-}
-.deploy-orbit .num {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: rgba(0, 30, 60, 0.85);
-    color: var(--hud-cyan);
-    font-size: 13px;
-    font-family: var(--headline-font);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1.5px solid var(--hud-cyan-soft);
-    z-index: 2;
+    background: var(--ring-green);
+    filter: drop-shadow(0 0 6px var(--ring-green-glow));
 }
 
 #btn-deploy-1 { left:  87px; bottom: 507px; }
@@ -446,14 +451,14 @@ body.touch.portrait #rotate-warning { display: flex; }
     <div id="joystick" class="control"><div id="joystick-knob"></div></div>
     <!-- FIRE in the centre; 5 buttons orbit around it on a radius-130 circle -->
     <div id="btn-fire"   class="control touch-btn"><div class="icon" data-icon="hud_flame"></div></div>
-    <div id="btn-deploy-1" class="control touch-btn deploy-orbit" data-keynum="1"><div class="icon" data-icon="hud_infantry"></div><span class="num">1</span></div>
-    <div id="btn-deploy-2" class="control touch-btn deploy-orbit" data-keynum="2"><div class="icon" data-icon="hud_bazooka"></div><span class="num">2</span></div>
-    <div id="btn-deploy-3" class="control touch-btn deploy-orbit" data-keynum="3"><div class="icon" data-icon="hud_tank"></div><span class="num">3</span></div>
-    <div id="btn-deploy-4" class="control touch-btn deploy-orbit" data-keynum="4"><div class="icon" data-icon="hud_missile"></div><span class="num">4</span></div>
+    <div id="btn-deploy-1" class="control touch-btn deploy-orbit" data-keynum="1"><div class="icon" data-icon="hud_infantry"></div></div>
+    <div id="btn-deploy-2" class="control touch-btn deploy-orbit" data-keynum="2"><div class="icon" data-icon="hud_bazooka"></div></div>
+    <div id="btn-deploy-3" class="control touch-btn deploy-orbit" data-keynum="3"><div class="icon" data-icon="hud_tank"></div></div>
+    <div id="btn-deploy-4" class="control touch-btn deploy-orbit" data-keynum="4"><div class="icon" data-icon="hud_missile"></div></div>
     <!-- PICK joins the orbit at 6 o'clock with an SVG up-arrow icon -->
     <div id="btn-pickup" class="control touch-btn deploy-orbit" data-keynum="P">
         <div class="icon">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 3 L20.5 13 H15.5 V21 H8.5 V13 H3.5 Z"/>
             </svg>
         </div>
@@ -728,6 +733,17 @@ const MISSILE_VS_AA_DAMAGE = 25;  // 4 hits to destroy a 100-HP AA
 const CRATE_HP = 3;               // 3 heli bullets to "open"
 const CRATE_RESPAWN_MS = 20000;   // 20s respawn from same slot
 const CRATE_PARACHUTE_MS = 4000;  // parachute descent duration
+// Crate body geometry. Bumped up so they're an easier target — the
+// original 28x22 box was too tight, especially on mobile where bullets
+// fly past on either side. Growth is mostly upward so the bottom stays
+// flat against the beach (matches the "no-hovering" anchoring from
+// earlier in development).
+const CRATE_HALF_W = 22;          // visual half-width (body is 44 wide)
+const CRATE_TOP    = 28;          // distance from c.y to top of body
+const CRATE_BOT    = 6;           // distance from c.y to bottom of body (matches old behaviour)
+const CRATE_HIT_X  = 28;          // bullet hitbox half-width (slightly wider than body)
+const CRATE_HIT_Y  = 20;          // bullet hitbox half-height (centred on c.y + CRATE_HIT_CY)
+const CRATE_HIT_CY = -11;         // hitbox centre offset from c.y (middle of the body)
 const CRATE_SLOTS = [
     { type: 'medi',   x: 700 },                       // near home base
     { type: 'medi',   x: WORLD_WIDTH / 2 },            // centre
@@ -1703,7 +1719,7 @@ function update() {
         if (!hit && b.team === 'player' && (b.type === 'heli' || b.type === 'heliMissile')) {
             for (const c of crates) {
                 if (c.state !== 'landed') continue;
-                if (Math.abs(b.x - c.x) < 20 && Math.abs(b.y - (c.y - 6)) < 22) {
+                if (Math.abs(b.x - c.x) < CRATE_HIT_X && Math.abs(b.y - (c.y + CRATE_HIT_CY)) < CRATE_HIT_Y) {
                     c.hp--;
                     spawnParticles(b.x, b.y, c.type === 'medi' ? '#ef5350' : '#42a5f5',
                                    4, 1, 8);
@@ -2837,55 +2853,62 @@ function shadeColor(color, percent) {
 }
 
 function drawCrate(c) {
+    // Convenience locals for the dimensions
+    const HW = CRATE_HALF_W;       // half-width (22)
+    const HT = CRATE_TOP;          // distance up from c.y (28)
+    const HB = CRATE_BOT;          // distance down from c.y (6)
+    const H  = HT + HB;            // total body height (34)
+    const W_ = HW * 2;             // total body width (44)
+
     if (c.state === 'respawning') {
         // Invisible while waiting to redrop. Show a small ghost marker so
         // the player can see WHERE it'll respawn.
         const sx = c.x - cameraX;
-        if (sx < -30 || sx > W + 30) return;
+        if (sx < -40 || sx > W + 40) return;
         const pulse = 0.4 + 0.3 * Math.sin(frameCount * 0.12);
         ctx.save();
         ctx.globalAlpha = pulse;
         ctx.strokeStyle = c.type === 'medi' ? '#ef5350' : '#42a5f5';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 3]);
-        ctx.strokeRect(sx - 14, CRATE_LANDED_Y - 16, 28, 22);
+        ctx.strokeRect(sx - HW, CRATE_LANDED_Y - HT, W_, H);
         ctx.setLineDash([]);
         // Countdown
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 11px "Lilita One", sans-serif';
+        ctx.font = 'bold 13px "Lilita One", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(`${(c.respawnTimer / 1000).toFixed(0)}s`, sx, CRATE_LANDED_Y + 4);
+        ctx.fillText(`${(c.respawnTimer / 1000).toFixed(0)}s`, sx, CRATE_LANDED_Y + 6);
         ctx.restore();
         return;
     }
 
     const sx = c.x - cameraX;
-    if (sx < -60 || sx > W + 60) return;
+    if (sx < -80 || sx > W + 80) return;
     const sy = c.y;
 
     // Parachute (only while descending)
     if (c.state === 'parachuting') {
         ctx.save();
-        // Strings
+        // Strings — anchored to the top corners of the now-larger crate
         ctx.strokeStyle = '#3e2723';
-        ctx.lineWidth = 1.2;
-        for (let dx of [-12, -4, 4, 12]) {
+        ctx.lineWidth = 1.4;
+        for (let dx of [-18, -6, 6, 18]) {
             ctx.beginPath();
-            ctx.moveTo(sx + dx, sy - 8);
-            ctx.lineTo(sx + dx * 1.6, sy - 32);
+            ctx.moveTo(sx + dx, sy - HT);
+            ctx.lineTo(sx + dx * 1.6, sy - HT - 28);
             ctx.stroke();
         }
-        // Canopy
+        // Canopy — scaled up to suit the new crate
         ctx.fillStyle = c.type === 'medi' ? '#ef5350' : '#42a5f5';
         ctx.strokeStyle = '#0a1628';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(sx, sy - 32, 24, Math.PI, 0);
+        ctx.arc(sx, sy - HT - 28, 32, Math.PI, 0);
         ctx.closePath();
         ctx.fill(); ctx.stroke();
         // White stripe centre on the canopy
         ctx.fillStyle = '#fff';
-        ctx.fillRect(sx - 3, sy - 32 - 24, 6, 24);
+        ctx.fillRect(sx - 4, sy - HT - 28 - 32, 8, 32);
         ctx.restore();
     }
 
@@ -2893,40 +2916,42 @@ function drawCrate(c) {
     ctx.save();
     ctx.fillStyle = '#6d4c41';
     ctx.strokeStyle = '#3e2723';
-    ctx.lineWidth = 2;
-    ctx.fillRect(sx - 14, sy - 16, 28, 22);
-    ctx.strokeRect(sx - 14, sy - 16, 28, 22);
-    // Plank seams
+    ctx.lineWidth = 2.4;
+    ctx.fillRect(sx - HW, sy - HT, W_, H);
+    ctx.strokeRect(sx - HW, sy - HT, W_, H);
+    // Plank seam — sits just under the symbol plate, splits lid from base
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(sx - 14, sy - 4); ctx.lineTo(sx + 14, sy - 4); ctx.stroke();
-    // Metal corner brackets
+    ctx.moveTo(sx - HW, sy - 2); ctx.lineTo(sx + HW, sy - 2); ctx.stroke();
+    // Metal corner brackets (6x6, inset 1px)
     ctx.strokeStyle = '#9e9e9e';
     ctx.lineWidth = 2;
-    ctx.strokeRect(sx - 13, sy - 15, 4, 4);
-    ctx.strokeRect(sx + 9, sy - 15, 4, 4);
-    ctx.strokeRect(sx - 13, sy + 1, 4, 4);
-    ctx.strokeRect(sx + 9, sy + 1, 4, 4);
+    ctx.strokeRect(sx - HW + 1,     sy - HT + 1, 6, 6);
+    ctx.strokeRect(sx + HW - 7,     sy - HT + 1, 6, 6);
+    ctx.strokeRect(sx - HW + 1,     sy + HB - 7, 6, 6);
+    ctx.strokeRect(sx + HW - 7,     sy + HB - 7, 6, 6);
 
-    // Symbol on the lid
+    // Symbol on the lid — white plate ~60% of body, then red cross or shield
+    const plateW = 24, plateH = 20;
+    const plateX = sx - plateW / 2;
+    const plateY = sy - HT + 4;
     if (c.type === 'medi') {
-        // Red cross
         ctx.fillStyle = '#fff';
-        ctx.fillRect(sx - 8, sy - 12, 16, 14);
+        ctx.fillRect(plateX, plateY, plateW, plateH);
         ctx.fillStyle = '#e53935';
-        ctx.fillRect(sx - 2, sy - 11, 4, 12);
-        ctx.fillRect(sx - 7, sy - 7, 14, 4);
+        // Cross — vertical bar 6 wide, horizontal bar 6 tall, centred
+        ctx.fillRect(sx - 3, plateY + 2, 6, plateH - 4);
+        ctx.fillRect(plateX + 2, plateY + 7, plateW - 4, 6);
     } else if (c.type === 'shield') {
-        // Blue shield
         ctx.fillStyle = '#fff';
-        ctx.fillRect(sx - 8, sy - 12, 16, 14);
+        ctx.fillRect(plateX, plateY, plateW, plateH);
         ctx.fillStyle = '#1976d2';
         ctx.beginPath();
-        ctx.moveTo(sx, sy - 11);
-        ctx.lineTo(sx + 6, sy - 8);
-        ctx.quadraticCurveTo(sx + 6, sy + 1, sx, sy + 2);
-        ctx.quadraticCurveTo(sx - 6, sy + 1, sx - 6, sy - 8);
+        ctx.moveTo(sx, plateY + 2);
+        ctx.lineTo(sx + 9, plateY + 6);
+        ctx.quadraticCurveTo(sx + 9, plateY + plateH - 3, sx, plateY + plateH - 1);
+        ctx.quadraticCurveTo(sx - 9, plateY + plateH - 3, sx - 9, plateY + 6);
         ctx.closePath();
         ctx.fill();
     }
@@ -2936,7 +2961,7 @@ function drawCrate(c) {
         for (let i = 0; i < CRATE_HP; i++) {
             ctx.fillStyle = i < c.hp ? '#69f0ae' : 'rgba(255,255,255,0.2)';
             ctx.beginPath();
-            ctx.arc(sx - 8 + i * 8, sy - 24, 2.5, 0, Math.PI * 2);
+            ctx.arc(sx - 10 + i * 10, sy - HT - 8, 3, 0, Math.PI * 2);
             ctx.fill();
         }
     }
@@ -5371,9 +5396,10 @@ async function tryLockLandscape() {
     });
 })();
 
-// When the icon sprites finish loading, swap them onto each touch button.
-// Wire each [data-icon] node to its PNG via mask-image, so the icon
-// becomes a cyan silhouette inside the transparent button frame.
+// Wire each [data-icon] node to its PNG via background-image. The CSS
+// filter chain (grayscale → sepia → hue-rotate → saturate) turns the
+// full-colour sprite into a 2-tone cyan icon that still has internal
+// shading, so it reads as a detailed icon rather than a flat silhouette.
 function applyHudIconsToButtons() {
     const iconMap = {
         hud_flame:    'assets/hud_flame.png',
@@ -5385,17 +5411,21 @@ function applyHudIconsToButtons() {
     document.querySelectorAll('.icon[data-icon]').forEach((el) => {
         const src = iconMap[el.dataset.icon];
         if (!src) return;
-        el.style.setProperty('--icon-mask', `url(${src})`);
+        el.style.setProperty('--icon-src', `url(${src})`);
     });
 }
 applyHudIconsToButtons();
 
-// Live fill update for each touch button — runs every animation frame
-// so the cyan rings track state smoothly.
-//   Deploy 1/2/3 → CP / unit cpCost
-//   Deploy 4    → gold / MISSILE_PAIR_COST (full when loaded)
-//   FIRE        → ammo / maxAmmo (or reload progress when empty)
-//   PICK        → always full (no resource gate)
+// Live state update for each touch button — runs every animation frame.
+//
+// Each ring is RED while filling toward affordability/reload, then flips
+// to a solid GREEN ring when ready. The .ready class drives the colour
+// swap; --cp-fill / --ammo-fill drive the red fill arc.
+//
+//   Deploy 1/2/3 → red fill = CP / cost,        green = affordable
+//   Deploy 4     → red fill = gold / cost,      green = affordable OR already loaded
+//   FIRE         → red fill = reload progress,  green = ammo > 0
+//   PICK         → always green (no resource gate)
 function updateButtonFills() {
     const costs = {
         '1': UNIT_DEFS.infantry.cpCost,
@@ -5404,36 +5434,30 @@ function updateButtonFills() {
     };
     document.querySelectorAll('.deploy-orbit').forEach((el) => {
         const k = el.dataset.keynum;
-        let pct = 100;
-        let ready = true;
+        let pct = 0;
+        let ready = false;
         if (k === '4') {
-            pct = Math.min(100, (money / MISSILE_PAIR_COST) * 100);
             ready = money >= MISSILE_PAIR_COST || heli.missiles > 0;
-            if (heli.missiles > 0) pct = 100;
+            pct = ready ? 100 : Math.min(100, (money / MISSILE_PAIR_COST) * 100);
         } else if (k === 'P') {
-            pct = 100;
             ready = true;
+            pct = 100;
         } else {
             const cost = costs[k];
-            pct = Math.min(100, (commandPoints / cost) * 100);
             ready = commandPoints >= cost;
+            pct = ready ? 100 : Math.min(100, (commandPoints / cost) * 100);
         }
         el.style.setProperty('--cp-fill', pct.toFixed(1));
         el.classList.toggle('ready', ready);
     });
 
-    // FIRE button — ammo OR reload progress
+    // FIRE button — red ring filling during reload, solid green when armed
     const fire = document.getElementById('btn-fire');
     if (fire) {
-        let pct;
-        if (heli.ammo > 0) {
-            pct = (heli.ammo / heli.maxAmmo) * 100;
-        } else {
-            // Filling back from 0 as the reload timer drains
-            pct = (1 - heli.reloadMs / HELI_RELOAD_MS) * 100;
-        }
+        const ready = heli.ammo > 0;
+        const pct = ready ? 100 : (1 - heli.reloadMs / HELI_RELOAD_MS) * 100;
         fire.style.setProperty('--ammo-fill', pct.toFixed(1));
-        fire.classList.toggle('ready', heli.ammo > 0);
+        fire.classList.toggle('ready', ready);
     }
 
     requestAnimationFrame(updateButtonFills);
