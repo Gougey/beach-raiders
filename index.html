@@ -783,6 +783,122 @@ async function loadBalance() {
     }
 }
 
+// ============================================================
+// CAMPAIGN — LEVEL DATA (inline defaults; levels.json overrides on fetch)
+// ============================================================
+const LEVELS_DATA = {
+    regions: [
+        {
+            id: 'coral_coast', name: 'Coral Coast', theme: 'tropical', unlockStars: 0,
+            levels: [
+                { id:'r1_l01', name:'First Blood',    types:['infantry','infantry','bazooka'],        spawnEvery:165, baseHp:350, aaCount:1, woundedCount:2, goldReward:80,  xpReward:20, briefText:'Enemy scouts have occupied the beach. Clear them out.' },
+                { id:'r1_l02', name:'Push to Shore',  types:['infantry','bazooka'],                   spawnEvery:155, baseHp:380, aaCount:1, woundedCount:2, goldReward:90,  xpReward:22, briefText:'Hold the waterline and drive the enemy back.' },
+                { id:'r1_l03', name:'Armoured Threat',types:['infantry','bazooka','tank'],             spawnEvery:145, baseHp:400, aaCount:1, woundedCount:2, goldReward:100, xpReward:25, briefText:'Tanks spotted on the coast road. Bring bazookas.' },
+                { id:'r1_l04', name:'AA Alley',       types:['infantry','bazooka','tank'],             spawnEvery:140, baseHp:420, aaCount:2, woundedCount:3, goldReward:110, xpReward:28, briefText:'Anti-air emplacements active. Stay low or use missiles.' },
+                { id:'r1_l05', name:'Crossfire',      types:['infantry','bazooka','tank'],             spawnEvery:135, baseHp:440, aaCount:2, woundedCount:3, goldReward:120, xpReward:30, briefText:'Multiple enemy flanks engaged. Watch the minimap.' },
+                { id:'r1_l06', name:'Tank Column',    types:['bazooka','bazooka','tank'],              spawnEvery:128, baseHp:460, aaCount:2, woundedCount:3, goldReward:130, xpReward:33, briefText:'Heavy armour rolling in. Deploy anti-tank assets.' },
+                { id:'r1_l07', name:'The Grinder',    types:['infantry','bazooka','bazooka','tank'],   spawnEvery:122, baseHp:480, aaCount:2, woundedCount:3, goldReward:140, xpReward:36, briefText:'Sustained assault. Manage your Command Points carefully.' },
+                { id:'r1_l08', name:'Bunker Line',    types:['bazooka','bazooka','tank','tank'],       spawnEvery:115, baseHp:500, aaCount:3, woundedCount:4, goldReward:155, xpReward:40, briefText:'Entrenched positions and heavy armour. No easy runs.' },
+                { id:'r1_l09', name:'Last Line',      types:['bazooka','tank','tank'],                 spawnEvery:108, baseHp:520, aaCount:3, woundedCount:4, goldReward:165, xpReward:44, briefText:'The enemy has committed everything to this push.' },
+                { id:'r1_l10', name:'Iron Gate',      types:['infantry','bazooka','bazooka','tank'],   spawnEvery:100, baseHp:540, aaCount:3, woundedCount:3, goldReward:200, xpReward:55, boss:'miniBossTank', briefText:'Reinforced position with heavy armour. Missiles recommended.' },
+                { id:'r1_l11', name:'Steel Rain',     types:['tank','tank','bazooka','bazooka'],       spawnEvery:95,  baseHp:560, aaCount:3, woundedCount:4, goldReward:175, xpReward:48, briefText:'Maximum enemy commitment. A test of your whole loadout.' },
+                { id:'r1_l12', name:'Operation Coral',types:['tank','tank','bazooka','infantry'],      spawnEvery:85,  baseHp:600, aaCount:3, woundedCount:4, goldReward:250, xpReward:70, boss:'bossTank', briefText:'Region boss. Full commitment. This is what you trained for.' },
+            ],
+        },
+        {
+            id: 'saharan_front', name: 'Saharan Front', theme: 'desert', unlockStars: 8,
+            levels: [
+                { id:'r2_l01', name:'Desert Landing',  types:['infantry','bazooka'],                   spawnEvery:155, baseHp:580, aaCount:2, woundedCount:3, goldReward:130, xpReward:35, briefText:'The desert offers no cover. Fly fast and strike hard.' },
+                { id:'r2_l02', name:'Dune Assault',    types:['infantry','bazooka','tank'],             spawnEvery:148, baseHp:610, aaCount:2, woundedCount:3, goldReward:140, xpReward:38, briefText:'Reinforced desert patrol. Watch your flanks.' },
+                { id:'r2_l03', name:'Sandwall',        types:['infantry','bazooka','tank'],             spawnEvery:140, baseHp:640, aaCount:2, woundedCount:3, goldReward:150, xpReward:40, briefText:'AA emplacements dug into dunes. Use your missiles.' },
+                { id:'r2_l04', name:'The Oasis',       types:['bazooka','tank'],                       spawnEvery:132, baseHp:670, aaCount:3, woundedCount:4, goldReward:160, xpReward:44, briefText:'Enemy supply point. Destroy it before reinforcements arrive.' },
+                { id:'r2_l05', name:'Hot Zone',        types:['infantry','bazooka','bazooka','tank'],   spawnEvery:125, baseHp:700, aaCount:3, woundedCount:4, goldReward:170, xpReward:48, briefText:'Heavy contact. Enemy is rotating fresh units.' },
+                { id:'r2_l06', name:'Dust Storm',      types:['bazooka','bazooka','tank'],              spawnEvery:118, baseHp:730, aaCount:3, woundedCount:4, goldReward:180, xpReward:52, briefText:'Visibility reduced. Stay sharp and hit fast.' },
+                { id:'r2_l07', name:'Iron Dunes',      types:['bazooka','bazooka','tank','tank'],       spawnEvery:112, baseHp:760, aaCount:3, woundedCount:4, goldReward:190, xpReward:56, briefText:'Armoured column advancing. Anti-tank only.' },
+                { id:'r2_l08', name:'Scorched Earth',  types:['tank','tank','bazooka'],                 spawnEvery:105, baseHp:790, aaCount:3, woundedCount:4, goldReward:200, xpReward:60, briefText:'Enemy denying ground. Aggressive push required.' },
+                { id:'r2_l09', name:'The Forge',       types:['tank','tank','bazooka','bazooka'],       spawnEvery:98,  baseHp:820, aaCount:3, woundedCount:4, goldReward:210, xpReward:64, briefText:'Hardened position. One chance to get this right.' },
+                { id:'r2_l10', name:'Desert Fang',     types:['infantry','bazooka','tank','tank'],      spawnEvery:92,  baseHp:860, aaCount:3, woundedCount:3, goldReward:280, xpReward:80, boss:'miniBossTank', briefText:'Saharan mini-boss. Armour up and hit hard.' },
+                { id:'r2_l11', name:'Saharan Siege',   types:['tank','tank','tank','bazooka'],          spawnEvery:86,  baseHp:880, aaCount:3, woundedCount:4, goldReward:220, xpReward:68, briefText:'Maximum armour density. Bring everything.' },
+                { id:'r2_l12', name:'Operation Sahara',types:['tank','tank','bazooka','infantry'],      spawnEvery:76,  baseHp:950, aaCount:3, woundedCount:4, goldReward:350, xpReward:90, boss:'bossTank', briefText:'Region boss. The desert is their final stronghold.' },
+            ],
+        },
+    ],
+};
+
+async function loadLevels() {
+    try {
+        const resp = await fetch('levels.json', { cache: 'no-cache' });
+        if (!resp.ok) return;
+        const override = await resp.json();
+        deepMerge(LEVELS_DATA, override);
+        console.log('[levels] levels.json overrides applied');
+    } catch (e) {
+        console.log('[levels] using inline level defaults');
+    }
+}
+
+// ============================================================
+// SAVE SYSTEM
+// ============================================================
+const XP_THRESHOLDS = [0,100,250,500,900,1500,2300,3500,5000,7500,10000,15000,21000,30000,42000,58000,80000,110000];
+
+const DEFAULT_SAVE = {
+    version: 1,
+    gold: 30,
+    stars: {},
+    xp: 0,
+    rank: 1,
+    lives: 5,
+    livesLastRefillTs: 0,
+    upgrades: {},
+    currentRegionIdx: 0,
+    currentLevelIdx: 0,
+    ftueComplete: true,
+};
+
+let save = { ...DEFAULT_SAVE, stars: {}, upgrades: {} };
+
+function loadSave() {
+    try {
+        const raw = JSON.parse(localStorage.getItem('fe_save_v1') || '{}');
+        const s = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+        deepMerge(s, raw);
+        return s;
+    } catch { return JSON.parse(JSON.stringify(DEFAULT_SAVE)); }
+}
+
+function writeSave() {
+    try {
+        save.gold = money;
+        localStorage.setItem('fe_save_v1', JSON.stringify(save));
+    } catch (e) {
+        showToast('⚠ Save failed — storage full?');
+    }
+}
+
+function totalStars() {
+    return Object.values(save.stars).reduce((a, b) => a + b, 0);
+}
+
+function rankFromXp(xp) {
+    for (let i = XP_THRESHOLDS.length - 1; i >= 0; i--) {
+        if (xp >= XP_THRESHOLDS[i]) return i + 1;
+    }
+    return 1;
+}
+
+function refreshLives() {
+    const maxLives = 5;
+    if (save.lives >= maxLives) { save.livesLastRefillTs = Date.now(); return; }
+    const msPerLife = 30 * 60 * 1000;
+    const elapsed = Date.now() - (save.livesLastRefillTs || Date.now());
+    const gained = Math.min(Math.floor(elapsed / msPerLife), maxLives - save.lives);
+    if (gained > 0) {
+        save.lives = Math.min(maxLives, save.lives + gained);
+        save.livesLastRefillTs = Date.now();
+    }
+}
+
 // ---- GAME CONFIG (visual / world geometry — not for live tuning) ----
 const WORLD_WIDTH = 4000;
 const GROUND_Y = 560;
@@ -1040,6 +1156,37 @@ function resetCrates() {
     }));
 }
 
+// ============================================================
+// CAMPAIGN STATE
+// ============================================================
+let campaignRegionIdx = 0;
+let campaignLevelIdx  = 0;
+let currentLevelData  = null;
+
+// Per-level tracking
+let woundedSoldiers          = [];
+let starsThisLevel           = { victory: false, rescue: false, discipline: true };
+let playerUnitsLostThisLevel = 0;
+let woundedRescuedThisLevel  = 0;
+
+// Post-level star award screen
+let levelCompleteTimer = 0;
+let pendingGoldReward  = 0;
+let pendingXpReward    = 0;
+
+// World-map state
+let worldMapScrollX         = 0;
+let worldMapScrollTarget    = 0;
+let worldMapSelectedRegion  = 0;
+let worldMapSelectedLevel   = -1;
+
+// DDA history
+const playerDeployedTypes = [];
+
+// Shared UI animation frame (incremented every rAF regardless of state)
+let uiAnimFrame = 0;
+
+// ---- GAME STATE ----
 // Buttons hit-rects (filled in during draw, used by click handler)
 let hudHitRects = [];
 let pauseHitRect = null;
@@ -1088,7 +1235,11 @@ canvas.addEventListener('click', e => {
             return;
         }
     }
-    if (gameState !== 'playing') return;
+    // HUD hit rects are active in playing, shop, worldmap, levelbrief, and levelcomplete
+    const hitsActive = (gameState === 'playing' || gameState === 'shop' ||
+                        gameState === 'worldmap' || gameState === 'levelbrief' ||
+                        gameState === 'levelcomplete');
+    if (!hitsActive) return;
     for (const r of hudHitRects) {
         if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) {
             if (r.action) r.action();
@@ -1099,15 +1250,19 @@ canvas.addEventListener('click', e => {
 
 document.getElementById('start-btn').addEventListener('click', () => {
     document.getElementById('start-screen').style.display = 'none';
-    gameState = 'playing';
-    initGame();
+    // Restore campaign position from save
+    campaignRegionIdx = save.currentRegionIdx || 0;
+    campaignLevelIdx  = save.currentLevelIdx  || 0;
+    worldMapSelectedRegion = campaignRegionIdx;
+    worldMapSelectedLevel  = campaignLevelIdx;
+    money = save.gold;
+    gameState = 'worldmap';
 });
 document.getElementById('restart-btn').addEventListener('click', () => {
-    // Guard against rapid double-tap restarting initGame() twice.
     if (gameState !== 'gameover') return;
     document.getElementById('game-over-screen').style.display = 'none';
-    gameState = 'playing';
-    initGame();
+    // Offer retry or go to world map via retryCurrentLevel
+    retryCurrentLevel();
 });
 
 // ---- HELICOPTER ----
@@ -1161,11 +1316,13 @@ function buyMissiles() {
 // HP / bounty / fire-interval / range live in BALANCE.aa.
 let airDefences = [];
 
-function resetAirDefences() {
+function resetAirDefences(count) {
     airDefences = [];
-    // Place 3 batteries spread across the enemy half
-    const positions = [WORLD_WIDTH * 0.55, WORLD_WIDTH * 0.70, WORLD_WIDTH * 0.85];
-    for (const x of positions) {
+    const c = (count !== undefined) ? Math.min(count, 3) : 3;
+    // Spread from back of enemy half; later levels get more AA batteries
+    const allPositions = [WORLD_WIDTH * 0.85, WORLD_WIDTH * 0.70, WORLD_WIDTH * 0.55];
+    for (let i = 0; i < c; i++) {
+        const x = allPositions[i];
         airDefences.push({
             x,
             y: GROUND_Y - 20,
@@ -1181,10 +1338,10 @@ function resetAirDefences() {
 // ---- BASES ----
 let playerBase = {};
 let enemyBase = {};
-function resetBases() {
-    const baseHp = BALANCE.bases.hp;
-    playerBase = { x: 100, hp: baseHp, maxHp: baseHp, team: 'player' };
-    enemyBase = { x: WORLD_WIDTH - 200, hp: baseHp, maxHp: baseHp, team: 'enemy' };
+function resetBases(levelData) {
+    const baseHp = (levelData && levelData.baseHp) || BALANCE.bases.hp;
+    playerBase = { x: 100, hp: BALANCE.bases.hp, maxHp: BALANCE.bases.hp, team: 'player' };
+    enemyBase  = { x: WORLD_WIDTH - 200, hp: baseHp, maxHp: baseHp, team: 'enemy' };
 }
 
 // ---- INIT ----
@@ -1198,23 +1355,29 @@ let bgMountains = [];
 let bgTrees = [];
 let birds = [];
 
-function initGame() {
+function initGame(levelData) {
+    currentLevelData = levelData || null;
     resetHeli();
-    resetBases();
-    resetAirDefences();
+    resetBases(levelData);
+    resetAirDefences(levelData ? levelData.aaCount : 3);
     resetCrates();
-    money = BALANCE.economy.startMoney;
+    resetWounded(levelData);
+    // Gold: start from saved balance (persistent across levels)
+    money = save.gold;
     commandPoints = BALANCE.economy.cpCapDefault;
     cpCap = BALANCE.economy.cpCapDefault;
     enemyCommandPoints = BALANCE.economy.cpCapDefault;
     floatingTexts = [];
     enemySpawnTimer = 0;
-    currentLevel = 1;
+    // currentLevel kept for legacy HUD; campaign uses campaignLevelIdx
+    if (!levelData) currentLevel = 1;
     levelState = 'active';
+    levelCompleteTimer = 0;
     bossSpawnedThisLevel = false;
     bossSpawnTimer = 0;
     powerupShieldMs = 0;
-    upgradeLevels = makeFreshUpgradeLevels();
+    // Load persistent upgrades from save (not reset each level)
+    upgradeLevels = { ...makeFreshUpgradeLevels(), ...save.upgrades };
     frameCount = 0;
     particles = [];
     bullets = [];
@@ -1324,6 +1487,75 @@ function initGame() {
     }
 }
 
+// ============================================================
+// WOUNDED SOLDIERS
+// ============================================================
+
+function resetWounded(levelData) {
+    woundedSoldiers = [];
+    starsThisLevel  = { victory: false, rescue: false, discipline: true };
+    playerUnitsLostThisLevel = 0;
+    woundedRescuedThisLevel  = 0;
+    if (!levelData || !levelData.woundedCount) return;
+    const count = levelData.woundedCount;
+    const spread = WORLD_WIDTH - 1600;
+    const step = spread / (count + 1);
+    for (let i = 0; i < count; i++) {
+        woundedSoldiers.push({
+            id: `wounded_${i}`,
+            x: 800 + step * (i + 1),
+            y: GROUND_Y - 11,
+            rescued: false,
+            inHeli: false,
+            type: 'wounded',
+            team: 'player',
+            w: 14, h: 22,
+            bobOffset: Math.random() * Math.PI * 2,
+        });
+    }
+}
+
+function checkRescueComplete() {
+    const total = woundedSoldiers.length;
+    if (total === 0) return;
+    const rescued = woundedSoldiers.filter(w => w.rescued).length;
+    woundedRescuedThisLevel = rescued;
+    if (rescued >= total) starsThisLevel.rescue = true;
+}
+
+function drawWounded() {
+    for (const w of woundedSoldiers) {
+        if (w.rescued || w.inHeli) continue;
+        const sx = w.x - cameraX;
+        if (sx < -40 || sx > W + 40) continue;
+        ctx.save();
+        ctx.globalAlpha = 0.78;
+        const drawn = drawSprite('infantry_blue_1', sx, w.y, 22);
+        if (!drawn) {
+            ctx.fillStyle = '#1565c0';
+            ctx.fillRect(sx - 7, w.y - 11, 14, 22);
+        }
+        ctx.restore();
+        // Pulsing red cross above soldier
+        const cx2 = sx, cy2 = w.y - 28;
+        const pulse = 0.5 + 0.5 * Math.abs(Math.sin(uiAnimFrame * 0.08 + w.bobOffset));
+        ctx.save();
+        ctx.strokeStyle = `rgba(239,83,80,${0.7 + 0.3 * pulse})`;
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx2 - 5, cy2); ctx.lineTo(cx2 + 5, cy2);
+        ctx.moveTo(cx2, cy2 - 5); ctx.lineTo(cx2, cy2 + 5);
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(239,83,80,${0.15 + 0.2 * pulse})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(cx2, cy2, 9 + 2 * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
 // ---- UNIT DEFINITIONS ----
 // Unit stats live in BALANCE.units (top of file). The const alias here
 // shares the object by reference, so debug-overlay edits to BALANCE.units
@@ -1421,6 +1653,7 @@ function buyUpgrade(id) {
     }
     money -= tier.cost;
     upgradeLevels[id] = lvl + 1;
+    save.upgrades[id] = upgradeLevels[id]; // persist
     if (id === 'heliHp') {
         heli.maxHp += tier.hp;
         heli.hp += tier.hp;
@@ -1452,6 +1685,9 @@ function spawnPlayerUnit(type) {
     };
     applyUpgradesToUnit(u);
     units.push(u);
+    // Track for DDA
+    playerDeployedTypes.push(type);
+    if (playerDeployedTypes.length > 10) playerDeployedTypes.shift();
     spawnFloatingText(playerBase.x + 80, GROUND_Y - 60, `-${def.cpCost} CP`, '#42a5f5');
 }
 
@@ -1480,6 +1716,7 @@ function helicopterPickup() {
         return;
     }
     let lifted = 0;
+    // Pick up regular troops
     for (let i = units.length - 1; i >= 0; i--) {
         const u = units[i];
         const liftable = u.team === 'player' && (u.type === 'infantry' || u.type === 'bazooka');
@@ -1494,6 +1731,19 @@ function helicopterPickup() {
             lifted++;
         }
     }
+    // Pick up wounded soldiers
+    for (let i = 0; i < woundedSoldiers.length; i++) {
+        const w = woundedSoldiers[i];
+        if (w.rescued || w.inHeli) continue;
+        if (heli.carrying.length >= heli.maxCarry) break;
+        const dx = w.x - heli.x;
+        const dy = w.y - heli.y;
+        if (Math.abs(dx) < 60 && Math.abs(dy) < 80) {
+            w.inHeli = true;
+            heli.carrying.push(w);
+            lifted++;
+        }
+    }
     if (lifted === 0) {
         spawnFloatingText(heli.x, heli.y - 40, 'NO TROOPS NEARBY', '#90a4ae');
     }
@@ -1504,14 +1754,37 @@ function helicopterDrop() {
         spawnFloatingText(heli.x, heli.y - 40, 'CARGO HOLD EMPTY', '#90a4ae');
         return;
     }
-    // Must be at low altitude (essentially landed) to drop troops.
     if (heli.y < HELI_LANDING_Y) {
         spawnFloatingText(heli.x, heli.y - 40, 'MUST LAND TO DROP', '#ff9800');
         return;
     }
-    for (let i = 0; i < heli.carrying.length; i++) {
-        const s = heli.carrying[i];
-        s.x = heli.x + (i - (heli.carrying.length - 1) / 2) * 24;
+    const atBase = Math.abs(heli.x - playerBase.x) < 220;
+    let rescuedCount = 0;
+    const regularTroops = [];
+    for (const s of heli.carrying) {
+        if (s.type === 'wounded') {
+            s.inHeli = false;
+            if (atBase) {
+                s.rescued = true;
+                rescuedCount++;
+            } else {
+                s.x = heli.x;
+                s.y = GROUND_Y - 11;
+            }
+        } else {
+            regularTroops.push(s);
+        }
+    }
+    if (rescuedCount > 0) {
+        spawnFloatingText(heli.x, heli.y - 40, `${rescuedCount} RESCUED!`, '#69f0ae');
+        for (let i = 0; i < 14; i++) {
+            spawnParticles(heli.x + (Math.random()-0.5)*40, heli.y + 20, '#69f0ae', 1, 1, 14);
+        }
+        checkRescueComplete();
+    }
+    for (let i = 0; i < regularTroops.length; i++) {
+        const s = regularTroops[i];
+        s.x = heli.x + (i - (regularTroops.length - 1) / 2) * 24;
         s.y = GROUND_Y - s.h / 2;
         s.state = 'march';
         units.push(s);
@@ -1696,6 +1969,10 @@ function spawnDustCloud(x, y) {
 
 // ---- UPDATE ----
 function update() {
+    if (gameState === 'levelcomplete') {
+        levelCompleteTimer += 16.67;
+        return;
+    }
     if (gameState !== 'playing') return;
     frameCount++;
 
@@ -1782,6 +2059,11 @@ function update() {
                     triggerScreenShake(12, 30);
                     spawnFloatingText(u.x, u.y - 60, `${u.bossLabel} DOWN`, '#ffd54f');
                 }
+            }
+            // Discipline star tracking: any player deployed unit dying = no discipline star
+            if (u.team === 'player') {
+                playerUnitsLostThisLevel++;
+                starsThisLevel.discipline = false;
             }
             units.splice(i, 1);
             continue;
@@ -2178,30 +2460,28 @@ function update() {
     }
 
     // Level update — single continuous fight, ends when enemy base destroyed.
-    const level = LEVEL_COMPOSITIONS[Math.min(currentLevel - 1, TOTAL_LEVELS - 1)];
+    // Use currentLevelData if available, otherwise fall back to legacy LEVEL_COMPOSITIONS.
+    const levelDef = currentLevelData
+        || LEVEL_COMPOSITIONS[Math.min(currentLevel - 1, TOTAL_LEVELS - 1)];
     if (levelState === 'active') {
         enemySpawnTimer++;
-        if (enemySpawnTimer > level.spawnEvery) {
+        if (enemySpawnTimer > levelDef.spawnEvery) {
             enemySpawnTimer = 0;
-            const type = level.types[Math.floor(Math.random() * level.types.length)];
+            const type = levelDef.types[Math.floor(Math.random() * levelDef.types.length)];
             const cpCost = UNIT_DEFS[type].cpCost;
             if (enemyCommandPoints >= cpCost) {
                 spawnEnemyUnit(type);
                 enemyCommandPoints -= cpCost;
             }
         }
-        // Boss appears once per level on elite levels, after a short delay so
-        // the player has a moment to scout the regular enemies first.
-        if (level.boss && !bossSpawnedThisLevel) {
+        if (levelDef.boss && !bossSpawnedThisLevel) {
             bossSpawnTimer = (bossSpawnTimer || 0) + 16.67;
             if (bossSpawnTimer > 8000) {
-                spawnBossUnit(level.boss);
+                spawnBossUnit(levelDef.boss);
                 bossSpawnedThisLevel = true;
             }
         }
     }
-    // 'complete' state is purely UI-driven — shop overlay advances to the
-    // next level via the READY button.
     // Decay shield powerup
     if (powerupShieldMs > 0) powerupShieldMs = Math.max(0, powerupShieldMs - 16.67);
     // Helicopter reload: empty magazine → wait BALANCE.heli.reloadMs → full refill.
@@ -2220,23 +2500,34 @@ function update() {
 
     // Win/Lose conditions
     if (enemyBase.hp <= 0 && levelState === 'active') {
-        // Level complete — bonus, refill CP, then open the shop overlay.
-        money += 100 + currentLevel * 50;   // bigger bonus on higher levels
+        starsThisLevel.victory = true;
+        // Rescue star: auto-pass if no wounded in this level
+        if (!currentLevelData || !currentLevelData.woundedCount) starsThisLevel.rescue = true;
         commandPoints = cpCap;
-        spawnFloatingText(enemyBase.x, GROUND_Y - 100,
-                          `LEVEL ${currentLevel} COMPLETE`, '#69f0ae');
         triggerScreenShake(10, 30);
         spawnExplosion(enemyBase.x, GROUND_Y - 40, 8);
-        if (currentLevel >= TOTAL_LEVELS) {
-            // Cleared the final level = full victory
-            gameState = 'gameover';
-            gameOverResult = 'win';
-            document.getElementById('game-over-text').textContent = 'VICTORY!';
-            document.getElementById('game-over-text').style.color = '#4caf50';
-            document.getElementById('game-over-screen').style.display = 'flex';
-        } else {
-            levelState = 'complete';
+        // Compute star count (A=victory, B=rescue, C=discipline)
+        let earnedStars = 1; // always get victory star
+        if (starsThisLevel.rescue && currentLevelData && currentLevelData.woundedCount) earnedStars++;
+        if (starsThisLevel.discipline) earnedStars++;
+        // For levels with no wounded, max is 2 stars
+        const maxStars = (currentLevelData && currentLevelData.woundedCount) ? 3 : 2;
+        earnedStars = Math.min(earnedStars, maxStars);
+        if (currentLevelData) {
+            const prev = save.stars[currentLevelData.id] || 0;
+            save.stars[currentLevelData.id] = Math.max(prev, earnedStars);
+            save.xp = (save.xp || 0) + (currentLevelData.xpReward || 20);
+            save.rank = rankFromXp(save.xp);
         }
+        // Gold reward
+        pendingGoldReward = (currentLevelData ? currentLevelData.goldReward : (100 + currentLevel * 50));
+        pendingXpReward   = currentLevelData ? currentLevelData.xpReward : 20;
+        money += pendingGoldReward;
+        save.gold = money;
+        writeSave();
+        levelCompleteTimer = 0;
+        levelState = 'complete';
+        gameState = 'levelcomplete';
     }
     if (playerBase.hp <= 0 || heli.hp <= 0) {
         gameState = 'gameover';
@@ -4590,8 +4881,8 @@ function bevelButton(x, y, w, h, opts = {}) {
 // ---- Main HUD ----
 
 function drawHUD() {
-    hudHitRects = [];
     pauseHitRect = null;
+    // hudHitRects reset happens at top of render() now
 
     drawTopHUD();
     // On touch devices the deploy orbit + a compact gold readout replace
@@ -4602,7 +4893,8 @@ function drawHUD() {
         drawDeployPanel();
         drawIncomePowerupPanel();
     }
-    if (levelState === 'complete') drawShopOverlay();
+    // Shop overlay shown when gameState === 'shop' (levelState === 'complete')
+    if (gameState === 'shop') drawShopOverlay();
 
     // Pause overlay if game is paused
     if (gameState === 'paused') {
@@ -5357,33 +5649,475 @@ function drawShopOverlay() {
     ctx.restore();
     hudHitRects.push({
         x: readyX, y: readyY, w: readyW, h: readyH,
-        action: () => {
-            currentLevel = Math.min(TOTAL_LEVELS, currentLevel + 1);
-            // Refill enemy base + clear the battlefield for the next level
-            enemyBase.hp = enemyBase.maxHp;
-            playerBase.hp = playerBase.maxHp;
-            units.length = 0;
-            bullets.length = 0;
-            resetAirDefences();
-            resetCrates();
-            bossSpawnedThisLevel = false;
-            bossSpawnTimer = 0;
-            enemySpawnTimer = 0;
-            heli.hp = heli.maxHp;
-            heli.ammo = heli.maxAmmo;
-            heli.reloadMs = 0;
-            heli.missiles = 0;
-            commandPoints = cpCap;
-            levelState = 'active';
-        },
+        action: () => { advanceToNextLevel(); },
     });
+
+    ctx.restore();
+}
+
+// ---- CAMPAIGN NAVIGATION ----
+
+function startSelectedLevel() {
+    const region = LEVELS_DATA.regions[worldMapSelectedRegion];
+    if (!region) return;
+    const lvl = region.levels[worldMapSelectedLevel];
+    if (!lvl) return;
+    if (save.lives <= 0) { showToast('No lives — wait for refill!'); return; }
+    campaignRegionIdx = worldMapSelectedRegion;
+    campaignLevelIdx  = worldMapSelectedLevel;
+    playerUnitsLostThisLevel = 0;
+    woundedRescuedThisLevel  = 0;
+    starsThisLevel = { victory: false, rescue: false, discipline: true };
+    gameState = 'levelbrief';
+}
+
+function launchCurrentLevel() {
+    const region = LEVELS_DATA.regions[campaignRegionIdx];
+    if (!region) return;
+    const lvl = region.levels[campaignLevelIdx];
+    if (!lvl) return;
+    document.getElementById('start-screen').style.display    = 'none';
+    document.getElementById('game-over-screen').style.display = 'none';
+    save.lives = Math.max(0, save.lives - 1);
+    save.currentRegionIdx = campaignRegionIdx;
+    save.currentLevelIdx  = campaignLevelIdx;
+    writeSave();
+    initGame(lvl);
+    gameState = 'playing';
+}
+
+function retryCurrentLevel() {
+    if (save.lives <= 0) { showToast('No lives — wait for refill!'); gameState = 'worldmap'; return; }
+    document.getElementById('game-over-screen').style.display = 'none';
+    save.lives = Math.max(0, save.lives - 1);
+    writeSave();
+    const region = LEVELS_DATA.regions[campaignRegionIdx];
+    const lvl = region ? region.levels[campaignLevelIdx] : null;
+    initGame(lvl || null);
+    gameState = 'playing';
+}
+
+function advanceAfterLevel() {
+    // Called when player taps the star award screen — goes to shop
+    gameState = 'shop';
+    save.gold = money;
+    writeSave();
+}
+
+function advanceToNextLevel() {
+    // Called by shop READY button — advances campaign position and starts next level
+    const region = LEVELS_DATA.regions[campaignRegionIdx];
+    if (region && campaignLevelIdx + 1 < region.levels.length) {
+        campaignLevelIdx++;
+    } else {
+        // Move to next region if unlocked, otherwise stay on map
+        const nextRegionIdx = campaignRegionIdx + 1;
+        if (nextRegionIdx < LEVELS_DATA.regions.length) {
+            const nextRegion = LEVELS_DATA.regions[nextRegionIdx];
+            if (totalStars() >= (nextRegion.unlockStars || 0)) {
+                campaignRegionIdx = nextRegionIdx;
+                campaignLevelIdx  = 0;
+            } else {
+                gameState = 'worldmap'; return;
+            }
+        } else {
+            gameState = 'worldmap'; return;
+        }
+    }
+    save.currentRegionIdx = campaignRegionIdx;
+    save.currentLevelIdx  = campaignLevelIdx;
+    writeSave();
+    const nextRegion = LEVELS_DATA.regions[campaignRegionIdx];
+    const nextLevel  = nextRegion ? nextRegion.levels[campaignLevelIdx] : null;
+    if (!nextLevel) { gameState = 'worldmap'; return; }
+    save.lives = Math.max(0, save.lives - 1);
+    writeSave();
+    playerUnitsLostThisLevel = 0;
+    woundedRescuedThisLevel  = 0;
+    starsThisLevel = { victory: false, rescue: false, discipline: true };
+    initGame(nextLevel);
+    gameState = 'playing';
+}
+
+// ---- STAR AWARD SCREEN ----
+
+function drawStar5(cx, cy, r, filled) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+        const angle = (Math.PI / 5) * i - Math.PI / 2;
+        const rad   = (i % 2 === 0) ? r : r * 0.42;
+        const x = Math.cos(angle) * rad;
+        const y = Math.sin(angle) * rad;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    if (filled) {
+        ctx.fillStyle   = '#FFD700';
+        ctx.strokeStyle = '#c8a000';
+        ctx.lineWidth   = 2;
+        ctx.fill();
+        ctx.stroke();
+    } else {
+        ctx.fillStyle   = 'rgba(255,255,255,0.15)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth   = 2;
+        ctx.fill();
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+function drawStarAwardScreen() {
+    // Translucent overlay
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(0, 0, W, H);
+
+    // Card
+    const cw = Math.min(W * 0.88, 520);
+    const ch = 290;
+    const cx = (W - cw) / 2;
+    const cy = H * 0.14;
+    ctx.fillStyle = 'rgba(20,40,20,0.97)';
+    roundRect(ctx, cx, cy, cw, ch, 18);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(100,200,100,0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Title
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.round(cw * 0.072)}px "Lilita One", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 10; ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.fillText('MISSION COMPLETE', W / 2, cy + 42);
+    ctx.shadowBlur = 0;
+
+    // Stars - animated reveal
+    const stars3 = [starsThisLevel.victory, starsThisLevel.rescue, starsThisLevel.discipline];
+    const labels  = ['Victory', 'Rescue', 'Discipline'];
+    const r = Math.min(cw * 0.1, 38);
+    const spacing = cw / 4;
+    const starY   = cy + 130;
+    for (let i = 0; i < 3; i++) {
+        const sx  = W / 2 + (i - 1) * spacing;
+        const pct = Math.min(1, (levelCompleteTimer - i * 400) / 350);
+        if (pct <= 0) {
+            drawStar5(sx, starY, r, false);
+        } else if (stars3[i]) {
+            const rr = r * (pct < 1 ? 0.5 + 0.7 * pct : 1);
+            drawStar5(sx, starY, rr, true);
+        } else {
+            drawStar5(sx, starY, r, false);
+        }
+        ctx.fillStyle = stars3[i] ? '#FFD700' : 'rgba(255,255,255,0.4)';
+        ctx.font = `${Math.round(cw * 0.042)}px "Lilita One", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(labels[i], sx, starY + r + 8);
+    }
+
+    // Rewards
+    ctx.fillStyle = '#aef7ae';
+    ctx.font = `bold ${Math.round(cw * 0.052)}px "Lilita One", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`+${pendingGoldReward} Gold  +${pendingXpReward} XP`, W / 2, cy + ch - 48);
+
+    // Continue tap hint (blink after 1.5 s)
+    if (levelCompleteTimer > 1500 && Math.floor(levelCompleteTimer / 500) % 2 === 0) {
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.font = `${Math.round(cw * 0.044)}px "Lilita One", sans-serif`;
+        ctx.fillText('Tap to continue', W / 2, cy + ch - 18);
+    }
+
+    // Hit rect for the whole overlay — tap to go to shop
+    if (levelCompleteTimer > 1200) {
+        hudHitRects.push({
+            x: 0, y: 0, w: W, h: H,
+            action: () => { advanceAfterLevel(); },
+        });
+    }
+    ctx.restore();
+}
+
+// ---- WORLD MAP ----
+
+function drawWorldMap() {
+    // Gradient sky background
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0,   '#1a3a5c');
+    grad.addColorStop(0.5, '#2d6a8c');
+    grad.addColorStop(1,   '#4aa8b0');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.font = 'bold 22px "Lilita One", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const nRegions = LEVELS_DATA.regions.length;
+    const tileW = Math.max(W * 0.7, 300);
+    const totalW = nRegions * tileW + (nRegions - 1) * 30;
+    const startX = (W - Math.min(totalW, W * 0.9)) / 2;
+    const tileH  = H * 0.62;
+    const tileY  = H * 0.16;
+
+    const ts = totalStars();
+
+    for (let ri = 0; ri < nRegions; ri++) {
+        const region = LEVELS_DATA.regions[ri];
+        const tx = startX + ri * (tileW + 30) - worldMapScrollX;
+        const locked = ts < (region.unlockStars || 0);
+
+        // Region tile
+        ctx.save();
+        if (locked) { ctx.globalAlpha = 0.45; }
+        ctx.fillStyle = ri === 0 ? 'rgba(30,100,60,0.85)' : 'rgba(160,110,40,0.85)';
+        roundRect(ctx, tx, tileY, tileW, tileH, 16);
+        ctx.fill();
+        ctx.strokeStyle = worldMapSelectedRegion === ri ? '#FFD700' : 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = worldMapSelectedRegion === ri ? 3 : 1.5;
+        ctx.stroke();
+
+        // Region name
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 6; ctx.shadowColor = '#000';
+        ctx.fillText(region.name, tx + tileW / 2, tileY + 28);
+        ctx.shadowBlur = 0;
+
+        if (locked) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px "Lilita One", sans-serif';
+            ctx.fillText(`🔒 Unlock at ${region.unlockStars} stars`, tx + tileW / 2, tileY + tileH / 2);
+            ctx.restore();
+            continue;
+        }
+
+        // Level buttons grid
+        const cols = 4;
+        const btnW = (tileW - 20 - (cols - 1) * 8) / cols;
+        const btnH = 46;
+        const rows = Math.ceil(region.levels.length / cols);
+        const gridH = rows * (btnH + 8) - 8;
+        const gridY = tileY + (tileH - gridH) / 2 + 10;
+
+        for (let li = 0; li < region.levels.length; li++) {
+            const lv   = region.levels[li];
+            const col  = li % cols;
+            const row  = Math.floor(li / cols);
+            const bx   = tx + 10 + col * (btnW + 8);
+            const by   = gridY + row * (btnH + 8);
+            const stars = save.stars[lv.id] || 0;
+            const isSelected = (worldMapSelectedRegion === ri && worldMapSelectedLevel === li);
+
+            ctx.fillStyle = isSelected ? 'rgba(255,220,80,0.35)' : 'rgba(0,0,0,0.35)';
+            roundRect(ctx, bx, by, btnW, btnH, 8);
+            ctx.fill();
+            ctx.strokeStyle = isSelected ? '#FFD700' : 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = isSelected ? 2.5 : 1;
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${Math.round(btnW * 0.18)}px "Lilita One", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(lv.name, bx + btnW / 2, by + btnH * 0.38);
+
+            // Mini stars
+            const sr = Math.min(btnW * 0.09, 7);
+            const maxS = lv.woundedCount ? 3 : 2;
+            for (let s = 0; s < maxS; s++) {
+                const sx = bx + btnW / 2 + (s - (maxS - 1) / 2) * (sr * 2.3);
+                drawStar5(sx, by + btnH * 0.75, sr, s < stars);
+            }
+
+            // Hit rect
+            hudHitRects.push({
+                x: bx, y: by, w: btnW, h: btnH,
+                action: (() => {
+                    const rri = ri, lli = li;
+                    return () => {
+                        worldMapSelectedRegion = rri;
+                        worldMapSelectedLevel  = lli;
+                    };
+                })(),
+            });
+        }
+        ctx.restore();
+    }
+
+    ctx.restore();
+    drawWorldMapHUD();
+    if (worldMapSelectedLevel >= 0) drawWorldMapLevelPanel();
+}
+
+function drawWorldMapHUD() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(0, 0, W, 52);
+
+    // Title
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 20px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FRONTLINE EXTRACTION', 12, 26);
+
+    // Stars
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.fillText(`⭐ ${totalStars()}`, W / 2, 26);
+
+    // Gold + Lives
+    ctx.textAlign = 'right';
+    ctx.fillText(`💰 ${money}   ❤️ ${save.lives}`, W - 10, 26);
+
+    ctx.restore();
+}
+
+function drawWorldMapLevelPanel() {
+    const region = LEVELS_DATA.regions[worldMapSelectedRegion];
+    if (!region) return;
+    const lv = region.levels[worldMapSelectedLevel];
+    if (!lv) return;
+
+    const ph = 120;
+    const py = H - ph;
+    ctx.save();
+    ctx.fillStyle = 'rgba(10,30,10,0.92)';
+    ctx.fillRect(0, py, W, ph);
+    ctx.strokeStyle = 'rgba(100,220,100,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(lv.name, 14, py + 10);
+
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText(lv.briefText || '', 14, py + 34);
+
+    const stars = save.stars[lv.id] || 0;
+    const maxS  = lv.woundedCount ? 3 : 2;
+    for (let s = 0; s < maxS; s++) {
+        drawStar5(14 + s * 22 + 9, py + 70, 9, s < stars);
+    }
+
+    // Launch button
+    const bw = 130, bh = 42;
+    const bx = W - bw - 14;
+    const by = py + (ph - bh) / 2;
+    const canPlay = save.lives > 0;
+    ctx.fillStyle = canPlay ? 'rgba(50,180,80,0.95)' : 'rgba(100,100,100,0.7)';
+    roundRect(ctx, bx, by, bw, bh, 10);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 17px "Lilita One", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(canPlay ? 'DEPLOY ▶' : 'NO LIVES', bx + bw / 2, by + bh / 2);
+
+    hudHitRects.push({ x: bx, y: by, w: bw, h: bh, action: () => { startSelectedLevel(); } });
+    ctx.restore();
+}
+
+// ---- LEVEL BRIEF ----
+
+function drawLevelBrief() {
+    const region = LEVELS_DATA.regions[campaignRegionIdx];
+    if (!region) return;
+    const lv = region.levels[campaignLevelIdx];
+    if (!lv) return;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.78)';
+    ctx.fillRect(0, 0, W, H);
+
+    const cw = Math.min(W * 0.88, 500);
+    const ch = 240;
+    const cx = (W - cw) / 2;
+    const cy = (H - ch) / 2;
+
+    ctx.fillStyle = 'rgba(10,30,50,0.97)';
+    roundRect(ctx, cx, cy, cw, ch, 18);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(80,160,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#aad4ff';
+    ctx.font = `bold ${Math.round(cw * 0.055)}px "Lilita One", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 8; ctx.shadowColor = '#000';
+    ctx.fillText('MISSION BRIEFING', W / 2, cy + 34);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.round(cw * 0.07)}px "Lilita One", sans-serif`;
+    ctx.fillText(lv.name, W / 2, cy + 76);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = `${Math.round(cw * 0.042)}px sans-serif`;
+    ctx.fillText(lv.briefText || '', W / 2, cy + 118);
+
+    const objectives = ['Destroy enemy base'];
+    if (lv.woundedCount) objectives.push(`Rescue ${lv.woundedCount} wounded`);
+    objectives.push('Zero casualty run (discipline star)');
+    ctx.fillStyle = '#aef7ae';
+    ctx.font = `${Math.round(cw * 0.038)}px sans-serif`;
+    ctx.textAlign = 'left';
+    for (let i = 0; i < objectives.length; i++) {
+        ctx.fillText(`• ${objectives[i]}`, cx + 18, cy + 150 + i * 20);
+    }
+
+    // Deploy button
+    const bw = 140, bh = 44;
+    const bx = (W - bw) / 2;
+    const by = cy + ch - bh - 14;
+    ctx.fillStyle = 'rgba(50,200,80,0.95)';
+    roundRect(ctx, bx, by, bw, bh, 12);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 19px "Lilita One", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('DEPLOY ▶', bx + bw / 2, by + bh / 2);
+    hudHitRects.push({ x: bx, y: by, w: bw, h: bh, action: () => { launchCurrentLevel(); } });
+
+    // Back button
+    ctx.fillStyle = 'rgba(80,80,80,0.8)';
+    const backW = 80, backH = 36;
+    const backX = cx + 14, backY = cy + ch - backH - 14;
+    roundRect(ctx, backX, backY, backW, backH, 10);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '15px sans-serif';
+    ctx.fillText('◀ Back', backX + backW / 2, backY + backH / 2);
+    hudHitRects.push({ x: backX, y: backY, w: backW, h: backH, action: () => { gameState = 'worldmap'; } });
 
     ctx.restore();
 }
 
 // ---- MAIN RENDER ----
 function render() {
+    hudHitRects = []; // reset hit rects each frame (moved out of drawHUD)
     ctx.clearRect(0, 0, W, H);
+
+    // World map and level brief are full replacements for the game world
+    if (gameState === 'worldmap' || gameState === 'levelbrief') {
+        drawWorldMap();
+        if (gameState === 'levelbrief') drawLevelBrief();
+        return;
+    }
 
     // Apply screen shake
     ctx.save();
@@ -5415,6 +6149,9 @@ function render() {
     // Crates (drawn after structures so they sit on top of the beach)
     for (const c of crates) drawCrate(c);
 
+    // Wounded soldiers (before regular units so they render behind them)
+    drawWounded();
+
     // Units
     for (const u of units) {
         drawUnit(u);
@@ -5435,14 +6172,42 @@ function render() {
 
     // HUD (not affected by shake)
     drawHUD();
+
+    // Star award overlay (on top of game world, after HUD)
+    if (gameState === 'levelcomplete') {
+        drawStarAwardScreen();
+    }
 }
 
 // ---- GAME LOOP ----
-function gameLoop() {
+let _gameLoopRafId = null;
+let _lastFrameTs   = 0;
+
+function gameLoop(ts) {
+    uiAnimFrame++;
+    // Throttle idle screens to ~10fps to save battery
+    const idleState = (gameState === 'worldmap' || gameState === 'levelbrief' ||
+                       gameState === 'paused'   || gameState === 'shop');
+    if (idleState && ts - _lastFrameTs < 96) {
+        _gameLoopRafId = requestAnimationFrame(gameLoop);
+        return;
+    }
+    _lastFrameTs = ts;
     update();
     render();
-    requestAnimationFrame(gameLoop);
+    _gameLoopRafId = requestAnimationFrame(gameLoop);
 }
+
+// Pause rAF when tab is hidden to save battery and avoid time drift
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        if (_gameLoopRafId) { cancelAnimationFrame(_gameLoopRafId); _gameLoopRafId = null; }
+        writeSave();
+    } else {
+        _lastFrameTs = 0;
+        _gameLoopRafId = requestAnimationFrame(gameLoop);
+    }
+});
 
 // =====================================================================
 // MOBILE / TOUCH SUPPORT
@@ -5852,6 +6617,11 @@ function setupDebugPanel() {
 // balance values. Then enter the menu state and start rendering.
 (async () => {
     await loadBalance();
+    save = loadSave();
+    refreshLives();
+    money = save.gold;
+    campaignRegionIdx = save.currentRegionIdx || 0;
+    campaignLevelIdx  = save.currentLevelIdx  || 0;
     setupDebugPanel();
     loadSprites();
     initGame();
