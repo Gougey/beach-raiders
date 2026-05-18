@@ -1,7 +1,7 @@
 // Minimal service worker — primarily exists so the game can be installed
 // as a PWA. Caches the shell on first load so it works offline afterwards.
 
-const CACHE = 'frontline-extraction-v1';
+const CACHE = 'frontline-extraction-v2';
 const CORE = [
     './',
     './index.html',
@@ -34,6 +34,12 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(req).catch(() => caches.match('./index.html'))
         );
+        return;
+    }
+    // balance.json must always be fresh — if a designer pushes a new
+    // tuning file, players need it on next load, not after cache eviction.
+    if (req.url.includes('balance.json')) {
+        event.respondWith(fetch(req).catch(() => caches.match(req)));
         return;
     }
     event.respondWith(

@@ -439,6 +439,132 @@ body.touch.portrait #rotate-warning { display: flex; }
         3px 3px 0 var(--wood-dark),
         6px 6px 12px rgba(0, 0, 0, 0.7);
 }
+
+/* ============================================================
+   DEBUG BALANCE OVERLAY — press ` to toggle.
+   Designed to sit out of the way; tighter typography than the
+   gameplay HUD so we can fit a lot of values on screen.
+   ============================================================ */
+#debug-panel {
+    position: fixed;
+    top: 0; right: 0;
+    height: 100vh;
+    width: 380px;
+    background: rgba(8, 18, 32, 0.96);
+    color: #cfeaff;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.45);
+    border-left: 1px solid rgba(132, 232, 255, 0.4);
+    transform: translateX(100%);
+    transition: transform 0.18s ease-out;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+}
+#debug-panel.open { transform: translateX(0); }
+
+#debug-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(132, 232, 255, 0.2);
+    background: rgba(0, 0, 0, 0.3);
+}
+#debug-header strong {
+    font-family: "Lilita One", sans-serif;
+    color: rgba(132, 232, 255, 0.95);
+    font-size: 16px;
+    letter-spacing: 1px;
+}
+#debug-hint {
+    flex: 1;
+    opacity: 0.55;
+    font-size: 11px;
+}
+#debug-header button {
+    background: rgba(132, 232, 255, 0.12);
+    color: #cfeaff;
+    border: 1px solid rgba(132, 232, 255, 0.4);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+}
+#debug-header button:hover {
+    background: rgba(132, 232, 255, 0.25);
+}
+#debug-header #debug-close {
+    width: 28px;
+    padding: 4px 0;
+    font-size: 16px;
+    line-height: 1;
+}
+
+#debug-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px 16px;
+}
+.debug-section {
+    margin-bottom: 14px;
+}
+.debug-section h4 {
+    margin: 8px 0 4px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: rgba(132, 232, 255, 0.95);
+    text-transform: uppercase;
+    font-family: "Lilita One", sans-serif;
+    font-weight: normal;
+}
+.debug-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+}
+.debug-row label {
+    flex: 1;
+    opacity: 0.85;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.debug-row input {
+    width: 110px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(132, 232, 255, 0.3);
+    color: #fff;
+    padding: 3px 6px;
+    font-family: inherit;
+    font-size: 12px;
+    border-radius: 3px;
+}
+.debug-row input:focus {
+    outline: none;
+    border-color: rgba(132, 232, 255, 0.9);
+    background: rgba(0, 30, 60, 0.6);
+}
+#debug-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: rgba(0, 0, 0, 0.8);
+    color: rgba(132, 232, 255, 0.95);
+    padding: 10px 16px;
+    border: 1px solid rgba(132, 232, 255, 0.4);
+    border-radius: 6px;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+#debug-toast.show { opacity: 1; }
 </style>
 </head>
 <body>
@@ -488,6 +614,25 @@ body.touch.portrait #rotate-warning { display: flex; }
     <button id="restart-btn" class="game-btn danger">PLAY AGAIN</button>
 </div>
 
+<div id="debug-toast"></div>
+
+<!-- Debug balance overlay. Press ` (backtick) to toggle. Walks BALANCE
+     and emits a live input per leaf — edits mutate BALANCE.path.to.val
+     so object-keyed reads (units, damageMatrix, bosses, upgrades, level
+     compositions) update on the next frame. Primitive reads that took
+     a value at script load (e.g. heli.maxAmmo in resetHeli) only apply
+     to the NEXT level/restart, since the heli object captured the value. -->
+<div id="debug-panel" aria-hidden="true">
+    <div id="debug-header">
+        <strong>BALANCE</strong>
+        <span id="debug-hint">live tuning</span>
+        <button id="debug-copy">Copy JSON</button>
+        <button id="debug-reload">Reload</button>
+        <button id="debug-close">×</button>
+    </div>
+    <div id="debug-body"></div>
+</div>
+
 <script>
 // ============================================================
 // BEACH RAIDERS — Rescue Raiders clone with Boom Beach aesthetics
@@ -498,7 +643,147 @@ const ctx = canvas.getContext('2d');
 const W = canvas.width;
 const H = canvas.height;
 
-// ---- GAME CONFIG ----
+// ============================================================
+// BALANCE — single source of truth for tunable gameplay numbers.
+//
+// Defaults live here. On startup the game tries to fetch
+// `balance.json` and deep-merges it over these defaults, so a
+// designer can tweak values without touching this file. The
+// debug overlay (press the backtick / ` key) lets you edit the
+// live values in-game; the "Copy JSON" button on the overlay
+// exports the current state for pasting back into balance.json.
+//
+// Rule of thumb: if you might ever want to retune this in soft
+// launch without an app store release, it lives here.
+//
+// Visual / geometry constants (world size, ground line, walk
+// cycle timing) stay as plain `const`s further down — they're
+// not for live tuning.
+// ============================================================
+const BALANCE = {
+    heli: {
+        maxAmmo:     50,
+        reloadMs:    7500,
+        startHp:     100,
+        maxCarry:    4,
+    },
+    missiles: {
+        pairCost:    100,
+        perPurchase: 2,
+        damage:      80,    // vs units / heli / bases
+        damageVsAA:  25,    // 4 hits to destroy a 100-HP AA
+    },
+    crates: {
+        hp:          3,     // heli bullets to "open"
+        respawnMs:   20000, // 20s respawn from same slot
+        parachuteMs: 4000,  // parachute descent duration
+    },
+    aa: {
+        hp:          90,
+        bounty:      80,
+        fireInterval: 240,  // frames between launches (~4s @ 60fps)
+        range:       800,
+    },
+    bases: {
+        hp:          500,
+    },
+    economy: {
+        startMoney:        30,
+        cpRegenPerFrame:   1 / 90,   // 1 CP per 1.5s @ 60fps
+        cpCapDefault:      10,
+    },
+    units: {
+        // hp/speed/damage/range/attackRate are intrinsic combat stats.
+        // cpCost is what the player spends from their Command Points pool.
+        // bounty is gold awarded when this unit is killed.
+        // engageDist: preferred firing distance — units advance INTO their range
+        //   until they reach this distance, so a queue of troops bunches close
+        //   enough that multiple of them can fire at once.
+        infantry: { hp: 32,  speed: 0.85, damage: 5,  range: 65,  attackRate: 30, cpCost: 2, bounty: 4,  w: 14, h: 22, engageDist: 30 },
+        bazooka:  { hp: 35,  speed: 0.70, damage: 28, range: 160, attackRate: 90, cpCost: 4, bounty: 10, w: 14, h: 22, engageDist: 110 },
+        tank:     { hp: 160, speed: 0.50, damage: 22, range: 130, attackRate: 80, cpCost: 7, bounty: 25, w: 36, h: 20, engageDist: 75 },
+    },
+    // Damage multiplier matrix (attacker -> target). Bullets hitting bases ignore this.
+    //   infantry overruns bazookas (1.5x), struggles vs tanks (0.5x)
+    //   bazooka shreds tanks (2.0x), slow attacks miss infantry (0.7x)
+    //   tank splash kills infantry (1.5x), gets out-ranged by bazooka (0.6x)
+    damageMatrix: {
+        infantry: { infantry: 1.0, bazooka: 1.5, tank: 0.5 },
+        bazooka:  { infantry: 0.7, bazooka: 1.0, tank: 2.0 },
+        tank:     { infantry: 1.5, bazooka: 0.6, tank: 1.0 },
+    },
+    bosses: {
+        miniBossTank: { hpMul: 4,  damageMul: 1.5, speedMul: 0.8, scale: 1.25, bounty: 100, label: 'MINI-BOSS' },
+        bossTank:     { hpMul: 8,  damageMul: 2.0, speedMul: 0.7, scale: 1.5,  bounty: 250, label: 'BOSS' },
+    },
+    upgrades: {
+        infantryDamage: {
+            name: 'Infantry Damage', icon: 'infantry_blue_1', desc: '+ damage to infantry',
+            tiers: [{ cost: 80, mult: 1.20 }, { cost: 200, mult: 1.40 }, { cost: 500, mult: 1.75 }],
+        },
+        bazookaRange: {
+            name: 'Bazooka Range', icon: 'bazooka_blue_1', desc: '+ bazooka range',
+            tiers: [{ cost: 100, mult: 1.15 }, { cost: 250, mult: 1.30 }, { cost: 500, mult: 1.50 }],
+        },
+        tankHp: {
+            name: 'Tank Armour', icon: 'tank_blue', desc: '+ tank max HP',
+            tiers: [{ cost: 120, mult: 1.20 }, { cost: 300, mult: 1.40 }, { cost: 600, mult: 1.75 }],
+        },
+        heliHp: {
+            name: 'Heli Armour', icon: 'heli', desc: '+ helicopter max HP',
+            tiers: [{ cost: 80, hp: 30 }, { cost: 180, hp: 50 }, { cost: 400, hp: 100 }],
+        },
+        cpCap: {
+            name: 'CP Capacity', icon: null, desc: '+ Command Points cap',
+            tiers: [{ cost: 300, cap: 12 }, { cost: 600, cap: 14 }, { cost: 1200, cap: 16 }],
+        },
+    },
+    levels: {
+        total: 5,
+        // Spawn composition per level + optional boss spawn key.
+        // spawnEvery is in frames (60fps); lower number = faster spawns = harder level.
+        compositions: [
+            { types: ['infantry', 'infantry', 'bazooka'],          spawnEvery: 140 },
+            { types: ['infantry', 'bazooka', 'tank'],              spawnEvery: 130 },
+            { types: ['infantry', 'bazooka', 'bazooka', 'tank'],   spawnEvery: 120, boss: 'miniBossTank' },
+            { types: ['bazooka', 'bazooka', 'tank', 'tank'],       spawnEvery: 110 },
+            { types: ['tank', 'tank', 'bazooka', 'infantry'],      spawnEvery: 90,  boss: 'bossTank' },
+        ],
+    },
+};
+
+// Deep-merge a plain-object source into target (mutates target).
+// Used by loadBalance() to overlay balance.json values on top of defaults.
+function deepMerge(target, source) {
+    for (const k of Object.keys(source)) {
+        if (source[k] && typeof source[k] === 'object' && !Array.isArray(source[k])) {
+            if (!target[k] || typeof target[k] !== 'object') target[k] = {};
+            deepMerge(target[k], source[k]);
+        } else {
+            target[k] = source[k];
+        }
+    }
+}
+
+// Attempt to fetch balance.json and merge over BALANCE defaults.
+// Silent failure (no file, malformed) — the game runs identically
+// with just the defaults, which is correct for a freshly-cloned repo.
+async function loadBalance() {
+    try {
+        const resp = await fetch('balance.json', { cache: 'no-cache' });
+        if (!resp.ok) {
+            console.log('[balance] no balance.json — using inline defaults');
+            return;
+        }
+        const override = await resp.json();
+        deepMerge(BALANCE, override);
+        console.log('[balance] balance.json overrides applied');
+    } catch (e) {
+        console.log('[balance] using inline defaults (', e.message, ')');
+    }
+}
+
+// ---- GAME CONFIG (visual / world geometry — not for live tuning) ----
 const WORLD_WIDTH = 4000;
 const GROUND_Y = 560;
 const WATER_Y = 590;
@@ -507,8 +792,6 @@ const HELI_SPEED = 4;
 const BULLET_SPEED = 10;
 const SCROLL_MARGIN = 350;
 const INCOME_RATE = 0;             // no passive income — kills + wave clears only
-const CP_REGEN_PER_FRAME = 1 / 90; // 1 Command Point every 1.5 seconds @ 60fps
-const CP_CAP_DEFAULT = 10;
 const FRIENDLY_SPACING = 28;       // min centre-to-centre gap between same-team units
 
 // ---- COLORS (Boom Beach palette) ----
@@ -690,30 +973,24 @@ function drawSprite(key, x, y, height, flipH = false) {
 // ---- GAME STATE ----
 let gameState = 'menu'; // menu, playing, paused, gameover
 let cameraX = 0;
-let money = 30;
+let money = BALANCE.economy.startMoney;
 // enemyMoney removed — enemy AI spawns from CP only.
 let enemySpawnTimer = 0;
 
 // Command Points (tactical resource for deploying units)
-let commandPoints = CP_CAP_DEFAULT;
-let cpCap = CP_CAP_DEFAULT;
-let enemyCommandPoints = CP_CAP_DEFAULT;
+let commandPoints = BALANCE.economy.cpCapDefault;
+let cpCap = BALANCE.economy.cpCapDefault;
+let enemyCommandPoints = BALANCE.economy.cpCapDefault;
 
 // ---- LEVEL SYSTEM ----
 // Arcade-style: each level is one continuous fight that ends only when the
 // enemy base is destroyed. After each level, the shop opens for upgrades,
-// then the next level begins with the next composition. Five levels total.
-const TOTAL_LEVELS = 5;
+// then the next level begins with the next composition.
+// Level count + per-level compositions live in BALANCE.levels (top of file).
+const TOTAL_LEVELS = BALANCE.levels.total;
 let currentLevel = 1;
 let levelState = 'active';   // 'active' | 'complete'
-// Spawn composition per level + optional boss spawn
-const LEVEL_COMPOSITIONS = [
-    { types: ['infantry', 'infantry', 'bazooka'],          spawnEvery: 140 },
-    { types: ['infantry', 'bazooka', 'tank'],              spawnEvery: 130 },
-    { types: ['infantry', 'bazooka', 'bazooka', 'tank'],   spawnEvery: 120, boss: 'miniBossTank' },
-    { types: ['bazooka', 'bazooka', 'tank', 'tank'],       spawnEvery: 110 },
-    { types: ['tank', 'tank', 'bazooka', 'infantry'],      spawnEvery: 90,  boss: 'bossTank' },
-];
+const LEVEL_COMPOSITIONS = BALANCE.levels.compositions;
 let bossSpawnedThisLevel = false;
 let bossSpawnTimer = 0;
 
@@ -722,17 +999,13 @@ let bossSpawnTimer = 0;
 // triggered by destroying a shield crate, not bought from a button.
 let powerupShieldMs = 0;
 
-// Missile purchase: $750 buys 2 missiles loaded into the heli. While missiles
-// are loaded, the minigun trigger fires a missile instead of bullets.
-const MISSILE_PAIR_COST = 100;
-const MISSILES_PER_PURCHASE = 2;
-const MISSILE_DAMAGE = 80;        // damage vs units / heli / bases
-const MISSILE_VS_AA_DAMAGE = 25;  // 4 hits to destroy a 100-HP AA
+// Missile purchase: missiles are bought as a pair, loaded into the heli.
+// While missiles are loaded, the minigun trigger fires a missile instead.
+// All four numbers live in BALANCE.missiles (top of file).
 
 // ---- CRATES (collectible powerups parachuted onto the map) ----
-const CRATE_HP = 3;               // 3 heli bullets to "open"
-const CRATE_RESPAWN_MS = 20000;   // 20s respawn from same slot
-const CRATE_PARACHUTE_MS = 4000;  // parachute descent duration
+// Combat numbers (HP, respawn, descent) live in BALANCE.crates.
+// Hit/visual geometry stays here because it's not for live tuning.
 // Crate body geometry. Bumped up so they're an easier target — the
 // original 28x22 box was too tight, especially on mobile where bullets
 // fly past on either side. Growth is mostly upward so the bottom stays
@@ -759,7 +1032,7 @@ const CRATE_LANDED_Y = GROUND_Y;
 function resetCrates() {
     crates = CRATE_SLOTS.map(s => ({
         ...s,
-        hp: CRATE_HP,
+        hp: BALANCE.crates.hp,
         state: 'landed',
         respawnTimer: 0,
         parachuteMs: 0,
@@ -839,23 +1112,23 @@ document.getElementById('restart-btn').addEventListener('click', () => {
 
 // ---- HELICOPTER ----
 let heli = {};
-const HELI_MAX_AMMO = 50;
-const HELI_RELOAD_MS = 7500;           // empty magazine → full reload after this delay
-const HELI_LANDING_Y = GROUND_Y - 50;  // heli must be at/below this y to drop troops
+// Magazine size + reload timer live in BALANCE.heli — references below
+// read from BALANCE so the debug overlay can tweak them at runtime.
+const HELI_LANDING_Y = GROUND_Y - 50;  // heli must be at/below this y to drop troops (visual, not balance)
 
 function resetHeli() {
     heli = {
         x: 200, y: 300,
         vx: 0, vy: 0,
-        hp: 100, maxHp: 100,
+        hp: BALANCE.heli.startHp, maxHp: BALANCE.heli.startHp,
         facing: 1, // 1=right, -1=left
         bladeAngle: 0,
         shootCooldown: 0,
         carrying: [],
-        maxCarry: 4,
+        maxCarry: BALANCE.heli.maxCarry,
         bobTimer: 0,
-        ammo: HELI_MAX_AMMO,
-        maxAmmo: HELI_MAX_AMMO,
+        ammo: BALANCE.heli.maxAmmo,
+        maxAmmo: BALANCE.heli.maxAmmo,
         reloadMs: 0,           // > 0 while waiting for the magazine to come back
         emptyClickCooldown: 0,
         missiles: 0,           // loaded missiles; trigger fires these instead of bullets
@@ -863,17 +1136,17 @@ function resetHeli() {
 }
 
 function buyMissiles() {
-    if (heli.missiles >= MISSILES_PER_PURCHASE) {
+    if (heli.missiles >= BALANCE.missiles.perPurchase) {
         spawnFloatingText(heli.x, heli.y - 40, 'MISSILES LOADED', '#90a4ae');
         return;
     }
-    if (money < MISSILE_PAIR_COST) {
+    if (money < BALANCE.missiles.pairCost) {
         spawnFloatingText(heli.x, heli.y - 40, 'NOT ENOUGH GOLD', '#ef5350');
         return;
     }
-    money -= MISSILE_PAIR_COST;
-    heli.missiles = MISSILES_PER_PURCHASE;
-    spawnFloatingText(heli.x, heli.y - 40, `+${MISSILES_PER_PURCHASE} MISSILES`, '#ff5722');
+    money -= BALANCE.missiles.pairCost;
+    heli.missiles = BALANCE.missiles.perPurchase;
+    spawnFloatingText(heli.x, heli.y - 40, `+${BALANCE.missiles.perPurchase} MISSILES`, '#ff5722');
     for (let i = 0; i < 18; i++) {
         spawnParticles(heli.x + (Math.random() - 0.5) * 60,
                        heli.y + (Math.random() - 0.5) * 36,
@@ -885,10 +1158,7 @@ function buyMissiles() {
 // Static enemy missile batteries on the right half of the map.
 // Damage the heli only. Heli minigun cannot harm them — must be killed
 // by ground troops (infantry / bazooka / tank).
-const AA_HP = 90;
-const AA_BOUNTY = 80;
-const AA_FIRE_INTERVAL = 240;     // ~4 seconds between launches
-const AA_RANGE = 800;             // wide engagement zone
+// HP / bounty / fire-interval / range live in BALANCE.aa.
 let airDefences = [];
 
 function resetAirDefences() {
@@ -899,8 +1169,8 @@ function resetAirDefences() {
         airDefences.push({
             x,
             y: GROUND_Y - 20,
-            hp: AA_HP, maxHp: AA_HP,
-            fireTimer: Math.random() * AA_FIRE_INTERVAL,
+            hp: BALANCE.aa.hp, maxHp: BALANCE.aa.hp,
+            fireTimer: Math.random() * BALANCE.aa.fireInterval,
             team: 'enemy',
             kind: 'aa',
             w: 36, h: 40,
@@ -912,8 +1182,9 @@ function resetAirDefences() {
 let playerBase = {};
 let enemyBase = {};
 function resetBases() {
-    playerBase = { x: 100, hp: 500, maxHp: 500, team: 'player' };
-    enemyBase = { x: WORLD_WIDTH - 200, hp: 500, maxHp: 500, team: 'enemy' };
+    const baseHp = BALANCE.bases.hp;
+    playerBase = { x: 100, hp: baseHp, maxHp: baseHp, team: 'player' };
+    enemyBase = { x: WORLD_WIDTH - 200, hp: baseHp, maxHp: baseHp, team: 'enemy' };
 }
 
 // ---- INIT ----
@@ -932,10 +1203,10 @@ function initGame() {
     resetBases();
     resetAirDefences();
     resetCrates();
-    money = 30;
-    commandPoints = CP_CAP_DEFAULT;
-    cpCap = CP_CAP_DEFAULT;
-    enemyCommandPoints = CP_CAP_DEFAULT;
+    money = BALANCE.economy.startMoney;
+    commandPoints = BALANCE.economy.cpCapDefault;
+    cpCap = BALANCE.economy.cpCapDefault;
+    enemyCommandPoints = BALANCE.economy.cpCapDefault;
     floatingTexts = [];
     enemySpawnTimer = 0;
     currentLevel = 1;
@@ -1054,27 +1325,13 @@ function initGame() {
 }
 
 // ---- UNIT DEFINITIONS ----
-const UNIT_DEFS = {
-    // hp/speed/damage/range/attackRate are intrinsic combat stats.
-    // cpCost is what the player spends from their Command Points pool.
-    // bounty is gold awarded when this unit is killed.
-    // engageDist: preferred firing distance. Units advance INTO their range
-    //   until they reach this distance, so a queue of troops bunches close
-    //   enough that multiple of them can fire at once.
-    infantry: { hp: 32,  speed: 0.85, damage: 5,  range: 65,  attackRate: 30, cpCost: 2, bounty: 4,  w: 14, h: 22, engageDist: 30 },
-    bazooka:  { hp: 35,  speed: 0.70, damage: 28, range: 160, attackRate: 90, cpCost: 4, bounty: 10, w: 14, h: 22, engageDist: 110 },
-    tank:     { hp: 160, speed: 0.50, damage: 22, range: 130, attackRate: 80, cpCost: 7, bounty: 25, w: 36, h: 20, engageDist: 75 },
-};
+// Unit stats live in BALANCE.units (top of file). The const alias here
+// shares the object by reference, so debug-overlay edits to BALANCE.units
+// show up immediately at every read site.
+const UNIT_DEFS = BALANCE.units;
 
-// Damage multiplier matrix (attacker -> target). Bullets hitting bases ignore this.
-//   infantry overruns bazookas (1.5x), struggles vs tanks (0.5x)
-//   bazooka shreds tanks (2.0x), slow attacks miss infantry (0.7x)
-//   tank splash kills infantry (1.5x), gets out-ranged by bazooka (0.6x)
-const DAMAGE_MATRIX = {
-    infantry: { infantry: 1.0, bazooka: 1.5, tank:    0.5 },
-    bazooka:  { infantry: 0.7, bazooka: 1.0, tank:    2.0 },
-    tank:     { infantry: 1.5, bazooka: 0.6, tank:    1.0 },
-};
+// RPS damage matrix — lives in BALANCE.damageMatrix (top of file).
+const DAMAGE_MATRIX = BALANCE.damageMatrix;
 function applyDamageModifier(attackerType, targetType, base) {
     const row = DAMAGE_MATRIX[attackerType];
     const mult = row && row[targetType] != null ? row[targetType] : 1.0;
@@ -1089,10 +1346,8 @@ function spawnFloatingText(x, y, text, color = '#ffd54f') {
 
 // ---- BOSS UNITS (elite tanks for wave 3 mini-boss and wave 5 boss) ----
 // These reuse the tank rendering but have inflated stats.
-const BOSS_DEFS = {
-    miniBossTank: { hpMul: 4,  damageMul: 1.5, speedMul: 0.8, scale: 1.25, bounty: 100, label: 'MINI-BOSS' },
-    bossTank:     { hpMul: 8,  damageMul: 2.0, speedMul: 0.7, scale: 1.5,  bounty: 250, label: 'BOSS' },
-};
+// Stats live in BALANCE.bosses (top of file).
+const BOSS_DEFS = BALANCE.bosses;
 
 function spawnBossUnit(bossKey) {
     const tank = UNIT_DEFS.tank;
@@ -1124,29 +1379,8 @@ function spawnBossUnit(bossKey) {
 
 // ---- UPGRADE SYSTEM ----
 // Persistent (within a level) upgrades the player buys between waves.
-const UPGRADES = {
-    infantryDamage: {
-        name: 'Infantry Damage', icon: 'infantry_blue_1', desc: '+ damage to infantry',
-        tiers: [{ cost: 80, mult: 1.20 }, { cost: 200, mult: 1.40 }, { cost: 500, mult: 1.75 }],
-        apply(unit) { if (unit.type === 'infantry') unit.damage *= this.tiers[upgradeLevels[this.id] - 1].mult / (upgradeLevels[this.id] > 1 ? this.tiers[upgradeLevels[this.id] - 2].mult : 1); }
-    },
-    bazookaRange:   {
-        name: 'Bazooka Range', icon: 'bazooka_blue_1', desc: '+ bazooka range',
-        tiers: [{ cost: 100, mult: 1.15 }, { cost: 250, mult: 1.30 }, { cost: 500, mult: 1.50 }],
-    },
-    tankHp:         {
-        name: 'Tank Armour', icon: 'tank_blue', desc: '+ tank max HP',
-        tiers: [{ cost: 120, mult: 1.20 }, { cost: 300, mult: 1.40 }, { cost: 600, mult: 1.75 }],
-    },
-    heliHp:         {
-        name: 'Heli Armour', icon: 'heli', desc: '+ helicopter max HP',
-        tiers: [{ cost: 80, hp: 30 }, { cost: 180, hp: 50 }, { cost: 400, hp: 100 }],
-    },
-    cpCap:          {
-        name: 'CP Capacity', icon: null, desc: '+ Command Points cap',
-        tiers: [{ cost: 300, cap: 12 }, { cost: 600, cap: 14 }, { cost: 1200, cap: 16 }],
-    },
-};
+// Definitions live in BALANCE.upgrades (top of file).
+const UPGRADES = BALANCE.upgrades;
 // Inject id onto each entry for easy lookup
 for (const k of Object.keys(UPGRADES)) UPGRADES[k].id = k;
 
@@ -1301,8 +1535,8 @@ function heliShoot() {
             vx: 5 * heli.facing + heli.vx,
             vy: 10 + heli.vy,
             team: 'player',
-            damage: MISSILE_DAMAGE,
-            aaDamage: MISSILE_VS_AA_DAMAGE,
+            damage: BALANCE.missiles.damage,
+            aaDamage: BALANCE.missiles.damageVsAA,
             life: 80,
             type: 'heliMissile',
         });
@@ -1324,7 +1558,7 @@ function heliShoot() {
     heli.shootCooldown = 8;
     heli.ammo--;
     if (heli.ammo === 0 && heli.reloadMs <= 0) {
-        heli.reloadMs = HELI_RELOAD_MS;
+        heli.reloadMs = BALANCE.heli.reloadMs;
     }
     const spreadX = (Math.random() - 0.5) * 1.5;
     const spreadY = (Math.random() - 0.5) * 1.5;
@@ -1469,8 +1703,8 @@ function update() {
     // (INCOME_RATE is 0 and the variable is preserved for HUD compatibility.)
 
     // Command Points regenerate up to the cap
-    commandPoints = Math.min(cpCap, commandPoints + CP_REGEN_PER_FRAME);
-    enemyCommandPoints = Math.min(cpCap, enemyCommandPoints + CP_REGEN_PER_FRAME * 1.1);
+    commandPoints = Math.min(cpCap, commandPoints + BALANCE.economy.cpRegenPerFrame);
+    enemyCommandPoints = Math.min(cpCap, enemyCommandPoints + BALANCE.economy.cpRegenPerFrame * 1.1);
 
     // Update floating texts
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
@@ -1744,7 +1978,7 @@ function update() {
                         }
                         spawnExplosion(c.x, c.y, 2);
                         c.state = 'respawning';
-                        c.respawnTimer = CRATE_RESPAWN_MS;
+                        c.respawnTimer = BALANCE.crates.respawnMs;
                     }
                     hit = true;
                     break;
@@ -1769,7 +2003,7 @@ function update() {
                         spawnParticles(b.x, b.y, C.explosion1, 4, 1, 8);
                         if (b.type === 'shell') spawnExplosion(b.x, b.y, 2);
                     } else if (b.type === 'heliMissile') {
-                        aa.hp -= b.aaDamage || MISSILE_VS_AA_DAMAGE;
+                        aa.hp -= b.aaDamage || BALANCE.missiles.damageVsAA;
                         spawnExplosion(b.x, b.y, 4);
                         triggerScreenShake(4, 10);
                     } else {
@@ -1884,17 +2118,17 @@ function update() {
             c.respawnTimer -= 16.67;
             if (c.respawnTimer <= 0) {
                 c.state = 'parachuting';
-                c.parachuteMs = CRATE_PARACHUTE_MS;
+                c.parachuteMs = BALANCE.crates.parachuteMs;
                 c.y = 40;  // start near top of screen
             }
         } else if (c.state === 'parachuting') {
             c.parachuteMs -= 16.67;
-            const fall = (1 - c.parachuteMs / CRATE_PARACHUTE_MS);
+            const fall = (1 - c.parachuteMs / BALANCE.crates.parachuteMs);
             c.y = 40 + fall * (CRATE_LANDED_Y - 40);
             if (c.parachuteMs <= 0) {
                 c.state = 'landed';
                 c.y = CRATE_LANDED_Y;
-                c.hp = CRATE_HP;
+                c.hp = BALANCE.crates.hp;
                 spawnParticles(c.x, c.y + 8, '#9e9e9e', 6, 1, 14);  // dust on landing
             }
         }
@@ -1907,8 +2141,8 @@ function update() {
             // Big death explosion + bounty
             spawnExplosion(aa.x, aa.y - 10, 5);
             triggerScreenShake(8, 18);
-            money += AA_BOUNTY;
-            spawnFloatingText(aa.x, aa.y - 50, `+$${AA_BOUNTY}`, '#69f0ae');
+            money += BALANCE.aa.bounty;
+            spawnFloatingText(aa.x, aa.y - 50, `+$${BALANCE.aa.bounty}`, '#69f0ae');
             spawnFloatingText(aa.x, aa.y - 30, 'AA DESTROYED', '#ffd54f');
             airDefences.splice(i, 1);
             continue;
@@ -1917,7 +2151,7 @@ function update() {
         const dxh = heli.x - aa.x;
         const dyh = heli.y - aa.y;
         const distH = Math.sqrt(dxh * dxh + dyh * dyh);
-        if (distH < AA_RANGE && aa.fireTimer > AA_FIRE_INTERVAL) {
+        if (distH < BALANCE.aa.range && aa.fireTimer > BALANCE.aa.fireInterval) {
             aa.fireTimer = 0;
             // Lead the target slightly using heli velocity
             const leadFrames = 30;
@@ -1970,7 +2204,7 @@ function update() {
     // next level via the READY button.
     // Decay shield powerup
     if (powerupShieldMs > 0) powerupShieldMs = Math.max(0, powerupShieldMs - 16.67);
-    // Helicopter reload: empty magazine → wait HELI_RELOAD_MS → full refill.
+    // Helicopter reload: empty magazine → wait BALANCE.heli.reloadMs → full refill.
     if (heli.reloadMs > 0) {
         heli.reloadMs = Math.max(0, heli.reloadMs - 16.67);
         if (heli.reloadMs === 0 && heli.ammo === 0) {
@@ -2957,8 +3191,8 @@ function drawCrate(c) {
     }
 
     // HP pips above the crate when damaged
-    if (c.state === 'landed' && c.hp < CRATE_HP) {
-        for (let i = 0; i < CRATE_HP; i++) {
+    if (c.state === 'landed' && c.hp < BALANCE.crates.hp) {
+        for (let i = 0; i < BALANCE.crates.hp; i++) {
             ctx.fillStyle = i < c.hp ? '#69f0ae' : 'rgba(255,255,255,0.2)';
             ctx.beginPath();
             ctx.arc(sx - 10 + i * 10, sy - HT - 8, 3, 0, Math.PI * 2);
@@ -3040,7 +3274,7 @@ function drawAirDefence(aa) {
 
     // Range warning indicator (subtle red glow if heli is in range)
     const distH = Math.sqrt((heli.x - aa.x) ** 2 + (heli.y - aa.y) ** 2);
-    if (distH < AA_RANGE) {
+    if (distH < BALANCE.aa.range) {
         ctx.fillStyle = 'rgba(244, 67, 54, 0.35)';
         ctx.beginPath();
         ctx.arc(sx, by - 22, 4 + Math.sin(frameCount * 0.2) * 2, 0, Math.PI * 2);
@@ -4448,7 +4682,7 @@ function drawTopHUD() {
     ctx.arc(ammoIconX, ammoIconY, ammoArcR, 0, Math.PI * 2);
     ctx.stroke();
     if (isReloading) {
-        const fraction = heli.reloadMs / HELI_RELOAD_MS;
+        const fraction = heli.reloadMs / BALANCE.heli.reloadMs;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.beginPath();
         ctx.moveTo(ammoIconX, ammoIconY);
@@ -4544,7 +4778,7 @@ function drawWaveBar() {
         ctx.fill(); ctx.stroke();
         // Pulse dot if it's actively firing range of the heli
         const dx = heli.x - aa.x, dy = heli.y - aa.y;
-        if (dx * dx + dy * dy < AA_RANGE * AA_RANGE) {
+        if (dx * dx + dy * dy < BALANCE.aa.range * BALANCE.aa.range) {
             const pulse = 0.4 + Math.abs(Math.sin(frameCount * 0.15)) * 0.6;
             ctx.fillStyle = `rgba(255, 100, 100, ${pulse})`;
             ctx.beginPath();
@@ -4918,7 +5152,7 @@ function drawIncomePowerupPanel() {
     const cardX = panelX + innerPad;
     const cardY = panelY + 28;
     const loaded = heli.missiles > 0;
-    const canAfford = money >= MISSILE_PAIR_COST;
+    const canAfford = money >= BALANCE.missiles.pairCost;
     const enabled = canAfford && !loaded;
     bevelButton(cardX, cardY, cardW, cardH, {
         radius: 12,
@@ -4956,7 +5190,7 @@ function drawIncomePowerupPanel() {
         ctx.fillText(`${heli.missiles}×`, cardX + cardW / 2, cardY + cardH - 14);
     } else {
         ctx.fillStyle = canAfford ? '#69f0ae' : '#888';
-        ctx.fillText(`$${MISSILE_PAIR_COST}`, cardX + cardW / 2, cardY + cardH - 14);
+        ctx.fillText(`$${BALANCE.missiles.pairCost}`, cardX + cardW / 2, cardY + cardH - 14);
     }
     ctx.shadowBlur = 0;
 
@@ -5437,8 +5671,8 @@ function updateButtonFills() {
         let pct = 0;
         let ready = false;
         if (k === '4') {
-            ready = money >= MISSILE_PAIR_COST || heli.missiles > 0;
-            pct = ready ? 100 : Math.min(100, (money / MISSILE_PAIR_COST) * 100);
+            ready = money >= BALANCE.missiles.pairCost || heli.missiles > 0;
+            pct = ready ? 100 : Math.min(100, (money / BALANCE.missiles.pairCost) * 100);
         } else if (k === 'P') {
             ready = true;
             pct = 100;
@@ -5455,7 +5689,7 @@ function updateButtonFills() {
     const fire = document.getElementById('btn-fire');
     if (fire) {
         const ready = heli.ammo > 0;
-        const pct = ready ? 100 : (1 - heli.reloadMs / HELI_RELOAD_MS) * 100;
+        const pct = ready ? 100 : (1 - heli.reloadMs / BALANCE.heli.reloadMs) * 100;
         fire.style.setProperty('--ammo-fill', pct.toFixed(1));
         fire.classList.toggle('ready', ready);
     }
@@ -5489,11 +5723,141 @@ if ('serviceWorker' in navigator) {
 
 // =====================================================================
 
-// Start the loop (rendering menu background)
-loadSprites();
-initGame();
-gameState = 'menu';
-gameLoop();
+// =====================================================================
+// DEBUG BALANCE OVERLAY
+//
+// Walks the BALANCE object and emits a live <input> per numeric/string
+// leaf. Edits write straight back into BALANCE, so any read site that
+// references BALANCE.foo.bar (or holds a reference to a BALANCE sub-
+// object — UNIT_DEFS, DAMAGE_MATRIX, etc.) sees the change on the next
+// frame. Reads that captured a primitive at script load (heli.hp once
+// inside resetHeli, etc.) only update on the next reset/restart.
+// =====================================================================
+function showToast(msg) {
+    const t = document.getElementById('debug-toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 1400);
+}
+
+function setPath(root, path, val) {
+    let cur = root;
+    for (let i = 0; i < path.length - 1; i++) cur = cur[path[i]];
+    cur[path[path.length - 1]] = val;
+}
+
+function renderDebugPanel() {
+    const body = document.getElementById('debug-body');
+    body.innerHTML = '';
+    for (const section of Object.keys(BALANCE)) {
+        if (section.startsWith('_')) continue;     // skip _doc fields
+        const block = document.createElement('div');
+        block.className = 'debug-section';
+        const h = document.createElement('h4');
+        h.textContent = section;
+        block.appendChild(h);
+        renderDebugObject(BALANCE[section], [section], block);
+        body.appendChild(block);
+    }
+}
+
+function renderDebugObject(obj, basePath, container) {
+    // Emit one row per leaf. For nested objects, recurse and let the
+    // label show the full dotted path so the designer can read context.
+    for (const k of Object.keys(obj)) {
+        const v = obj[k];
+        const path = [...basePath, k];
+        const labelText = path.slice(1).join('.');
+        if (typeof v === 'number') {
+            container.appendChild(makeRow(labelText, 'number', v, (n) => setPath(BALANCE, path, n)));
+        } else if (typeof v === 'string') {
+            container.appendChild(makeRow(labelText, 'text', v, (s) => setPath(BALANCE, path, s)));
+        } else if (Array.isArray(v)) {
+            v.forEach((item, i) => {
+                if (item && typeof item === 'object' && !Array.isArray(item)) {
+                    renderDebugObject(item, [...path, i], container);
+                } else if (typeof item === 'number') {
+                    container.appendChild(makeRow(`${labelText}[${i}]`, 'number', item, (n) => { v[i] = n; }));
+                } else if (typeof item === 'string') {
+                    container.appendChild(makeRow(`${labelText}[${i}]`, 'text', item, (s) => { v[i] = s; }));
+                }
+            });
+        } else if (v && typeof v === 'object') {
+            renderDebugObject(v, path, container);
+        }
+    }
+}
+
+function makeRow(labelText, inputType, value, onChange) {
+    const row = document.createElement('div');
+    row.className = 'debug-row';
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    label.title = labelText;   // hover shows the full path when truncated
+    row.appendChild(label);
+    const input = document.createElement('input');
+    input.type = inputType;
+    input.value = value;
+    if (inputType === 'number') input.step = 'any';
+    input.addEventListener('input', () => {
+        if (inputType === 'number') {
+            const n = parseFloat(input.value);
+            if (!isNaN(n)) onChange(n);
+        } else {
+            onChange(input.value);
+        }
+    });
+    row.appendChild(input);
+    return row;
+}
+
+function copyBalanceToClipboard() {
+    // Strip _doc-style keys (anything starting with _) before copying
+    const clean = JSON.parse(JSON.stringify(BALANCE, (k, v) => k.startsWith('_') ? undefined : v));
+    const json = JSON.stringify(clean, null, 4);
+    navigator.clipboard.writeText(json).then(
+        () => showToast('balance JSON copied'),
+        () => {
+            // Clipboard API blocked (e.g. file://) — fall back to prompt
+            window.prompt('Copy the JSON below into balance.json:', json);
+        }
+    );
+}
+
+function setupDebugPanel() {
+    const panel = document.getElementById('debug-panel');
+    document.getElementById('debug-close').addEventListener('click', () => panel.classList.remove('open'));
+    document.getElementById('debug-copy').addEventListener('click', copyBalanceToClipboard);
+    document.getElementById('debug-reload').addEventListener('click', () => location.reload());
+    // Backtick toggles the panel. Use code rather than key so the same
+    // physical key works on layouts where ` lives elsewhere.
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Backquote') {
+            // Don't hijack if the user is typing inside the panel itself
+            const target = e.target;
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') &&
+                panel.contains(target)) return;
+            panel.classList.toggle('open');
+            if (panel.classList.contains('open')) renderDebugPanel();
+            e.preventDefault();
+        }
+    });
+}
+
+// Boot: load any balance.json overrides BEFORE the first initGame() so
+// the world spins up with the correct (possibly tuned) values. Sprite
+// preload + game loop can fire in parallel — they don't depend on
+// balance values. Then enter the menu state and start rendering.
+(async () => {
+    await loadBalance();
+    setupDebugPanel();
+    loadSprites();
+    initGame();
+    gameState = 'menu';
+    gameLoop();
+})();
 
 </script>
 </body>

@@ -1,0 +1,91 @@
+{
+    "_doc": "Live balance values for Frontline Extraction. Edit and reload to retune. Use the in-game debug overlay (press the backtick key) to fiddle live, then 'Copy JSON' to capture the result back into this file. Anything missing falls back to the defaults baked into index.html.",
+
+    "heli": {
+        "maxAmmo":     50,
+        "reloadMs":    7500,
+        "startHp":     100,
+        "maxCarry":    4
+    },
+
+    "missiles": {
+        "pairCost":    100,
+        "perPurchase": 2,
+        "damage":      80,
+        "damageVsAA":  25
+    },
+
+    "crates": {
+        "hp":          3,
+        "respawnMs":   20000,
+        "parachuteMs": 4000
+    },
+
+    "aa": {
+        "hp":          90,
+        "bounty":      80,
+        "fireInterval": 240,
+        "range":       800
+    },
+
+    "bases": {
+        "hp":          500
+    },
+
+    "economy": {
+        "startMoney":      30,
+        "cpRegenPerFrame": 0.011111,
+        "cpCapDefault":    10
+    },
+
+    "units": {
+        "infantry": { "hp": 32,  "speed": 0.85, "damage": 5,  "range": 65,  "attackRate": 30, "cpCost": 2, "bounty": 4,  "w": 14, "h": 22, "engageDist": 30  },
+        "bazooka":  { "hp": 35,  "speed": 0.70, "damage": 28, "range": 160, "attackRate": 90, "cpCost": 4, "bounty": 10, "w": 14, "h": 22, "engageDist": 110 },
+        "tank":     { "hp": 160, "speed": 0.50, "damage": 22, "range": 130, "attackRate": 80, "cpCost": 7, "bounty": 25, "w": 36, "h": 20, "engageDist": 75  }
+    },
+
+    "damageMatrix": {
+        "infantry": { "infantry": 1.0, "bazooka": 1.5, "tank": 0.5 },
+        "bazooka":  { "infantry": 0.7, "bazooka": 1.0, "tank": 2.0 },
+        "tank":     { "infantry": 1.5, "bazooka": 0.6, "tank": 1.0 }
+    },
+
+    "bosses": {
+        "miniBossTank": { "hpMul": 4, "damageMul": 1.5, "speedMul": 0.8, "scale": 1.25, "bounty": 100, "label": "MINI-BOSS" },
+        "bossTank":     { "hpMul": 8, "damageMul": 2.0, "speedMul": 0.7, "scale": 1.5,  "bounty": 250, "label": "BOSS" }
+    },
+
+    "upgrades": {
+        "infantryDamage": {
+            "name": "Infantry Damage", "icon": "infantry_blue_1", "desc": "+ damage to infantry",
+            "tiers": [{ "cost": 80, "mult": 1.20 }, { "cost": 200, "mult": 1.40 }, { "cost": 500, "mult": 1.75 }]
+        },
+        "bazookaRange": {
+            "name": "Bazooka Range", "icon": "bazooka_blue_1", "desc": "+ bazooka range",
+            "tiers": [{ "cost": 100, "mult": 1.15 }, { "cost": 250, "mult": 1.30 }, { "cost": 500, "mult": 1.50 }]
+        },
+        "tankHp": {
+            "name": "Tank Armour", "icon": "tank_blue", "desc": "+ tank max HP",
+            "tiers": [{ "cost": 120, "mult": 1.20 }, { "cost": 300, "mult": 1.40 }, { "cost": 600, "mult": 1.75 }]
+        },
+        "heliHp": {
+            "name": "Heli Armour", "icon": "heli", "desc": "+ helicopter max HP",
+            "tiers": [{ "cost": 80, "hp": 30 }, { "cost": 180, "hp": 50 }, { "cost": 400, "hp": 100 }]
+        },
+        "cpCap": {
+            "name": "CP Capacity", "icon": null, "desc": "+ Command Points cap",
+            "tiers": [{ "cost": 300, "cap": 12 }, { "cost": 600, "cap": 14 }, { "cost": 1200, "cap": 16 }]
+        }
+    },
+
+    "levels": {
+        "total": 5,
+        "compositions": [
+            { "types": ["infantry", "infantry", "bazooka"],          "spawnEvery": 140 },
+            { "types": ["infantry", "bazooka", "tank"],              "spawnEvery": 130 },
+            { "types": ["infantry", "bazooka", "bazooka", "tank"],   "spawnEvery": 120, "boss": "miniBossTank" },
+            { "types": ["bazooka", "bazooka", "tank", "tank"],       "spawnEvery": 110 },
+            { "types": ["tank", "tank", "bazooka", "infantry"],      "spawnEvery": 90,  "boss": "bossTank" }
+        ]
+    }
+}
