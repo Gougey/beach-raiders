@@ -28,6 +28,13 @@ TRIM = [
     "rock_1.png",
     "base_blue.png",
     "base_red.png",
+    # HUD icons — square, centred, but generated with padding we don't want.
+    "hud_infantry.png",
+    "hud_bazooka.png",
+    "hud_tank.png",
+    "hud_missile.png",
+    "hud_coin.png",
+    "hud_ammo.png",
 ]
 
 ALPHA_SOLID = 200   # consider only nearly-opaque pixels as "real content"

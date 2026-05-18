@@ -136,9 +136,9 @@ body.touch #touch-overlay { display: block; }
     font-size: 22px;
 }
 #btn-pickup {
-    /* Just above the FIRE button so the left thumb can swap between them */
+    /* Below FIRE — left thumb pulls down for pickup. (Drops are automatic.) */
     left: 90px;
-    bottom: 435px;
+    bottom: 135px;
     width: 70px;
     height: 70px;
     background: radial-gradient(circle at 50% 50%,
@@ -146,7 +146,72 @@ body.touch #touch-overlay { display: block; }
                                 rgba(21, 101, 192, 0.20) 100%);
     border: 3px solid rgba(129, 212, 250, 0.75);
     box-shadow: 0 0 12px rgba(33, 150, 243, 0.35);
+    font-size: 16px;
 }
+
+/* ---- Deploy orbit ---- */
+/* FIRE is centred at (125, 350) in the 1200x700 stage. Buttons orbit
+   clockwise on the right-hand semicircle at radius ~115 so the left
+   thumb can flick from FIRE to any of them. */
+.deploy-orbit {
+    width: 78px;
+    height: 78px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    background: radial-gradient(circle at 50% 50%,
+                                rgba(255, 193, 7, 0.10) 0%,
+                                rgba(0, 0, 0, 0.45) 100%);
+    border: 3px solid rgba(255, 213, 79, 0.75);
+    box-shadow: 0 0 12px rgba(255, 193, 7, 0.35);
+    background-size: 68% 68%;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.deploy-orbit .num {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #ffc107;
+    color: #0a1628;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #0a1628;
+    text-shadow: none;
+}
+.deploy-orbit .lbl {
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 6px;
+    padding: 1px 5px;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+/* When the matching icon sprite is available, use it as the background
+   and hide the text label. Hooked up in JS once icons load. */
+.deploy-orbit.has-icon .lbl { display: none; }
+
+/* Positions: angles 270°, 315°, 0°, 45° at radius 115 from FIRE centre.
+   FIRE centre = (125, 350) in stage coords. Buttons 78×78 (centre offset 39).
+   In CSS coords (left + bottom), bottom = 700 - canvas_y - 78.
+
+     1 (Infantry, 12 o'clock):     centre (125, 235)
+     2 (Bazooka,  1:30):           centre (206, 269)
+     3 (Tank,     3 o'clock):      centre (240, 350)
+     4 (Missile,  4:30):           centre (206, 431) */
+#btn-deploy-1 { left:  86px; bottom: 387px; }
+#btn-deploy-2 { left: 167px; bottom: 353px; }
+#btn-deploy-3 { left: 201px; bottom: 272px; }
+#btn-deploy-4 { left: 167px; bottom: 191px; }
 
 /* Portrait warning overlay */
 #rotate-warning {
@@ -321,6 +386,11 @@ body.touch.portrait #rotate-warning { display: flex; }
     <div id="joystick" class="control"><div id="joystick-knob"></div></div>
     <div id="btn-fire"   class="control touch-btn">FIRE</div>
     <div id="btn-pickup" class="control touch-btn">PICK</div>
+    <!-- Deploy buttons orbit FIRE clockwise from 12 to 4:30 -->
+    <div id="btn-deploy-1" class="control touch-btn deploy-orbit" data-keynum="1"><span class="num">1</span><span class="lbl">INF</span></div>
+    <div id="btn-deploy-2" class="control touch-btn deploy-orbit" data-keynum="2"><span class="num">2</span><span class="lbl">BZK</span></div>
+    <div id="btn-deploy-3" class="control touch-btn deploy-orbit" data-keynum="3"><span class="num">3</span><span class="lbl">TNK</span></div>
+    <div id="btn-deploy-4" class="control touch-btn deploy-orbit" data-keynum="4"><span class="num">4</span><span class="lbl">MSL</span></div>
 </div>
 </div>
 
@@ -427,6 +497,13 @@ const SPRITE_FILES = (() => {
         rock_1: 'assets/rock_1.png',
         cloud_1: 'assets/cloud_1.png',
         mountain_bg: 'assets/mountain_bg.png',
+        // HUD icons (deploy orbit + currencies)
+        hud_infantry: 'assets/hud_infantry.png',
+        hud_bazooka:  'assets/hud_bazooka.png',
+        hud_tank:     'assets/hud_tank.png',
+        hud_missile:  'assets/hud_missile.png',
+        hud_coin:     'assets/hud_coin.png',
+        hud_ammo:     'assets/hud_ammo.png',
     };
     // 8-frame walk cycles per soldier type
     for (const soldier of ['infantry_blue', 'infantry_red', 'bazooka_blue', 'bazooka_red']) {
@@ -4188,8 +4265,14 @@ function drawHUD() {
     pauseHitRect = null;
 
     drawTopHUD();
-    drawDeployPanel();
-    drawIncomePowerupPanel();
+    // On touch devices the deploy orbit + a compact gold readout replace
+    // the bottom panels, freeing the lower screen edge from clutter.
+    if (IS_TOUCH) {
+        drawCompactGoldReadout();
+    } else {
+        drawDeployPanel();
+        drawIncomePowerupPanel();
+    }
     if (levelState === 'complete') drawShopOverlay();
 
     // Pause overlay if game is paused
@@ -4578,9 +4661,9 @@ function drawDeployPanel() {
 
     // 3 unit cards (cost = Command Points, not gold)
     const cards = [
-        { key: '1', cpCost: UNIT_DEFS.infantry.cpCost, type: 'infantry', sprite: 'infantry_blue_1', action: () => spawnPlayerUnit('infantry') },
-        { key: '2', cpCost: UNIT_DEFS.bazooka.cpCost,  type: 'bazooka',  sprite: 'bazooka_blue_1',  action: () => spawnPlayerUnit('bazooka') },
-        { key: '3', cpCost: UNIT_DEFS.tank.cpCost,     type: 'tank',     sprite: 'tank_blue',       action: () => spawnPlayerUnit('tank') },
+        { key: '1', cpCost: UNIT_DEFS.infantry.cpCost, type: 'infantry', sprite: 'hud_infantry', action: () => spawnPlayerUnit('infantry') },
+        { key: '2', cpCost: UNIT_DEFS.bazooka.cpCost,  type: 'bazooka',  sprite: 'hud_bazooka',  action: () => spawnPlayerUnit('bazooka') },
+        { key: '3', cpCost: UNIT_DEFS.tank.cpCost,     type: 'tank',     sprite: 'hud_tank',     action: () => spawnPlayerUnit('tank') },
     ];
     const cardW = 96, cardH = 76;
     const cardY = panelY + 28;
@@ -4690,6 +4773,30 @@ function drawDeployPanel() {
 }
 
 // ----- Bottom-right INCOME + POWERUPS panel -----
+
+// Compact touch-mode readout: just gold + missile loaded badge, bottom-right.
+// Replaces the full deploy/weapons panels when the deploy orbit is in play.
+function drawCompactGoldReadout() {
+    const panelW = 200;
+    const panelH = 54;
+    const panelX = W - panelW - 12;
+    const panelY = H - panelH - 12;
+    hudPanel(panelX, panelY, panelW, panelH);
+    iconCoin(panelX + 28, panelY + panelH / 2, 16);
+    ctx.fillStyle = '#ffd54f';
+    ctx.font = 'bold 22px "Lilita One", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.fillText(Math.floor(money).toString(), panelX + 50, panelY + panelH / 2 + 1);
+    if (heli.missiles > 0) {
+        ctx.fillStyle = '#ff5722';
+        ctx.font = 'bold 13px "Lilita One", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`MSL ×${heli.missiles}`, panelX + panelW - 14, panelY + panelH / 2 + 1);
+    }
+    ctx.shadowBlur = 0;
+}
 
 function drawIncomePowerupPanel() {
     // Compact panel: just a missile card (same size as a deploy card) and
@@ -5179,7 +5286,41 @@ async function tryLockLandscape() {
 
     hold(fire, ' ');
     tap(pickup, () => helicopterPickup());
+
+    // Deploy orbit — taps fire the same actions as the canvas deploy cards.
+    const deployAction = {
+        '1': () => spawnPlayerUnit('infantry'),
+        '2': () => spawnPlayerUnit('bazooka'),
+        '3': () => spawnPlayerUnit('tank'),
+        '4': () => buyMissiles(),
+    };
+    document.querySelectorAll('.deploy-orbit').forEach((el) => {
+        const k = el.dataset.keynum;
+        const fn = deployAction[k];
+        if (fn) tap(el, fn);
+    });
 })();
+
+// When the icon sprites finish loading, swap them onto the orbit buttons.
+function applyHudIconsToOrbit() {
+    const mapping = {
+        '1': 'assets/hud_infantry.png',
+        '2': 'assets/hud_bazooka.png',
+        '3': 'assets/hud_tank.png',
+        '4': 'assets/hud_missile.png',
+    };
+    document.querySelectorAll('.deploy-orbit').forEach((el) => {
+        const src = mapping[el.dataset.keynum];
+        if (!src) return;
+        const img = new Image();
+        img.onload = () => {
+            el.style.backgroundImage = `url(${src})`;
+            el.classList.add('has-icon');
+        };
+        img.src = src;
+    });
+}
+applyHudIconsToOrbit();
 
 // Translate touch taps on the canvas into the same click event the
 // existing canvas click handler already handles (deploy cards,

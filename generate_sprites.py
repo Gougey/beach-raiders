@@ -177,6 +177,117 @@ No background colours, no scenery, just the logo on transparency."""
     },
 ]
 
+# ---- HUD icons (deploy cards, currencies) --------------------------------
+# Prompts derived from UI_STYLE_GUIDE.md templates A/B/C with concrete
+# subjects. Each renders as a square 1024x1024 PNG ready to trim and drop
+# into the in-game HUD.
+
+HUD_ICONS = [
+    {
+        "name": "hud_infantry.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI icon of a chunky cartoon TROPICAL MILITARY INFANTRY SOLDIER
+in olive-green uniform with a green helmet, blue undershirt, holding a small black
+assault rifle across his chest at the ready. Oversized head with friendly determined
+expression, big eyes, slight thumbs-up energy. 3/4 isometric perspective with the
+camera tilted ~25 degrees down and ~15 degrees to the side, full-figure hero pose.
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), bold saturated colours, single warm key
+light from upper-left and cool fill from lower-right. Crisp specular highlights on
+the helmet and rifle, soft contact shadow under the figure. Subtle hero halo glow
+behind the figure. Stylised cartoony proportions like a polished mobile match-3 icon
+(Royal Match / Boom Beach craft).
+
+True alpha-channel transparent background, no scene, no podium, no text, no logos,
+centred composition with about 8% padding."""
+    },
+    {
+        "name": "hud_bazooka.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI icon of a chunky cartoon TROPICAL MILITARY SOLDIER WITH A
+ROCKET LAUNCHER. Olive-green uniform, green helmet with goggles pushed up on the
+brim, hoisting a long dark grey rocket launcher (bazooka) on his right shoulder.
+Red-tipped rocket visible in the tube. Oversized head, friendly determined
+expression. 3/4 isometric perspective tilted ~25 degrees down and ~15 degrees to
+the side.
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), bold saturated colours, warm key light
+upper-left, cool fill lower-right. Crisp specular streaks on the launcher tube and
+helmet, soft contact shadow under the figure. Royal-Match-style polish: chunky
+cartoony proportions, hand-sculpted 3D look.
+
+True alpha-channel transparent background, no text, no logos, centred composition
+with 8% padding."""
+    },
+    {
+        "name": "hud_tank.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI icon of a CHUNKY CARTOON MILITARY TANK in tropical-camo
+colour scheme (jungle green hull with darker green camo splotches) with grey-blue
+armour plates, a rounded turret with a long cannon, and visible track links. Small
+SKY-BLUE STAR EMBLEM on the side of the turret. 3/4 isometric perspective tilted
+~25 degrees down and ~15 degrees to the side.
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), bold saturated colours, warm key light
+upper-left, cool fill lower-right. Crisp specular highlights along the turret and
+barrel, brass rivet details on the armour plates, soft contact shadow underneath.
+Royal-Match-style polish, hand-sculpted 3D mobile game craft.
+
+True alpha-channel transparent background, no text, no logos, centred composition
+with 8% padding."""
+    },
+    {
+        "name": "hud_missile.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI powerup icon of TWO PAIRED MISSILES side by side, ready
+to launch. Each missile is white with a sleek aerodynamic body, RED CONE-SHAPED
+NOSE TIP, red fins at the tail, brass and gunmetal mechanical detail along the
+body. The two missiles are slightly fanned outward so both red noses are visible.
+3/4 isometric perspective tilted ~25 degrees down and ~15 degrees to the side.
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), bold saturated colours, warm key light
+upper-left, cool fill lower-right. Crisp specular streaks on the missile bodies,
+red glow highlight on the nose cones, small sparkle accents. Soft contact shadow.
+Hint of orange-yellow flame glow at the back of each missile suggesting power.
+Royal-Match-style polish, hand-sculpted 3D look.
+
+True alpha-channel transparent background, no smoke trail (that's rendered
+in-engine), no text, centred composition with 8% padding."""
+    },
+    {
+        "name": "hud_coin.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI currency coin with a CROSSED-RIFLES MILITARY INSIGNIA
+stamped into the face. Polished golden coin viewed from a 3/4 angle (tilted toward
+the camera so the rim is visible). HERO GOLD body, deep amber shadow at the bottom
+rim, a small WHITE STAR-SHAPED GLINT at the upper-left as the brightest highlight.
+Gold rim trim around the circumference.
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), warm key light upper-left, cool fill
+lower-right, soft contact shadow underneath. Royal-Match-style polish, faceted but
+friendly cartoony style, no realism.
+
+True alpha-channel transparent background, no text, centred composition with 10%
+padding."""
+    },
+    {
+        "name": "hud_ammo.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI ammunition icon — a CHUNKY BRASS RIFLE CARTRIDGE with a
+copper-jacketed bullet tip, standing vertically. 3/4 isometric perspective tilted
+~25 degrees down. Brass cartridge case with engraved rim at the bottom, COPPER
+bullet tip at the top, subtle vertical seam line on the case.
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), warm key light upper-left, cool fill
+lower-right. Crisp specular highlight running down the brass body, deep amber
+shadow on the opposite side, small SPARKLE on the bullet tip. Soft contact shadow.
+Royal-Match-style polish, chunky cartoony proportions.
+
+True alpha-channel transparent background, no text, no shadow plate, centred
+composition with 12% padding."""
+    },
+]
+
 # ---- Base assets (helicopter, tanks, bases) ------------------------------
 
 BASE_ASSETS = [
@@ -424,6 +535,8 @@ def main():
                         help="Only generate the walk-cycle soldier frames")
     parser.add_argument("--environment", action="store_true",
                         help="Only generate environment + logo assets")
+    parser.add_argument("--hud", action="store_true",
+                        help="Only generate HUD icons (deploy cards, currencies)")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -432,8 +545,30 @@ def main():
 
     generated = 0
 
+    # HUD icons (self-contained prompts — no STYLE prefix since these are
+    # not side-profile sprites)
+    if not args.soldiers and not args.environment:
+        for asset in HUD_ICONS:
+            name = asset["name"]
+            if args.only and not name.startswith(args.only):
+                continue
+            path = ASSETS_DIR / name
+            if args.skip_existing and path.exists():
+                print(f"\n[SKIP] {name}")
+                continue
+            print(f"\n[GENERATE] {name}")
+            try:
+                b64 = generate_image(asset["prompt"], asset["size"], name)
+                save_b64_png(b64, path)
+                generated += 1
+            except Exception as e:
+                print(f"  FAILED: {e}")
+        if args.hud:
+            print(f"\nDone. Generated {generated} images. Approx ${generated * 0.17:.2f}")
+            return
+
     # Environment + logo assets
-    if not args.soldiers:
+    if not args.soldiers and not args.hud:
         for asset in ENVIRONMENT_ASSETS:
             name = asset["name"]
             if args.only and not name.startswith(args.only):
