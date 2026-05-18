@@ -92,9 +92,9 @@ body.touch #touch-overlay { display: block; }
     width: 180px;
     height: 180px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.08);
-    border: 3px solid rgba(255, 255, 255, 0.55);
-    box-shadow: 0 0 18px rgba(0, 0, 0, 0.35);
+    background: rgba(0, 30, 60, 0.18);
+    border: 2px solid rgba(132, 232, 255, 0.55);
+    box-shadow: 0 0 18px rgba(132, 232, 255, 0.35);
 }
 #joystick-knob {
     position: absolute;
@@ -105,151 +105,149 @@ body.touch #touch-overlay { display: block; }
     margin-left: -35px;
     margin-top: -35px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.10);
-    border: 3px solid rgba(255, 255, 255, 0.75);
-    box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+    background: rgba(0, 30, 60, 0.45);
+    border: 2px solid rgba(132, 232, 255, 0.85);
+    box-shadow: 0 0 14px rgba(132, 232, 255, 0.55);
     transition: transform 0.05s ease-out;
 }
-/* ---- Touch buttons — chunky gold-rim style per UI_STYLE_GUIDE ---- */
-/* Triple-ring construction via inset box-shadow: thin black liner →
-   thick gold ring → darker gold shadow → recessed dark plate. Drop
-   shadow + outer glow ground the button visually.                  */
+/* ---- Touch buttons — monochrome cyan transparent HUD style ---- */
+/* Inspired by sci-fi controller overlay HUDs: thin cyan outline + soft
+   outer glow, transparent interior so the playfield breathes through.
+   Icons inside become cyan silhouettes via mask-image so the whole
+   control surface reads as a single colour.                          */
+:root {
+    --hud-cyan:      rgba(132, 232, 255, 0.95);
+    --hud-cyan-soft: rgba(132, 232, 255, 0.55);
+    --hud-cyan-glow: rgba(132, 232, 255, 0.45);
+    --hud-back:      rgba(0, 30, 60, 0.18);
+}
+
 .touch-btn {
     border-radius: 50%;
-    color: #fff;
+    color: var(--hud-cyan);
     font-family: var(--headline-font);
     display: flex;
     align-items: center;
     justify-content: center;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
-    background:
-        radial-gradient(circle at 50% 35%,
-            rgba(255, 255, 255, 0.10) 0%,
-            rgba(10, 22, 40, 0.65) 70%,
-            rgba(0, 0, 0, 0.75) 100%);
+    background: var(--hud-back);
+    border: 2px solid var(--hud-cyan-soft);
     box-shadow:
-        inset 0 0 0 2px rgba(0, 0, 0, 0.9),         /* inner dark liner */
-        inset 0 0 0 5px #ffd54f,                    /* hero gold ring */
-        inset 0 0 0 8px #b8860b,                    /* deeper gold shadow */
-        inset 0 4px 6px rgba(255, 255, 255, 0.18),  /* top bevel highlight */
-        inset 0 -4px 6px rgba(0, 0, 0, 0.45),       /* bottom bevel shadow */
-        0 6px 14px rgba(0, 0, 0, 0.55),             /* drop shadow */
-        0 0 18px rgba(255, 193, 7, 0.30);           /* outer glow */
-    background-size: 62% 62%;
-    background-repeat: no-repeat;
-    background-position: center;
+        0 0 14px var(--hud-cyan-glow),
+        inset 0 0 14px rgba(0, 200, 255, 0.12);
+    transition: filter 0.1s, transform 0.05s;
 }
 .touch-btn:active {
-    transform: translateY(2px);
-    filter: brightness(1.18);
-    box-shadow:
-        inset 0 0 0 2px rgba(0, 0, 0, 0.9),
-        inset 0 0 0 5px #ffd54f,
-        inset 0 0 0 8px #b8860b,
-        inset 0 -2px 4px rgba(0, 0, 0, 0.55),
-        0 2px 6px rgba(0, 0, 0, 0.55),
-        0 0 26px rgba(255, 193, 7, 0.50);
+    transform: translateY(1px);
+    filter: brightness(1.25) drop-shadow(0 0 8px var(--hud-cyan));
+    border-color: var(--hud-cyan);
 }
 
-/* FIRE — bigger, RED-rimmed variant of the same chunky button */
+/* Icon layer inside each button. Sits above the conic fill rings. */
+.touch-btn .icon {
+    position: absolute;
+    inset: 22%;
+    color: var(--hud-cyan);
+    pointer-events: none;
+    z-index: 1;
+}
+/* PNG-backed icons use mask-image so the icon's alpha shape gets
+   recoloured to cyan. JS sets --icon-mask to the asset url. */
+.touch-btn .icon[data-icon] {
+    background-color: var(--hud-cyan);
+    -webkit-mask-image: var(--icon-mask, none);
+            mask-image: var(--icon-mask, none);
+    -webkit-mask-size: contain;
+            mask-size: contain;
+    -webkit-mask-position: center;
+            mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+    filter: drop-shadow(0 0 4px var(--hud-cyan-glow));
+}
+.touch-btn .icon svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+    filter: drop-shadow(0 0 4px var(--hud-cyan-glow));
+}
+
+/* ---- FIRE button ---- */
 #btn-fire {
     left: 60px;
     bottom: 350px;
     width: 140px;
     height: 140px;
-    background:
-        radial-gradient(circle at 50% 35%,
-            rgba(255, 200, 180, 0.18) 0%,
-            rgba(80, 0, 0, 0.55) 70%,
-            rgba(0, 0, 0, 0.85) 100%);
-    box-shadow:
-        inset 0 0 0 2px rgba(0, 0, 0, 0.9),
-        inset 0 0 0 5px #ef5350,
-        inset 0 0 0 8px #8e0000,
-        inset 0 4px 6px rgba(255, 255, 255, 0.18),
-        inset 0 -4px 6px rgba(0, 0, 0, 0.45),
-        0 6px 16px rgba(0, 0, 0, 0.55),
-        0 0 22px rgba(244, 67, 54, 0.55);
-    background-size: 60% 60%;
-    background-repeat: no-repeat;
-    background-position: center;
 }
-#btn-fire:active {
-    box-shadow:
-        inset 0 0 0 2px rgba(0, 0, 0, 0.9),
-        inset 0 0 0 5px #ef5350,
-        inset 0 0 0 8px #8e0000,
-        inset 0 -2px 4px rgba(0, 0, 0, 0.55),
-        0 2px 8px rgba(0, 0, 0, 0.55),
-        0 0 36px rgba(244, 67, 54, 0.85);
-}
-
-/* PICK — small variant with BLUE rim */
-#btn-pickup {
-    left: 88px;
-    bottom: 210px;
-    width: 80px;
-    height: 80px;
-    background:
-        radial-gradient(circle at 50% 35%,
-            rgba(187, 222, 251, 0.18) 0%,
-            rgba(13, 71, 161, 0.45) 70%,
-            rgba(0, 0, 0, 0.80) 100%);
-    box-shadow:
-        inset 0 0 0 2px rgba(0, 0, 0, 0.9),
-        inset 0 0 0 4px #42a5f5,
-        inset 0 0 0 7px #0d47a1,
-        inset 0 4px 5px rgba(255, 255, 255, 0.20),
-        inset 0 -4px 5px rgba(0, 0, 0, 0.45),
-        0 5px 12px rgba(0, 0, 0, 0.55),
-        0 0 18px rgba(33, 150, 243, 0.45);
-    background-size: 62% 62%;
-}
-
-/* ---- Deploy orbit ---- */
-/* FIRE centre = (130, 280) in the 1200x700 stage (moved up so PICK clears the beach).
-   Orbit radius 120, four buttons at 12 / 1:30 / 3 / 4:30 o'clock.
-   Button size 86×86 (centre offset 43).
-   CSS bottom = 700 - canvas_y - 86. */
-.deploy-orbit {
-    width: 86px;
-    height: 86px;
-    font-size: 12px;
-    line-height: 1;
-    color: #fff;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-    background-size: 60% 60%;
-}
-.deploy-orbit::before {
-    /* CP-fill ring rendered as a conic gradient + circular mask.
-       --cp-fill is 0..100; clipped to the rim band of the button.    */
+#btn-fire .icon { inset: 18%; }
+#btn-fire::before {
+    /* Ammo recharge ring — same construction as the deploy CP ring.
+       --ammo-fill is 0..100 (current ammo / max, OR reload progress). */
     content: '';
     position: absolute;
     inset: -5px;
     border-radius: 50%;
     background: conic-gradient(
         from -90deg,
-        #69f0ae 0deg,
-        #69f0ae calc(var(--cp-fill, 0) * 3.6deg),
-        rgba(0, 0, 0, 0.45) calc(var(--cp-fill, 0) * 3.6deg)
+        var(--hud-cyan) 0deg,
+        var(--hud-cyan) calc(var(--ammo-fill, 0) * 3.6deg),
+        rgba(0, 0, 0, 0.30) calc(var(--ammo-fill, 0) * 3.6deg)
     );
     -webkit-mask: radial-gradient(circle,
-        transparent 0,
-        transparent 41px,
-        black 41px,
-        black 48px,
+        transparent 0, transparent 68px,
+        black 68px, black 75px,
+        transparent 75px);
+            mask: radial-gradient(circle,
+        transparent 0, transparent 68px,
+        black 68px, black 75px,
+        transparent 75px);
+    pointer-events: none;
+    transition: filter 0.15s;
+}
+#btn-fire.ready::before {
+    filter: drop-shadow(0 0 6px var(--hud-cyan));
+}
+
+/* ---- Deploy orbit (5 buttons evenly spaced) ---- */
+/* FIRE centre = (130, 280) in the 1200x700 stage. Orbit radius 130.
+   5 buttons spread over 180° from 12 o'clock to 6 o'clock (4 gaps of 45°):
+
+       angle    cx   cy   left  bottom
+     1  270°   130  150     87     507
+     2  315°   222  188    179     469
+     3    0°   260  280    217     377
+     4   45°   222  372    179     285
+     P   90°   130  410     87     247
+   Button 86×86 (centre offset 43); CSS bottom = 700 - cy - 43. */
+.deploy-orbit {
+    width: 86px;
+    height: 86px;
+    font-size: 12px;
+    line-height: 1;
+}
+.deploy-orbit::before {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    background: conic-gradient(
+        from -90deg,
+        var(--hud-cyan) 0deg,
+        var(--hud-cyan) calc(var(--cp-fill, 0) * 3.6deg),
+        rgba(0, 0, 0, 0.30) calc(var(--cp-fill, 0) * 3.6deg)
+    );
+    -webkit-mask: radial-gradient(circle,
+        transparent 0, transparent 41px,
+        black 41px, black 48px,
         transparent 48px);
             mask: radial-gradient(circle,
-        transparent 0,
-        transparent 41px,
-        black 41px,
-        black 48px,
+        transparent 0, transparent 41px,
+        black 41px, black 48px,
         transparent 48px);
     pointer-events: none;
     transition: filter 0.15s;
 }
 .deploy-orbit.ready::before {
-    filter: drop-shadow(0 0 6px rgba(105, 240, 174, 0.9));
+    filter: drop-shadow(0 0 6px var(--hud-cyan));
 }
 .deploy-orbit .num {
     position: absolute;
@@ -258,43 +256,22 @@ body.touch #touch-overlay { display: block; }
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: #ffc107;
-    color: #0a1628;
+    background: rgba(0, 30, 60, 0.85);
+    color: var(--hud-cyan);
     font-size: 13px;
     font-family: var(--headline-font);
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid #0a1628;
-    text-shadow: none;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+    border: 1.5px solid var(--hud-cyan-soft);
     z-index: 2;
 }
-.deploy-orbit .lbl {
-    background: rgba(0, 0, 0, 0.6);
-    border-radius: 6px;
-    padding: 1px 5px;
-    font-size: 10px;
-    letter-spacing: 1px;
-    z-index: 2;
-}
-.deploy-orbit.has-icon .lbl { display: none; }
 
-/* Orbit positions — each centre sits exactly on a circle of radius 130
-   around the FIRE button centre at canvas (130, 280). Compass angles
-   270° / 315° / 0° / 45° (12 / 1:30 / 3 / 4:30 o'clock).
-   Button is 86×86 (centre offset 43); CSS bottom = 700 - cy - 43, left = cx - 43.
-
-       angle    cx   cy   left  bottom
-     1  270°   130  150     87     507
-     2  315°   222  188    179     469
-     3    0°   260  280    217     377
-     4   45°   222  372    179     285
-*/
 #btn-deploy-1 { left:  87px; bottom: 507px; }
 #btn-deploy-2 { left: 179px; bottom: 469px; }
 #btn-deploy-3 { left: 217px; bottom: 377px; }
 #btn-deploy-4 { left: 179px; bottom: 285px; }
+#btn-pickup   { left:  87px; bottom: 247px; }
 
 /* Portrait warning overlay */
 #rotate-warning {
@@ -467,13 +444,20 @@ body.touch.portrait #rotate-warning { display: flex; }
 <!-- Touch controls overlay — only visible on touch devices -->
 <div id="touch-overlay">
     <div id="joystick" class="control"><div id="joystick-knob"></div></div>
-    <div id="btn-fire"   class="control touch-btn">FIRE</div>
-    <div id="btn-pickup" class="control touch-btn">PICK</div>
-    <!-- Deploy buttons orbit FIRE clockwise from 12 to 4:30 -->
-    <div id="btn-deploy-1" class="control touch-btn deploy-orbit" data-keynum="1"><span class="num">1</span><span class="lbl">INF</span></div>
-    <div id="btn-deploy-2" class="control touch-btn deploy-orbit" data-keynum="2"><span class="num">2</span><span class="lbl">BZK</span></div>
-    <div id="btn-deploy-3" class="control touch-btn deploy-orbit" data-keynum="3"><span class="num">3</span><span class="lbl">TNK</span></div>
-    <div id="btn-deploy-4" class="control touch-btn deploy-orbit" data-keynum="4"><span class="num">4</span><span class="lbl">MSL</span></div>
+    <!-- FIRE in the centre; 5 buttons orbit around it on a radius-130 circle -->
+    <div id="btn-fire"   class="control touch-btn"><div class="icon" data-icon="hud_flame"></div></div>
+    <div id="btn-deploy-1" class="control touch-btn deploy-orbit" data-keynum="1"><div class="icon" data-icon="hud_infantry"></div><span class="num">1</span></div>
+    <div id="btn-deploy-2" class="control touch-btn deploy-orbit" data-keynum="2"><div class="icon" data-icon="hud_bazooka"></div><span class="num">2</span></div>
+    <div id="btn-deploy-3" class="control touch-btn deploy-orbit" data-keynum="3"><div class="icon" data-icon="hud_tank"></div><span class="num">3</span></div>
+    <div id="btn-deploy-4" class="control touch-btn deploy-orbit" data-keynum="4"><div class="icon" data-icon="hud_missile"></div><span class="num">4</span></div>
+    <!-- PICK joins the orbit at 6 o'clock with an SVG up-arrow icon -->
+    <div id="btn-pickup" class="control touch-btn deploy-orbit" data-keynum="P">
+        <div class="icon">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 3 L20.5 13 H15.5 V21 H8.5 V13 H3.5 Z"/>
+            </svg>
+        </div>
+    </div>
 </div>
 </div>
 
@@ -5388,57 +5372,47 @@ async function tryLockLandscape() {
 })();
 
 // When the icon sprites finish loading, swap them onto each touch button.
+// Wire each [data-icon] node to its PNG via mask-image, so the icon
+// becomes a cyan silhouette inside the transparent button frame.
 function applyHudIconsToButtons() {
-    const orbitMapping = {
-        '1': 'assets/hud_infantry.png',
-        '2': 'assets/hud_bazooka.png',
-        '3': 'assets/hud_tank.png',
-        '4': 'assets/hud_missile.png',
+    const iconMap = {
+        hud_flame:    'assets/hud_flame.png',
+        hud_infantry: 'assets/hud_infantry.png',
+        hud_bazooka:  'assets/hud_bazooka.png',
+        hud_tank:     'assets/hud_tank.png',
+        hud_missile:  'assets/hud_missile.png',
     };
-    document.querySelectorAll('.deploy-orbit').forEach((el) => {
-        const src = orbitMapping[el.dataset.keynum];
+    document.querySelectorAll('.icon[data-icon]').forEach((el) => {
+        const src = iconMap[el.dataset.icon];
         if (!src) return;
-        const img = new Image();
-        img.onload = () => {
-            el.style.backgroundImage = `url(${src})`;
-            el.classList.add('has-icon');
-        };
-        img.src = src;
+        el.style.setProperty('--icon-mask', `url(${src})`);
     });
-    // FIRE and PICK swap from text to icon once loaded.
-    const swap = (btnId, src, clearText) => {
-        const el = document.getElementById(btnId);
-        if (!el) return;
-        const img = new Image();
-        img.onload = () => {
-            el.style.backgroundImage = `url(${src})`;
-            if (clearText) el.textContent = '';
-        };
-        img.src = src;
-    };
-    swap('btn-fire',   'assets/hud_flame.png',  true);
-    swap('btn-pickup', 'assets/hud_pickup.png', true);
 }
 applyHudIconsToButtons();
 
-// Live CP-fill update for the deploy orbit. Runs every animation frame
-// so the green ring tracks Command Points smoothly. Cost per type comes
-// straight from UNIT_DEFS so it stays in sync with balance changes.
-function updateDeployFills() {
+// Live fill update for each touch button — runs every animation frame
+// so the cyan rings track state smoothly.
+//   Deploy 1/2/3 → CP / unit cpCost
+//   Deploy 4    → gold / MISSILE_PAIR_COST (full when loaded)
+//   FIRE        → ammo / maxAmmo (or reload progress when empty)
+//   PICK        → always full (no resource gate)
+function updateButtonFills() {
     const costs = {
         '1': UNIT_DEFS.infantry.cpCost,
         '2': UNIT_DEFS.bazooka.cpCost,
         '3': UNIT_DEFS.tank.cpCost,
-        // missile is gold-gated, not CP — we fill it from gold/cost instead
     };
     document.querySelectorAll('.deploy-orbit').forEach((el) => {
         const k = el.dataset.keynum;
-        let pct = 0;
-        let ready = false;
+        let pct = 100;
+        let ready = true;
         if (k === '4') {
             pct = Math.min(100, (money / MISSILE_PAIR_COST) * 100);
-            ready = money >= MISSILE_PAIR_COST && heli.missiles === 0;
-            if (heli.missiles > 0) { pct = 100; ready = true; }
+            ready = money >= MISSILE_PAIR_COST || heli.missiles > 0;
+            if (heli.missiles > 0) pct = 100;
+        } else if (k === 'P') {
+            pct = 100;
+            ready = true;
         } else {
             const cost = costs[k];
             pct = Math.min(100, (commandPoints / cost) * 100);
@@ -5447,9 +5421,24 @@ function updateDeployFills() {
         el.style.setProperty('--cp-fill', pct.toFixed(1));
         el.classList.toggle('ready', ready);
     });
-    requestAnimationFrame(updateDeployFills);
+
+    // FIRE button — ammo OR reload progress
+    const fire = document.getElementById('btn-fire');
+    if (fire) {
+        let pct;
+        if (heli.ammo > 0) {
+            pct = (heli.ammo / heli.maxAmmo) * 100;
+        } else {
+            // Filling back from 0 as the reload timer drains
+            pct = (1 - heli.reloadMs / HELI_RELOAD_MS) * 100;
+        }
+        fire.style.setProperty('--ammo-fill', pct.toFixed(1));
+        fire.classList.toggle('ready', heli.ammo > 0);
+    }
+
+    requestAnimationFrame(updateButtonFills);
 }
-requestAnimationFrame(updateDeployFills);
+requestAnimationFrame(updateButtonFills);
 
 // Translate touch taps on the canvas into the same click event the
 // existing canvas click handler already handles (deploy cards,
