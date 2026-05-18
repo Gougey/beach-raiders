@@ -76,7 +76,7 @@ canvas {
     display: none;
     z-index: 5;
 }
-body.touch #touch-overlay { display: block; }
+body.touch.game-active #touch-overlay { display: block; }
 #touch-overlay .control {
     position: absolute;
     pointer-events: auto;
@@ -319,6 +319,7 @@ body.touch.portrait #rotate-warning { display: flex; }
     backdrop-filter: blur(2px);
 }
 #game-over-screen { display: none; }
+#start-screen { gap: 16px; }
 
 #logo-img {
     max-width: 75%;
@@ -391,42 +392,64 @@ body.touch.portrait #rotate-warning { display: flex; }
     text-align: center;
 }
 
-/* ---- Big chunky game button ---- */
+/* ---- Big chunky game button (style-guide §5) ---- */
 .game-btn {
-    font-family: var(--headline-font);
-    font-size: 26px;
-    letter-spacing: 2px;
-    padding: 14px 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Fredoka', var(--body-font), sans-serif;
+    font-weight: 600;
+    font-size: 30px;
+    letter-spacing: 1px;
+    padding: 0 72px;
+    height: 88px;
+    min-width: 220px;
     color: #fff;
-    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
-    border: 3px solid var(--wood-dark);
-    border-radius: 14px;
+    text-shadow: 0 2px 0 #1b5e20, 0 1px 4px rgba(0,0,0,0.5);
+    border: 2px solid #0a0d10;
+    border-radius: 44px;
     cursor: pointer;
     pointer-events: all;
-    transition: transform 0.08s, filter 0.08s;
+    transition: transform 90ms ease-out, box-shadow 140ms ease-out;
     box-shadow:
-        inset 0 3px 0 rgba(255, 255, 255, 0.3),
-        inset 0 -4px 0 rgba(0, 0, 0, 0.25),
-        0 6px 0 var(--wood-dark),
-        0 8px 18px rgba(0, 0, 0, 0.5);
-    background: linear-gradient(180deg, #66bb6a 0%, #2e7d32 50%, #1b5e20 100%);
+        inset 0 5px 0 rgba(255,255,255,0.35),
+        inset 0 -7px 0 rgba(0,0,0,0.18),
+        0 7px 0 #0d3f12,
+        0 12px 22px rgba(0,0,0,0.4);
+    background: linear-gradient(180deg,
+        #7ed957 0%, #43a047 30%, #2e7d32 65%, #1b5e20 100%);
+    animation: btn-pulse 2.4s ease-in-out infinite;
 }
-.game-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
-.game-btn:disabled {
-    filter: grayscale(0.6) brightness(0.7);
-    cursor: progress;
-    pointer-events: none;
+@keyframes btn-pulse {
+    0%, 100% { box-shadow: inset 0 5px 0 rgba(255,255,255,0.35), inset 0 -7px 0 rgba(0,0,0,0.18), 0 7px 0 #0d3f12, 0 12px 22px rgba(0,0,0,0.4); }
+    50%       { box-shadow: inset 0 5px 0 rgba(255,255,255,0.35), inset 0 -7px 0 rgba(0,0,0,0.18), 0 7px 0 #0d3f12, 0 18px 32px rgba(0,0,0,0.5), 0 0 40px rgba(126,217,87,0.35); }
 }
+.game-btn:hover  { filter: brightness(1.1); transform: translateY(-3px); animation: none; }
 .game-btn:active {
-    transform: translateY(4px);
+    transform: translateY(5px);
+    animation: none;
     box-shadow:
-        inset 0 3px 0 rgba(255, 255, 255, 0.2),
-        inset 0 -2px 0 rgba(0, 0, 0, 0.25),
-        0 2px 0 var(--wood-dark),
-        0 4px 10px rgba(0, 0, 0, 0.5);
+        inset 0 3px 0 rgba(255,255,255,0.2),
+        inset 0 -3px 0 rgba(0,0,0,0.1),
+        0 2px 0 #0d3f12,
+        0 5px 12px rgba(0,0,0,0.35);
+}
+.game-btn:disabled {
+    filter: grayscale(0.6) brightness(0.65);
+    cursor: default;
+    pointer-events: none;
+    animation: none;
 }
 .game-btn.danger {
-    background: linear-gradient(180deg, #ff7043 0%, #d84315 50%, #8e0000 100%);
+    background: linear-gradient(180deg,
+        #ff7961 0%, #e53935 30%, #c62828 65%, #8e0000 100%);
+    box-shadow:
+        inset 0 5px 0 rgba(255,255,255,0.3),
+        inset 0 -7px 0 rgba(0,0,0,0.18),
+        0 7px 0 #5a0000,
+        0 12px 22px rgba(0,0,0,0.4);
+    text-shadow: 0 2px 0 #8e0000, 0 1px 4px rgba(0,0,0,0.5);
+    animation: none;
 }
 
 /* ---- Game over ---- */
@@ -606,7 +629,7 @@ body.touch.portrait #rotate-warning { display: flex; }
         <span class="bottom">EXTRACTION</span>
     </div>
     <div id="tagline">Air Cavalry · Ground Assault</div>
-    <button id="start-btn" class="game-btn">START GAME</button>
+    <button id="start-btn" class="game-btn">PLAY</button>
 </div>
 
 <div id="game-over-screen">
@@ -1189,6 +1212,7 @@ let uiAnimFrame = 0;
 // ---- GAME STATE ----
 // Buttons hit-rects (filled in during draw, used by click handler)
 let hudHitRects = [];
+let _renderNow = 0;
 let pauseHitRect = null;
 let frameCount = 0;
 let particles = [];
@@ -2042,6 +2066,10 @@ function update() {
         screenShakeY = 0;
     }
 
+    // Pre-split units by team to halve target-scan work
+    const _playerUnits = units.filter(u => u.team === 'player' && u.hp > 0);
+    const _enemyUnits  = units.filter(u => u.team === 'enemy'  && u.hp > 0);
+
     // Update units
     for (let i = units.length - 1; i >= 0; i--) {
         const u = units[i];
@@ -2080,11 +2108,17 @@ function update() {
         let nearestEnemy = null;
         let nearestDist = Infinity;
 
-        // Check enemy units
-        for (const other of units) {
-            if (other.team === u.team || other.hp <= 0) continue;
-            const d = Math.abs(other.x - u.x);
-            if (d < nearestDist) { nearestDist = d; nearestEnemy = other; }
+        // Only rescan target every 8 frames or when current target dies
+        if (!u._cachedTarget || u._cachedTarget.hp <= 0 || frameCount % 8 === 0) {
+            const opponents = u.team === 'player' ? _enemyUnits : _playerUnits;
+            for (const other of opponents) {
+                const d = Math.abs(other.x - u.x);
+                if (d < nearestDist) { nearestDist = d; nearestEnemy = other; }
+            }
+            u._cachedTarget = nearestEnemy;
+        } else {
+            nearestEnemy = u._cachedTarget;
+            nearestDist = Math.abs(nearestEnemy.x - u.x);
         }
 
         // Player ground troops also target enemy AA structures
@@ -3901,7 +3935,7 @@ function drawUnit(u) {
         // Per-unit phase offset (deterministic, derived from spawn x) so units
         // don't all step in lockstep
         const phaseOffset = (u.x * 13) % WALK_CYCLE_MS;
-        const cycleMs = performance.now() + phaseOffset;
+        const cycleMs = _renderNow + phaseOffset;
         const marching = u.state === 'march';
         const frame = marching ? walkFrameAt(cycleMs) : 1;
         // Smooth interpolated Y bob — continuous, not stepped per frame
@@ -4320,36 +4354,36 @@ function drawBullets() {
         if (sx < -10 || sx > W + 10) continue;
 
         if (b.type === 'heli') {
-            // Bright tracer round — streak oriented along velocity vector so
-            // it reads clearly against sky and ground. Hot-red core, orange
-            // halo, white-hot tip.
             const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
             const dx = b.vx / speed;
             const dy = b.vy / speed;
-            const len = 14;        // streak length
+            const len = 14;
             const tailX = sx - dx * len;
             const tailY = b.y - dy * len;
-
             ctx.save();
-            // Outer glow
-            ctx.shadowBlur = 14;
-            ctx.shadowColor = '#ff5722';
-            ctx.strokeStyle = '#ff7043';
-            ctx.lineWidth = 6;
+            // Outer glow — wide translucent stroke (no shadowBlur, mobile-safe)
+            ctx.strokeStyle = 'rgba(255,87,34,0.30)';
+            ctx.lineWidth = 11;
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(tailX, tailY);
             ctx.lineTo(sx, b.y);
             ctx.stroke();
-            // Bright core
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = '#ffeb3b';
-            ctx.lineWidth = 3;
+            // Mid orange core
+            ctx.strokeStyle = '#ff7043';
+            ctx.lineWidth = 5;
             ctx.beginPath();
             ctx.moveTo(tailX, tailY);
             ctx.lineTo(sx, b.y);
             ctx.stroke();
-            // White-hot leading tip
+            // Bright inner core
+            ctx.strokeStyle = '#ffeb3b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(tailX, tailY);
+            ctx.lineTo(sx, b.y);
+            ctx.stroke();
+            // White-hot tip
             ctx.fillStyle = '#fff';
             ctx.beginPath();
             ctx.arc(sx, b.y, 2.5, 0, Math.PI * 2);
@@ -4375,12 +4409,9 @@ function drawBullets() {
         } else if (b.type === 'rocket') {
             // Rocket with smoke trail
             ctx.fillStyle = '#ef5350';
-            ctx.shadowBlur = 6;
-            ctx.shadowColor = '#ff5722';
             ctx.beginPath();
             ctx.arc(sx, b.y, 3.5, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0;
             // Rocket tip
             ctx.fillStyle = '#fff';
             ctx.beginPath();
@@ -6109,6 +6140,7 @@ function drawLevelBrief() {
 
 // ---- MAIN RENDER ----
 function render() {
+    _renderNow = performance.now();
     hudHitRects = []; // reset hit rects each frame (moved out of drawHUD)
     ctx.clearRect(0, 0, W, H);
 
@@ -6185,6 +6217,7 @@ let _lastFrameTs   = 0;
 
 function gameLoop(ts) {
     uiAnimFrame++;
+    document.body.classList.toggle('game-active', gameState === 'playing' || gameState === 'paused');
     // Throttle idle screens to ~10fps to save battery
     const idleState = (gameState === 'worldmap' || gameState === 'levelbrief' ||
                        gameState === 'paused'   || gameState === 'shop');
