@@ -175,6 +175,115 @@ Visual style:
 True alpha-channel transparent background. The logo fills ~90% of the canvas.
 No background colours, no scenery, just the logo on transparency."""
     },
+
+    # ---- REGION 2: SAHARAN FRONT (desert biome) ----
+    # Same Boom Beach cartoon language as Region 1, but a desert palette:
+    # warm tans, terracotta, sun-bleached greens. Same outline weight so
+    # the two biomes feel like one studio's art, not two.
+    {
+        "name": "desert_palm_1.png",
+        "size": "1024x1536",
+        "prompt": """A single tall sun-bleached desert palm tree, full plant from base to crown.
+Slender curved sandy-tan trunk with a few horizontal ring-scars in lighter tan and warm brown
+shadow (#d7b88c base, #8b6a3f shadow). Trunk leans slightly to one side as if shaped by hot wind.
+A small cluster of dates at the crown in deep reddish-brown.
+5-7 long DROOPING palm fronds in DUSTY YELLOW-GREEN (#c5b765 base, #7e853e shadow),
+fronds visibly drier than a tropical palm — slightly curled tips, sparser leaflets.
+Thick black outlines (3-4px), saturated cel-shaded colours, Boom Beach style.
+True alpha-channel transparent background. Tree centred. No ground, no sky."""
+    },
+    {
+        "name": "desert_rock_1.png",
+        "size": "1024x1024",
+        "prompt": """A single chunky sandstone boulder, low and rounded, sun-baked.
+Warm terracotta-tan body (#d7a76b base, #a06a32 shadow) with a small pale yellow highlight on top-left.
+Visible horizontal sedimentary banding in slightly different tan tones.
+A few small cracks and weathered chips. No moss — this is a hot dry rock.
+Thick black outlines (3-4px), chunky cartoon Boom Beach style.
+The rock should be wider than tall, fitting in the lower half of the canvas.
+True alpha-channel transparent background. Rock centred horizontally. No ground, no sky."""
+    },
+    {
+        "name": "desert_bush_1.png",
+        "size": "1024x1024",
+        "prompt": """A single dry desert scrub bush — small clump of sparse wiry vegetation.
+Stiff thin branches radiating outward in warm brown (#8d6e4a). Small clusters of dusty
+olive-green leaves (#a2a460 base, #6a7838 shadow) at branch tips — sparse, NOT a lush bush.
+A single small yellow desert flower (#ffd54f) somewhere in the cluster.
+Thick black outlines (3-4px), chunky cartoon Boom Beach style.
+Bush wider than tall, nestled into ground level.
+True alpha-channel transparent background. Bush centred horizontally. No ground, no sky."""
+    },
+    {
+        "name": "desert_mountain_bg.png",
+        "size": "1536x1024",
+        "prompt": """A SCENERY-ONLY background image of distant desert mesa silhouettes.
+Two or three FLAT-TOPPED mesa shapes layered behind each other,
+furthest in pale sandy peach (#e8c89c), middle in warm terracotta (#cd8b5a), nearest in deeper rust (#9a5530).
+Soft hazy heat-shimmer atmospheric depth, flat painterly cartoon style.
+Mesas span the FULL WIDTH of the image, occupying mainly the lower two-thirds.
+The horizon line is HIGH — sky/empty area takes only the top third.
+
+CRITICAL CONSTRAINTS:
+- ABSOLUTELY NO characters, soldiers, people, animals, vehicles, helicopters, tanks, weapons, or military elements.
+- NO foreground elements, NO buildings, NO bases, NO trees, NO cacti, NO clouds.
+- The image is ONLY mesa silhouette shapes.
+- Everything above the mesas and outside their silhouette must be TRUE TRANSPARENT (alpha = 0).
+- This is a clean parallax background layer for a side-scrolling game.
+Boom Beach scenery style — distant mesas on the desert horizon."""
+    },
+
+    # ---- Misc gameplay sprites ----
+    {
+        "name": "wounded_soldier.png",
+        "size": "1024x1024",
+        "prompt": """Subject: chunky cartoon Boom Beach style WOUNDED SOLDIER, strict side profile facing right.
+- The soldier is SITTING / CROUCHED on the ground, knees bent, propped on one arm,
+  the other hand clutching his side over a visible white bandage with a red spot.
+- Oversized head (~one-third of body height), tired/pained expression but still cartoony — slight grimace, eyes half-closed.
+- Olive green (#558b2f) helmet, slightly askew, with a small white highlight shine.
+- Warm tan (#ffcc80) skin.
+- A WHITE ARMBAND with a RED CROSS on the upper arm to clearly read as wounded.
+- Dusty olive green combat vest over a teal-blue (#1565c0) undershirt.
+- Olive green trousers with a small tear/dirt smudge near the bandaged side, brown leather combat boots.
+- No weapon — both hands occupied (one propping, one on the wound).
+- Stocky cartoon proportions matching the existing infantry soldiers.
+- Thick black outlines (3-4px), saturated cel-shaded colours.
+- True alpha-channel transparent background. Soldier centred. No ground, no shadow plate, no scenery."""
+    },
+
+    # ---- World map illustration (overlays the procedural map) ----
+    {
+        "name": "world_map.png",
+        "size": "1536x1024",
+        "prompt": """A hand-painted top-down WORLD MAP for a mobile game, treasure-map style,
+showing TWO regions side by side that fill the entire canvas with no border:
+
+LEFT HALF — Tropical "Coral Coast" region:
+- Deep blue ocean with paler turquoise shallows hugging the coast
+- An irregular coastal landmass in lush jungle green (#2e7d32, #66bb6a)
+- A sandy beach strip along the coastline in warm tan (#ffcc80)
+- Tiny stylised palm tree clusters dotted across the jungle
+- A few small offshore islands and rocky reefs
+
+RIGHT HALF — Desert "Saharan Front" region:
+- Warm sandy expanse in tans and terracotta (#e8c89c, #cd8b5a, #9a5530)
+- Wavy dune ridge lines drawn as soft brown shading
+- A few flat-topped mesas in deeper rust
+- An occasional tiny cactus or dry palm
+- The desert meets the jungle in a soft transition zone in the middle
+
+OVERALL:
+- Painterly hand-drawn treasure-map look, soft brush textures
+- Subtle paper-grain colour overlay
+- A small compass rose in one corner
+- A faded dashed travel-route line wandering from the jungle into the desert
+- NO TEXT, NO LABELS, NO PINS, NO NUMBERS — the game draws pins programmatically over the top
+- NO characters, NO bases, NO military elements
+
+True alpha-channel NOT required — the image should fill the canvas edge to edge.
+Composition: ocean and tropical to the left, desert to the right, horizon-less top-down view."""
+    },
 ]
 
 # ---- HUD icons (deploy cards, currencies) --------------------------------

@@ -28,6 +28,14 @@ TRIM = [
     "rock_1.png",
     "base_blue.png",
     "base_red.png",
+    # Region 2 (Saharan Front) scenery — same trim rules as the tropical set.
+    "desert_palm_1.png",
+    "desert_rock_1.png",
+    "desert_bush_1.png",
+    # NOTE: desert_mountain_bg.png intentionally NOT trimmed — it's a parallax
+    # background layer and the empty alpha is load-bearing for positioning.
+    # Wounded soldier sprite — same trim style as soldier walk frames.
+    "wounded_soldier.png",
     # HUD icons — square, centred, but generated with padding we don't want.
     "hud_infantry.png",
     "hud_bazooka.png",
