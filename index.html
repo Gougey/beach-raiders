@@ -723,6 +723,12 @@ const BALANCE = {
         startMoney:        30,
         cpRegenPerFrame:   1 / 90,   // 1 CP per 1.5s @ 60fps
         cpCapDefault:      10,
+        // Frames between free auto-spawns of infantry from the player
+        // base. Matches enemy spawn cadence in the easiest level (165)
+        // so the line stays steady without intervention; bazooka/tank
+        // reinforcements still cost CP. Tweak per level via levels.json
+        // override once we want region-specific pacing.
+        playerAutoSpawnEvery: 160,
     },
     units: {
         // hp/speed/damage/range/attackRate are intrinsic combat stats.
@@ -1133,6 +1139,9 @@ let cameraX = 0;
 let money = BALANCE.economy.startMoney;
 // enemyMoney removed — enemy AI spawns from CP only.
 let enemySpawnTimer = 0;
+// Free infantry trickle from the player base — Rescue Raiders model.
+// Heli + manual CP-bought reinforcements augment this baseline.
+let playerSpawnTimer = 0;
 
 // Command Points (tactical resource for deploying units)
 let commandPoints = BALANCE.economy.cpCapDefault;
@@ -1415,6 +1424,7 @@ function initGame(levelData) {
     enemyCommandPoints = BALANCE.economy.cpCapDefault;
     floatingTexts = [];
     enemySpawnTimer = 0;
+    playerSpawnTimer = 0;
     // currentLevel kept for legacy HUD; campaign uses campaignLevelIdx
     if (!levelData) currentLevel = 1;
     levelState = 'active';
@@ -1748,14 +1758,22 @@ function buyUpgrade(id) {
     }
 }
 
-function spawnPlayerUnit(type) {
+// Spawn a player unit. opts.auto = true is used by the auto-spawn
+// trickle from the base — those units skip the CP cost, don't show a
+// "-CP" toast, and don't feed the DDA history (auto-spawns aren't a
+// player choice). They also carry `auto: true` on the unit so the
+// Discipline-star check can exclude them when they die.
+function spawnPlayerUnit(type, opts) {
+    opts = opts || {};
     const def = UNIT_DEFS[type];
-    if (commandPoints < def.cpCost) {
-        // Not enough CP — flash a hint above the heli
-        spawnFloatingText(heli.x, heli.y - 40, 'NOT ENOUGH CP', '#ef5350');
-        return;
+    if (!opts.auto) {
+        if (commandPoints < def.cpCost) {
+            // Not enough CP — flash a hint above the heli
+            spawnFloatingText(heli.x, heli.y - 40, 'NOT ENOUGH CP', '#ef5350');
+            return;
+        }
+        commandPoints -= def.cpCost;
     }
-    commandPoints -= def.cpCost;
     const u = {
         type, team: 'player',
         x: playerBase.x + 80, y: GROUND_Y - def.h / 2,
@@ -1766,13 +1784,16 @@ function spawnPlayerUnit(type) {
         w: def.w, h: def.h,
         state: 'march',
         walkFrame: Math.random() * Math.PI * 2,
+        auto: !!opts.auto,
     };
     applyUpgradesToUnit(u);
     units.push(u);
-    // Track for DDA
-    playerDeployedTypes.push(type);
-    if (playerDeployedTypes.length > 10) playerDeployedTypes.shift();
-    spawnFloatingText(playerBase.x + 80, GROUND_Y - 60, `-${def.cpCost} CP`, '#42a5f5');
+    if (!opts.auto) {
+        // Track manual deploys for DDA + show the CP cost beat.
+        playerDeployedTypes.push(type);
+        if (playerDeployedTypes.length > 10) playerDeployedTypes.shift();
+        spawnFloatingText(playerBase.x + 80, GROUND_Y - 60, `-${def.cpCost} CP`, '#42a5f5');
+    }
 }
 
 function spawnEnemyUnit(type) {
@@ -2148,8 +2169,12 @@ function update() {
                     spawnFloatingText(u.x, u.y - 60, `${u.bossLabel} DOWN`, '#ffd54f');
                 }
             }
-            // Discipline star tracking: any player deployed unit dying = no discipline star
-            if (u.team === 'player') {
+            // Discipline star tracking: only player MANUAL deploys count.
+            // Auto-spawned infantry from the base are free pawns — losing
+            // them is part of the war happening underneath the heli, not
+            // a player tactical failure. (We'll revisit star criteria once
+            // the auto-spawn model has bedded in.)
+            if (u.team === 'player' && !u.auto) {
                 playerUnitsLostThisLevel++;
                 starsThisLevel.discipline = false;
             }
@@ -2567,6 +2592,15 @@ function update() {
                 spawnEnemyUnit(type);
                 enemyCommandPoints -= cpCost;
             }
+        }
+        // Free infantry trickle from the player base — Rescue Raiders
+        // model. Keeps the ground line alive while the player is busy
+        // flying. Manual CP-bought reinforcements and the heli are the
+        // player's edge on top of this baseline.
+        playerSpawnTimer++;
+        if (playerSpawnTimer > BALANCE.economy.playerAutoSpawnEvery) {
+            playerSpawnTimer = 0;
+            spawnPlayerUnit('infantry', { auto: true });
         }
         if (levelDef.boss && !bossSpawnedThisLevel) {
             bossSpawnTimer = (bossSpawnTimer || 0) + 16.67;

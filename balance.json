@@ -35,7 +35,8 @@
     "economy": {
         "startMoney":      30,
         "cpRegenPerFrame": 0.011111,
-        "cpCapDefault":    10
+        "cpCapDefault":    10,
+        "playerAutoSpawnEvery": 160
     },
 
     "units": {
