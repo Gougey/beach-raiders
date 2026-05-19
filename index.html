@@ -65,6 +65,14 @@ canvas {
         0 8px 40px rgba(0, 0, 0, 0.7),
         0 0 80px rgba(255, 193, 7, 0.08);
     display: block;
+    /* Promote the canvas to its own GPU layer on iOS Safari so the
+       composited bitmap isn't re-uploaded per frame and touch events
+       don't fall onto the slow-scroll path. translateZ(0) is the
+       compositor hint; will-change tells the engine to keep the layer
+       ready. */
+    transform: translateZ(0);
+    will-change: transform;
+    -webkit-backface-visibility: hidden;
 }
 
 /* ---- Touch overlay ---- */
@@ -2663,14 +2671,13 @@ function drawSky() {
     ctx.fillStyle = sunGrad;
     ctx.fillRect(0, 0, W, 300);
 
-    // Sun disc
+    // Sun disc — the radial sunGrad above already provides the glow,
+    // so shadowBlur is redundant. iOS Safari is brutal with shadowBlur,
+    // so we just draw the disc straight.
     ctx.fillStyle = '#fff9c4';
-    ctx.shadowBlur = 30;
-    ctx.shadowColor = '#ffee58';
     ctx.beginPath();
     ctx.arc(sunX, sunY, 20, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
 }
 
 function drawBackgroundMountains() {
@@ -2747,11 +2754,8 @@ function drawClouds() {
 
 function drawCloud(x, y, w) {
     const h = w * 0.4;
-    ctx.save();
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = 'rgba(0,0,0,0.05)';
-    ctx.shadowOffsetY = 4;
-    // Cloud body with gradient
+    // Cloud body with gradient — shadowBlur removed (was 5% opacity on
+    // an already-soft shape; not perceptible against the sky).
     const cGrad = ctx.createRadialGradient(x, y - h * 0.1, w * 0.1, x, y + h * 0.1, w * 0.6);
     cGrad.addColorStop(0, 'rgba(255,255,255,0.95)');
     cGrad.addColorStop(1, 'rgba(230,240,255,0.6)');
@@ -2761,7 +2765,6 @@ function drawCloud(x, y, w) {
     ctx.ellipse(x - w * 0.25, y + h * 0.1, w * 0.3, h * 0.3, 0, 0, Math.PI * 2);
     ctx.ellipse(x + w * 0.25, y + h * 0.05, w * 0.35, h * 0.35, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
 }
 
 function drawBirds() {
@@ -3210,12 +3213,11 @@ function drawBase(base, team) {
 
         // Windows with glow
         for (const wx of [-25, 20]) {
+            // Window glow — shadowBlur dropped (fired 4x per frame across
+            // both bases). The pale-blue fill is bright enough to read.
             ctx.fillStyle = '#bbdefb';
-            ctx.shadowBlur = 6;
-            ctx.shadowColor = '#bbdefb';
             roundRect(sx + wx - 6, by - 52, 12, 10, 2);
             ctx.fill();
-            ctx.shadowBlur = 0;
             // Window cross
             ctx.strokeStyle = '#795548';
             ctx.lineWidth = 1.5;
@@ -3345,10 +3347,9 @@ function drawBase(base, team) {
             ctx.fill();
             // Tower window (slit)
             ctx.fillStyle = '#ff8a65';
-            ctx.shadowBlur = 4;
-            ctx.shadowColor = '#ff5722';
+            // Slit-window glow — shadow stripped; the red fillRect on
+            // dark stone is high-contrast enough to read.
             ctx.fillRect(towerX - 2, by - 55, 4, 10);
-            ctx.shadowBlur = 0;
         }
 
         // Battlements
@@ -3357,14 +3358,12 @@ function drawBase(base, team) {
             ctx.fillRect(sx - 45 + i * 14, by - 75, 10, 12);
         }
 
-        // Skull emblem with glow
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = 'rgba(244,67,54,0.5)';
+        // Skull emblem — shadow stripped. The pale ivory on the dark
+        // fortress wall reads cleanly without a blur halo.
         ctx.fillStyle = '#e0e0e0';
         ctx.beginPath();
         ctx.arc(sx, by - 42, 11, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
         // Skull details
         ctx.fillStyle = '#212121';
         ctx.beginPath();
@@ -3889,19 +3888,17 @@ function drawHelicopter() {
     // Gun barrel detail
     ctx.fillStyle = '#37474f';
     ctx.fillRect(gunX + f * 12, 8, f * 4, 5);
-    // Muzzle flash when shooting
+    // Muzzle flash when shooting — three concentric discs replace
+    // shadowBlur (huge perf cost on iOS, runs every frame the player
+    // is firing). Outer translucent orange acts as the "glow halo".
     if (heli.shootCooldown > 5) {
+        const fx = gunX + f * 16, fy = 11;
+        ctx.fillStyle = 'rgba(255,152,0,0.55)';
+        ctx.beginPath(); ctx.arc(fx, fy, 9, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#ffeb3b';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#ff9800';
-        ctx.beginPath();
-        ctx.arc(gunX + f * 16, 11, 5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(fx, fy, 5, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(gunX + f * 16, 11, 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(fx, fy, 2, 0, Math.PI * 2); ctx.fill();
     }
 
     // Rotor mast
@@ -3946,15 +3943,14 @@ function drawHelicopter() {
     ctx.fill();
     ctx.restore();
 
-    // Carried soldiers indicator
+    // Carried soldiers indicator \u2014 offset shadow replaces shadowBlur
     if (heli.carrying.length > 0) {
-        ctx.fillStyle = C.gold;
-        ctx.shadowBlur = 4;
-        ctx.shadowColor = 'rgba(255,193,7,0.5)';
         ctx.font = 'bold 12px sans-serif';
         ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillText(`\u00d7${heli.carrying.length}`, 1, 33);
+        ctx.fillStyle = C.gold;
         ctx.fillText(`\u00d7${heli.carrying.length}`, 0, 32);
-        ctx.shadowBlur = 0;
     }
 
     ctx.restore();
@@ -4215,15 +4211,15 @@ function drawUnit(u) {
             ctx.restore();
         }
 
-        // Muzzle flash when fighting
+        // Muzzle flash when fighting — two concentric discs (fake bloom)
+        // replace shadowBlur. With up to 40 units on screen this saved
+        // dozens of blur invocations per frame on iOS.
         if (u.state === 'fight' && u.attackCooldown > u.attackRate - 5) {
+            const mx = dir * 24, my = -3;
+            ctx.fillStyle = 'rgba(255,152,0,0.55)';
+            ctx.beginPath(); ctx.arc(mx, my, 7, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#ffeb3b';
-            ctx.shadowBlur = 6;
-            ctx.shadowColor = '#ff9800';
-            ctx.beginPath();
-            ctx.arc(dir * 24, -3, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
+            ctx.beginPath(); ctx.arc(mx, my, 4, 0, Math.PI * 2); ctx.fill();
         }
 
     } else if (u.type === 'tank') {
@@ -4340,14 +4336,12 @@ function drawUnit(u) {
         ctx.fillStyle = 'rgba(255,255,255,0.1)';
         ctx.fillRect(dir * 7, -11, dir * barrelLen, 1.5);
 
-        // Team emblem on turret
+        // Team emblem on turret — shadow stripped, the bright accent
+        // fill on the dark turret reads clearly without it.
         ctx.fillStyle = accentColor;
-        ctx.shadowBlur = 3;
-        ctx.shadowColor = accentColor;
         ctx.beginPath();
         ctx.arc(0, -9, 3.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
         // Inner emblem detail
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
         ctx.beginPath();
@@ -4363,20 +4357,16 @@ function drawUnit(u) {
             ctx.fill();
         }
 
-        // Muzzle flash for tank
+        // Muzzle flash for tank — three concentric discs replace
+        // shadowBlur (was shadowBlur=12, the biggest blur in drawUnit).
         if (u.state === 'fight' && u.attackCooldown > u.attackRate - 5) {
             const muzzleX = dir * (7 + barrelLen + 2);
+            ctx.fillStyle = 'rgba(255,152,0,0.55)';
+            ctx.beginPath(); ctx.arc(muzzleX, -9, 11, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#ffeb3b';
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = '#ff9800';
-            ctx.beginPath();
-            ctx.arc(muzzleX, -9, 6, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(muzzleX, -9, 6, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#fff';
-            ctx.beginPath();
-            ctx.arc(muzzleX, -9, 3, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
+            ctx.beginPath(); ctx.arc(muzzleX, -9, 3, 0, Math.PI * 2); ctx.fill();
         }
     }
 
@@ -4670,10 +4660,12 @@ function hudPanel(x, y, w, h, opts = {}) {
     // Dark navy panel with rounded corners and subtle border, like the mockup
     const r = opts.radius || 14;
     ctx.save();
-    // Drop shadow
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = 'rgba(0, 10, 30, 0.5)';
-    ctx.shadowOffsetY = 3;
+    // Fake drop-shadow with a translucent fillRect offset down 3px —
+    // shadowBlur ate the iOS frame budget (this panel is drawn 3-5x
+    // per frame for the HUD).
+    ctx.fillStyle = 'rgba(0, 5, 20, 0.32)';
+    roundRect(x, y + 3, w, h, r);
+    ctx.fill();
     // Background
     const grad = ctx.createLinearGradient(x, y, x, y + h);
     grad.addColorStop(0, opts.top || 'rgba(20, 30, 55, 0.92)');
@@ -4681,7 +4673,6 @@ function hudPanel(x, y, w, h, opts = {}) {
     ctx.fillStyle = grad;
     roundRect(x, y, w, h, r);
     ctx.fill();
-    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
     // Inner highlight
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
@@ -4943,17 +4934,17 @@ function iconSoldier(cx, cy, h, color) {
 function bevelButton(x, y, w, h, opts = {}) {
     const r = opts.radius || 10;
     ctx.save();
-    // Drop shadow
-    ctx.shadowBlur = 6;
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-    ctx.shadowOffsetY = 2;
+    // Fake drop-shadow as a translucent fillRect offset down 2px,
+    // replacing shadowBlur (iOS Safari perf).
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    roundRect(x, y + 2, w, h, r);
+    ctx.fill();
     const grad = ctx.createLinearGradient(x, y, x, y + h);
     grad.addColorStop(0, opts.top || 'rgba(40, 55, 85, 0.95)');
     grad.addColorStop(1, opts.bottom || 'rgba(15, 25, 50, 0.95)');
     ctx.fillStyle = grad;
     roundRect(x, y, w, h, r);
     ctx.fill();
-    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
     // Inner highlight
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.lineWidth = 1;
@@ -4984,21 +4975,24 @@ function drawHUD() {
     // Shop overlay shown when gameState === 'shop' (levelState === 'complete')
     if (gameState === 'shop') drawShopOverlay();
 
-    // Pause overlay if game is paused
+    // Pause overlay if game is paused — offset-fillText shadow replaces
+    // shadowBlur. Paused state is throttled to 10fps but blur+fillText
+    // still costs more than two draw calls.
     if (gameState === 'paused') {
         ctx.save();
         ctx.fillStyle = 'rgba(10, 22, 40, 0.7)';
         ctx.fillRect(0, 0, W, H);
-        ctx.fillStyle = '#ffd54f';
         ctx.font = 'bold 80px "Lilita One", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.shadowBlur = 16;
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillText('PAUSED', W / 2 + 3, H / 2 - 20 + 3);
+        ctx.fillStyle = '#ffd54f';
         ctx.fillText('PAUSED', W / 2, H / 2 - 20);
         ctx.font = '600 22px "Fredoka", sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillText('Press P / Esc / click pause to resume', W / 2 + 1, H / 2 + 50 + 1);
         ctx.fillStyle = '#fff';
-        ctx.shadowBlur = 4;
         ctx.fillText('Press P / Esc / click pause to resume', W / 2, H / 2 + 50);
         ctx.restore();
     }
@@ -5018,7 +5012,7 @@ function drawTopHUD() {
     ctx.font = 'bold 11px "Lilita One", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    // shadowBlur on HUD text removed — iOS Safari is brutal with it. Dark navy panel + bright fill reads cleanly.
     ctx.fillText('HELI HP', leftX + 44, leftY + 22);
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 18px "Lilita One", sans-serif';
@@ -5167,17 +5161,14 @@ function drawWaveBar() {
         }
     }
 
-    // Helicopter — white dot with glow
+    // Helicopter — fake-bloom dot (two concentric circles) replaces
+    // shadowBlur for the player marker.
     const heliMX = mapX + (heli.x / WORLD_WIDTH) * mapW;
     const heliMY = mapY + 4 + (heli.y / GROUND_Y) * (mapH - 14);
-    ctx.save();
-    ctx.shadowBlur = 6;
-    ctx.shadowColor = '#fff';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath(); ctx.arc(heliMX, heliMY, 5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(heliMX, heliMY, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    ctx.beginPath(); ctx.arc(heliMX, heliMY, 3, 0, Math.PI * 2); ctx.fill();
 
     // Camera viewport — outline of what the player currently sees
     const camLeft = mapX + (cameraX / WORLD_WIDTH) * mapW;
@@ -5195,17 +5186,17 @@ function drawWaveBar() {
     // Legend strip above the map so the shapes are readable at a glance
     drawMinimapLegend(mapX, mapY, mapW);
 
-    // "WAVE 3 / 5" label below the minimap with state indicator
-    ctx.fillStyle = '#fff';
+    // "WAVE 3 / 5" label below the minimap with state indicator —
+    // offset-fillText shadow replaces shadowBlur.
     ctx.font = 'bold 13px "Lilita One", sans-serif';
     ctx.textAlign = 'center';
-    ctx.shadowBlur = 4;
-    ctx.shadowColor = 'rgba(0,0,0,0.6)';
     let stateText = `LEVEL ${currentLevel} / ${TOTAL_LEVELS}`;
     if (levelState === 'complete') stateText += '  •  CLEARED';
     if (levelState === 'active')   stateText += '  •  IN COMBAT';
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(stateText, mapX + mapW / 2 + 1, mapY + mapH + 18 + 1);
+    ctx.fillStyle = '#fff';
     ctx.fillText(stateText, mapX + mapW / 2, mapY + mapH + 18);
-    ctx.shadowBlur = 0;
 }
 
 // Per-type unit marker on the minimap
@@ -5364,7 +5355,7 @@ function drawDeployPanel() {
     ctx.font = 'bold 14px "Lilita One", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    // shadowBlur on HUD text removed — iOS Safari is brutal with it. Dark navy panel + bright fill reads cleanly.
     ctx.fillText('DEPLOY', panelX + 16, panelY + 10);
     ctx.shadowBlur = 0;
 
@@ -5421,7 +5412,7 @@ function drawDeployPanel() {
         ctx.font = 'bold 18px "Lilita One", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        // shadowBlur on HUD text removed — iOS Safari is brutal with it. Dark navy panel + bright fill reads cleanly.
         // Lightning bolt
         ctx.fillStyle = canAfford ? '#42a5f5' : '#666';
         const bx = cx + cardW / 2 - 16;
@@ -5476,7 +5467,7 @@ function drawDeployPanel() {
     ctx.font = 'bold 11px "Lilita One", sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 3; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    // shadowBlur stripped (iOS perf). The dark panel backdrop handles contrast.
     ctx.fillText(`${Math.floor(commandPoints)} / ${cpCap} CP`, cpBarX + cpBarW - 4, cpBarY + cpBarH / 2);
     ctx.shadowBlur = 0;
 }
@@ -5496,7 +5487,7 @@ function drawCompactGoldReadout() {
     ctx.font = 'bold 22px "Lilita One", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    // shadowBlur stripped (iOS perf). The dark panel backdrop handles contrast.
     ctx.fillText(Math.floor(money).toString(), panelX + 50, panelY + panelH / 2 + 1);
     if (heli.missiles > 0) {
         ctx.fillStyle = '#ff5722';
@@ -5524,7 +5515,7 @@ function drawIncomePowerupPanel() {
     ctx.font = 'bold 14px "Lilita One", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    // shadowBlur on HUD text removed — iOS Safari is brutal with it. Dark navy panel + bright fill reads cleanly.
     ctx.fillText('WEAPONS', panelX + innerPad, panelY + 10);
     ctx.shadowBlur = 0;
 
@@ -5564,7 +5555,7 @@ function drawIncomePowerupPanel() {
     ctx.font = 'bold 16px "Lilita One", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    // shadowBlur on HUD text removed — iOS Safari is brutal with it. Dark navy panel + bright fill reads cleanly.
     if (loaded) {
         ctx.fillStyle = '#ff5722';
         ctx.fillText(`${heli.missiles}×`, cardX + cardW / 2, cardY + cardH - 14);
@@ -5587,7 +5578,7 @@ function drawIncomePowerupPanel() {
     ctx.fillStyle = '#ffd54f';
     ctx.font = 'bold 26px "Lilita One", sans-serif';
     ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    // shadowBlur on HUD text removed — iOS Safari is brutal with it. Dark navy panel + bright fill reads cleanly.
     ctx.fillText(Math.floor(money).toString(), goldX + 44, goldCY - 4);
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#90caf9';
@@ -5613,19 +5604,20 @@ function drawShopOverlay() {
     ctx.fillStyle = 'rgba(10, 22, 40, 0.78)';
     ctx.fillRect(0, 0, W, H);
 
-    // Title
-    ctx.fillStyle = '#ffd54f';
+    // Title — offset-fillText shadow replaces shadowBlur
     ctx.font = 'bold 44px "Lilita One", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 14; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillText(`— LEVEL ${currentLevel} CLEARED —`, W / 2 + 3, 80 + 3);
+    ctx.fillStyle = '#ffd54f';
     ctx.fillText(`— LEVEL ${currentLevel} CLEARED —`, W / 2, 80);
 
     ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillText(`Level ${currentLevel} cleared. Spend gold on upgrades, then move on.`, W / 2 + 1, 116 + 1);
     ctx.fillStyle = '#90caf9';
-    ctx.shadowBlur = 4;
     ctx.fillText(`Level ${currentLevel} cleared. Spend gold on upgrades, then move on.`, W / 2, 116);
-    ctx.shadowBlur = 0;
 
     // Money display
     ctx.fillStyle = '#69f0ae';
@@ -5680,7 +5672,7 @@ function drawShopOverlay() {
         ctx.font = 'bold 16px "Lilita One", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        // shadowBlur stripped (iOS perf). The dark panel backdrop handles contrast.
         ctx.fillText(up.name, cx + cardW / 2, cardY + 105);
 
         // Tier dots
@@ -5728,11 +5720,12 @@ function drawShopOverlay() {
         top: 'rgba(80, 200, 100, 0.95)',
         bottom: 'rgba(30, 100, 50, 0.95)',
     });
-    ctx.fillStyle = '#fff';
     ctx.font = 'bold 26px "Lilita One", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 6; ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillText('READY ▶', 2, 2);
+    ctx.fillStyle = '#fff';
     ctx.fillText('READY ▶', 0, 0);
     ctx.restore();
     hudHitRects.push({
@@ -5875,14 +5868,14 @@ function drawStarAwardScreen() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Title
-    ctx.fillStyle = '#fff';
+    // Title — offset-fillText shadow replaces shadowBlur (iOS Safari)
     ctx.font = `bold ${Math.round(cw * 0.072)}px "Lilita One", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 10; ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.fillText('MISSION COMPLETE', W / 2 + 2, cy + 42 + 2);
+    ctx.fillStyle = '#fff';
     ctx.fillText('MISSION COMPLETE', W / 2, cy + 42);
-    ctx.shadowBlur = 0;
 
     // Stars - animated reveal
     const stars3 = [starsThisLevel.victory, starsThisLevel.rescue, starsThisLevel.discipline];
@@ -6398,13 +6391,14 @@ function drawLevelBrief() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.fillStyle = '#aad4ff';
     ctx.font = `bold ${Math.round(cw * 0.055)}px "Lilita One", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 8; ctx.shadowColor = '#000';
+    // Offset-fillText shadow replaces shadowBlur (iOS Safari).
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.fillText('MISSION BRIEFING', W / 2 + 2, cy + 34 + 2);
+    ctx.fillStyle = '#aad4ff';
     ctx.fillText('MISSION BRIEFING', W / 2, cy + 34);
-    ctx.shadowBlur = 0;
 
     ctx.fillStyle = '#fff';
     ctx.font = `bold ${Math.round(cw * 0.07)}px "Lilita One", sans-serif`;
@@ -6772,16 +6766,49 @@ applyHudIconsToButtons();
 //   Deploy 4     → red fill = gold / cost,      green = affordable OR already loaded
 //   FIRE         → red fill = reload progress,  green = ammo > 0
 //   PICK         → always green (no resource gate)
+// Touch-button ring update — runs in its own rAF chain independent of
+// the main gameLoop. The CSS conic-gradient + mask + drop-shadow combo
+// these rings use is expensive to repaint on iOS Safari, so we:
+//   1. Skip the whole pass unless gameState === 'playing' (the buttons
+//      are hidden on every other screen).
+//   2. Run the real work on 1 in every 3 rAF ticks (~20Hz, plenty for
+//      progress rings the eye can't see at 60Hz anyway).
+//   3. Cache the last written value per element and skip the DOM write
+//      when nothing has changed — a setProperty on --cp-fill / --ammo-fill
+//      invalidates the conic-gradient backing layer even when the value
+//      is identical.
+//   4. Cache the node list once instead of querySelectorAll every tick.
+let _btnFillSkip   = 0;
+let _btnDeployNodes = null;
+let _btnFireNode    = null;
+function _btnState(el) { return el.__lastFill ||= { pct: -1, ready: null }; }
 function updateButtonFills() {
+    // Bail if buttons aren't visible — no DOM thrash on menus / world map.
+    if (gameState !== 'playing' && gameState !== 'paused') {
+        requestAnimationFrame(updateButtonFills);
+        return;
+    }
+    // 1-in-3 throttle within the rAF chain
+    if (++_btnFillSkip < 3) {
+        requestAnimationFrame(updateButtonFills);
+        return;
+    }
+    _btnFillSkip = 0;
+
+    // Lazy-init the cached node list (deferred so DOM is present)
+    if (!_btnDeployNodes) {
+        _btnDeployNodes = document.querySelectorAll('.deploy-orbit');
+        _btnFireNode    = document.getElementById('btn-fire');
+    }
+
     const costs = {
         '1': UNIT_DEFS.infantry.cpCost,
         '2': UNIT_DEFS.bazooka.cpCost,
         '3': UNIT_DEFS.tank.cpCost,
     };
-    document.querySelectorAll('.deploy-orbit').forEach((el) => {
+    for (const el of _btnDeployNodes) {
         const k = el.dataset.keynum;
-        let pct = 0;
-        let ready = false;
+        let pct = 0, ready = false;
         if (k === '4') {
             ready = money >= BALANCE.missiles.pairCost || heli.missiles > 0;
             pct = ready ? 100 : Math.min(100, (money / BALANCE.missiles.pairCost) * 100);
@@ -6793,17 +6820,35 @@ function updateButtonFills() {
             ready = commandPoints >= cost;
             pct = ready ? 100 : Math.min(100, (commandPoints / cost) * 100);
         }
-        el.style.setProperty('--cp-fill', pct.toFixed(1));
-        el.classList.toggle('ready', ready);
-    });
+        // Quantise to 1% so a slow CP regen doesn't flap the fill ring
+        // at every tick — keeps the layer stable when nothing visible
+        // has changed.
+        const pctQ = Math.round(pct);
+        const cache = _btnState(el);
+        if (cache.pct !== pctQ) {
+            el.style.setProperty('--cp-fill', pctQ);
+            cache.pct = pctQ;
+        }
+        if (cache.ready !== ready) {
+            el.classList.toggle('ready', ready);
+            cache.ready = ready;
+        }
+    }
 
     // FIRE button — red ring filling during reload, solid green when armed
-    const fire = document.getElementById('btn-fire');
-    if (fire) {
+    if (_btnFireNode) {
         const ready = heli.ammo > 0;
         const pct = ready ? 100 : (1 - heli.reloadMs / BALANCE.heli.reloadMs) * 100;
-        fire.style.setProperty('--ammo-fill', pct.toFixed(1));
-        fire.classList.toggle('ready', ready);
+        const pctQ = Math.round(pct);
+        const cache = _btnState(_btnFireNode);
+        if (cache.pct !== pctQ) {
+            _btnFireNode.style.setProperty('--ammo-fill', pctQ);
+            cache.pct = pctQ;
+        }
+        if (cache.ready !== ready) {
+            _btnFireNode.classList.toggle('ready', ready);
+            cache.ready = ready;
+        }
     }
 
     requestAnimationFrame(updateButtonFills);
