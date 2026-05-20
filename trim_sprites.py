@@ -36,6 +36,14 @@ TRIM = [
     # background layer and the empty alpha is load-bearing for positioning.
     # Wounded soldier sprite — same trim style as soldier walk frames.
     "wounded_soldier.png",
+    # Title / mission-brief UI art — same trim rules as the other sprites.
+    # NOTE: title_bg.png intentionally NOT trimmed — it's a full-canvas
+    # background that uses every pixel.
+    "logo_hero.png",
+    "brief_tank.png",
+    "brief_infantry.png",
+    "brief_aa.png",
+    "star_badge.png",
     # HUD icons — square, centred, but generated with padding we don't want.
     "hud_infantry.png",
     "hud_bazooka.png",

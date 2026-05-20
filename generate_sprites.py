@@ -284,6 +284,172 @@ OVERALL:
 True alpha-channel NOT required — the image should fill the canvas edge to edge.
 Composition: ocean and tropical to the left, desert to the right, horizon-less top-down view."""
     },
+
+    # ---- TITLE / META-GAME UI ART ----
+    # Polished art for the title screen, mission brief overlays, and
+    # decorative insignia. Style anchor is Boom Beach / Royal Match craft.
+    {
+        "name": "title_bg.png",
+        "size": "1536x1024",
+        "prompt": """Hand-painted tropical title-screen hero scene for a mobile combat game,
+filling the entire 1536x1024 canvas edge to edge. Cartoon Boom Beach style.
+
+COMPOSITION (designed so a large central logo + button can overlay the middle
+without obscuring detail):
+- LEFT THIRD: a chunky cartoon cobalt-blue Allied base on a sandy bluff —
+  wooden plank walls, corrugated metal roof, sandbag foundation, small
+  glowing yellow window, sky-blue flag with white star fluttering. Small,
+  about 30% of the canvas height, sitting on the ground line.
+- RIGHT THIRD: 2-3 tall chunky tropical palm trees with curved tan trunks,
+  oversized fanning green fronds, coconuts. Layered at different depths.
+- MID-GROUND: a friendly cobalt-blue cartoon helicopter flying right-to-left
+  across the sky, motion-blur rotor disc, small puff of motion lines behind it.
+- FOREGROUND BOTTOM: warm tan sandy beach (#ffcc80) meeting a rounded
+  grass strip (#66bb6a). Subtle small flowers and rocks dotted along.
+- BACKGROUND: ocean horizon line meeting a bright tropical sky — gradient
+  from deep ocean blue (#0288d1) up through pale sky blue (#81d4fa) to
+  a soft warm zenith. A few small fluffy white cumulus clouds.
+- CENTRE: deliberately LESS BUSY — the sky region in the upper centre
+  must be a relatively clean gradient so a wordmark logo + button can
+  overlay without competing.
+
+Thick black outlines on every chunky element (3-4px), saturated cel-shaded
+colours with warm key light from upper-left. Painterly cartoon aesthetic.
+
+NO text, NO logo, NO labels, NO HUD elements — those are added in-engine."""
+    },
+
+    {
+        "name": "logo_hero.png",
+        "size": "1536x1024",
+        "prompt": """Polished bold chunky 3D cartoon video game logo wordmark for a mobile
+combat game, filling about 92% of the canvas.
+
+CENTRE-PIECE — the wordmark, EXACTLY TWO LINES, EXACTLY THESE LETTERS,
+NO EXTRA LETTERS, NO REPEATED LETTERS:
+
+    Top line (9 letters): F R O N T L I N E
+    Bottom line (10 letters): E X T R A C T I O N
+
+The two words must be spelled exactly: "FRONTLINE" and "EXTRACTION".
+Every letter occurs only once per word. There are NO doubled letters.
+
+STYLE:
+- Large bold extruded sans-serif letters
+- Letter faces in light yellow-orange (#ffd54f), extruded sides in deep
+  red-orange (#e65100). Thick black outline (~5px). Subtle white glints
+  on top edges, soft warm drop shadow underneath.
+- Bottom word "EXTRACTION" slightly smaller than the top word
+- Condensed bold cartoon character with slight perspective (top edge
+  closer to camera) like Boom Beach / Clash Royale logos.
+
+ADDED ABOVE THE WORDMARK:
+- A small but bold cobalt-blue chunky cartoon helicopter silhouette,
+  rotor disc spinning, flying across the top edge of the wordmark.
+  Same outline weight as the letters.
+- A bright gold five-point star (with extruded depth and a small white
+  glint) tucked between the helicopter and the wordmark — small enough
+  to read as decorative insignia, not as the hero element.
+
+True alpha-channel TRANSPARENT background. No background colours, no scenery,
+just the logo composition on transparency. NO additional text anywhere."""
+    },
+
+    {
+        "name": "brief_tank.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI illustration for a mission-briefing card — a CHUNKY CARTOON
+ENEMY TANK in 3/4 view tilted ~25 degrees down and ~15 degrees to the side.
+Crimson red (#c62828) hull with dark red (#8e0000) armour plates, brass rivet
+detail, white skull emblem on the turret side, long cannon barrel pointed
+camera-right with a small wisp of smoke at the muzzle. Track links visible
+along the bottom.
+
+SETTING BEHIND THE TANK (small, soft, just enough to imply action):
+- Subtle warm-grey smoke wisps behind and to the sides of the tank
+- A faint orange spark/ember or two suggesting recent combat
+- NO ground line, NO horizon, NO other characters
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), bold saturated colours, warm key
+light upper-left, cool fill lower-right. Crisp specular highlights along the
+turret and barrel, soft contact shadow underneath. Royal-Match-style polish,
+hand-sculpted 3D mobile game craft.
+
+True alpha-channel transparent background — the only visible pixels are the
+tank and its small smoke/ember accents. Subject centred horizontally with
+8% padding on all sides. No text, no UI frame, no labels."""
+    },
+
+    {
+        "name": "brief_infantry.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI illustration for a mission-briefing card — a TIGHT SQUAD
+OF THREE CHUNKY CARTOON ENEMY INFANTRY soldiers in 3/4 view, arranged in a
+short V-formation with the lead soldier slightly forward of the camera and
+two flanking soldiers behind. Soldiers in dark crimson (#c62828) helmets,
+dark uniforms with black accents, holding small black assault rifles in
+both hands at the ready. Menacing but cartoonish — oversized heads, big
+eyes, slight scowls.
+
+SETTING BEHIND THE SQUAD (small, soft, just enough to imply action):
+- Subtle warm-grey dust kicked up at their feet
+- Maybe one tiny muzzle-flash spark from the lead rifle
+- NO ground line, NO horizon, NO scenery
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), bold saturated colours, warm key
+light upper-left, cool fill lower-right. Crisp specular highlights, soft
+contact shadow under the group. Royal-Match-style polish.
+
+True alpha-channel transparent background. Subject group centred horizontally
+with 8% padding. No text, no UI frame, no labels."""
+    },
+
+    {
+        "name": "brief_aa.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI illustration for a mission-briefing card — a CHUNKY CARTOON
+ENEMY ANTI-AIRCRAFT EMPLACEMENT in 3/4 view tilted ~25 degrees down and
+~15 degrees to the side. Dark crimson (#c62828) and gunmetal grey housing
+on a circular base plate, paired long missile launcher tubes pointing
+diagonally up and to the camera-right with bright red nose tips visible,
+a small white radar dish on top spinning, sandbag fortification around the
+base of the platform. White skull emblem stencilled on the launcher housing.
+
+SETTING (small, soft, just enough to imply readiness):
+- A subtle faint cyan radar-sweep glow on the dish
+- Maybe a small orange targeting light blinking on the launcher
+- NO ground line, NO horizon, NO scenery
+
+THICK SOLID BLACK OUTLINE (4-6 px stroke), bold saturated colours, warm key
+light upper-left, cool fill lower-right. Crisp specular highlights on the
+launcher tubes and dish, soft contact shadow underneath. Royal-Match-style
+polish, hand-sculpted 3D mobile game craft.
+
+True alpha-channel transparent background. Subject centred horizontally with
+8% padding. No text, no UI frame, no labels."""
+    },
+
+    {
+        "name": "star_badge.png",
+        "size": "1024x1024",
+        "prompt": """Mobile game UI ornament — a SINGLE POLISHED CHUNKY GOLD FIVE-POINT STAR
+INSIGNIA viewed face-on, with 3D extruded depth.
+
+- Hero gold faces (#ffd54f) on the star's front, deep amber shadow side
+  (#e65100) on the extruded depth, a bright white star-shaped GLINT on
+  one of the upper-left points as the brightest highlight.
+- Bold black outline (~5px) tracing the entire 5-point star outline
+  and the depth seam.
+- A small additional sparkle dot or two near the bright point for extra
+  shine — Royal-Match-style polish.
+- Very subtle warm halo glow behind the star (a soft gold radial bloom
+  that fades to transparent within the star's bounding circle).
+
+True alpha-channel transparent background — the only visible pixels are
+the star and its tight halo glow. Subject centred. 8% padding. No text,
+no military rank chevrons, no laurel wreath, no other decoration — just
+the star itself."""
+    },
 ]
 
 # ---- HUD icons (deploy cards, currencies) --------------------------------

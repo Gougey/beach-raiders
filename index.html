@@ -328,7 +328,116 @@ body.touch.portrait #rotate-warning { display: flex; }
     backdrop-filter: blur(2px);
 }
 #game-over-screen { display: none; }
-#start-screen { gap: 16px; }
+
+/* Start screen replaces the navy backdrop with an illustrated hero scene.
+   The image fills the stage; a subtle dark vignette at top + bottom keeps
+   text and the HUD chip strip readable over the bright tropical art. */
+#start-screen {
+    gap: 16px;
+    backdrop-filter: none;
+    background:
+        linear-gradient(180deg,
+            rgba(0, 10, 30, 0.55) 0%,
+            rgba(0, 10, 30, 0.0) 25%,
+            rgba(0, 10, 30, 0.0) 70%,
+            rgba(0, 10, 30, 0.55) 100%),
+        url('assets/title_bg.png') center / cover no-repeat,
+        #0a1628;
+}
+
+/* Top-right meta HUD strip */
+#start-hud {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 2;
+}
+.start-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 14px 0 38px;
+    background: rgba(8, 22, 40, 0.82);
+    border: 2px solid rgba(255, 193, 7, 0.7);
+    border-radius: 22px;
+    color: #fff;
+    font-family: "Lilita One", sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.4px;
+    position: relative;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+.start-chip::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.start-chip.chip-star::before { background-image: url('assets/star_badge.png'); }
+.start-chip.chip-coin::before { background-image: url('assets/hud_coin.png'); }
+.start-chip.chip-heart::before {
+    /* Heart drawn inline via SVG so we don't need a sprite */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 21s-7-4.5-9.5-9.5C0.5 7 4 3 7.5 3c1.8 0 3.3 0.9 4.5 2.3C13.2 3.9 14.7 3 16.5 3 20 3 23.5 7 21.5 11.5 19 16.5 12 21 12 21z' fill='%23ef4452' stroke='%23000' stroke-width='1.5' stroke-linejoin='round'/></svg>");
+}
+
+/* Settings cog */
+.start-cog {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 193, 7, 0.7);
+    background: rgba(8, 22, 40, 0.82);
+    color: #ffe0b2;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+    padding: 0;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.start-cog:hover { background: rgba(20, 40, 70, 0.9); }
+
+/* Green-variant START button — chunky gloss with a chevron */
+.game-btn.green {
+    background: linear-gradient(180deg, #58c970, #1f8a3a);
+    border-color: #0d4f1c;
+    box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.35),
+        inset 0 -3px 0 rgba(0, 0, 0, 0.25),
+        0 6px 0 #0d4f1c,
+        0 10px 22px rgba(0, 0, 0, 0.55);
+    color: #fff;
+    text-shadow: 1px 2px 0 rgba(0, 0, 0, 0.4);
+    letter-spacing: 1px;
+    padding: 14px 38px;
+    font-size: 28px;
+}
+.game-btn.green:hover  { filter: brightness(1.05); }
+.game-btn.green:active {
+    transform: translateY(3px);
+    box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.35),
+        inset 0 -3px 0 rgba(0, 0, 0, 0.25),
+        0 3px 0 #0d4f1c,
+        0 5px 14px rgba(0, 0, 0, 0.5);
+}
+.game-btn.green .chev {
+    font-size: 0.7em;
+    margin-left: 8px;
+    opacity: 0.95;
+}
 
 #logo-img {
     max-width: 75%;
@@ -632,13 +741,24 @@ body.touch.portrait #rotate-warning { display: flex; }
 </div>
 
 <div id="start-screen">
-    <img id="logo-img" src="assets/logo.png" alt="Frontline Extraction" onerror="this.style.display='none'; document.getElementById('logo-text').style.display='block';">
+    <!-- Top-right meta HUD strip: stars / gold / lives chips + settings cog.
+         Values are populated by refreshStartHud() on screen show. -->
+    <div id="start-hud">
+        <div class="start-chip chip-star"><span class="chip-val" id="start-stars">0</span></div>
+        <div class="start-chip chip-coin"><span class="chip-val" id="start-gold">0</span></div>
+        <div class="start-chip chip-heart"><span class="chip-val" id="start-lives">0</span></div>
+        <button id="start-settings" class="start-cog" aria-label="Settings">&#9881;</button>
+    </div>
+
+    <img id="logo-img" src="assets/logo_hero.png"
+         onerror="this.onerror=null; this.src='assets/logo.png';"
+         alt="Frontline Extraction">
     <div id="logo-text" style="display:none">
         <span class="top">FRONTLINE</span>
         <span class="bottom">EXTRACTION</span>
     </div>
     <div id="tagline">Air Cavalry · Ground Assault</div>
-    <button id="start-btn" class="game-btn">PLAY</button>
+    <button id="start-btn" class="game-btn green">START GAME <span class="chev">&#9658;</span></button>
 </div>
 
 <div id="game-over-screen">
@@ -1015,6 +1135,13 @@ const SPRITE_FILES = (() => {
         desert_mountain_bg: 'assets/desert_mountain_bg.png',
         // Misc gameplay sprites
         wounded_soldier: 'assets/wounded_soldier.png',
+        // Title / mission-brief UI art
+        logo_hero:      'assets/logo_hero.png',
+        title_bg:       'assets/title_bg.png',
+        brief_tank:     'assets/brief_tank.png',
+        brief_infantry: 'assets/brief_infantry.png',
+        brief_aa:       'assets/brief_aa.png',
+        star_badge:     'assets/star_badge.png',
         // HUD icons (deploy orbit + currencies)
         hud_infantry: 'assets/hud_infantry.png',
         hud_bazooka:  'assets/hud_bazooka.png',
@@ -2670,19 +2797,54 @@ function update() {
 // RENDERING
 // ============================================================
 
-// Helper: rounded rect
-function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.arcTo(x + w, y, x + w, y + r, r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-    ctx.lineTo(x + r, y + h);
-    ctx.arcTo(x, y + h, x, y + h - r, r);
-    ctx.lineTo(x, y + r);
-    ctx.arcTo(x, y, x + r, y, r);
-    ctx.closePath();
+// Word-wrap a string into ≤maxW-wide lines using the current ctx font.
+// Tiny helper for short brief / overlay text — not for body copy at scale.
+function wrapText(text, maxW, ctx2) {
+    const c = ctx2 || ctx;
+    const words = String(text || '').split(/\s+/);
+    const lines = [];
+    let cur = '';
+    for (const w of words) {
+        if (!w) continue;
+        const trial = cur ? cur + ' ' + w : w;
+        if (c.measureText(trial).width <= maxW) {
+            cur = trial;
+        } else {
+            if (cur) lines.push(cur);
+            cur = w;
+        }
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [''];
+}
+
+// Helper: rounded rect path.
+// Accepts BOTH call patterns — historic call sites pass the module ctx
+// as the first arg ("roundRect(ctx, x, y, w, h, r)"), newer ones omit
+// it ("roundRect(x, y, w, h, r)"). The ctx-prefixed form was silently
+// no-op'ing before (object coerced via toString → NaN); we now detect
+// the canvas context and route correctly.
+//
+// Word of caution if you wrap text or paths: this DOES NOT call fill()
+// or stroke() — caller is responsible.
+function roundRect(a, b, c, d, e, f) {
+    let g = ctx, x, y, w, h, r;
+    if (a && typeof a === 'object' && typeof a.moveTo === 'function') {
+        g = a; x = b; y = c; w = d; h = e; r = f;
+    } else {
+        x = a; y = b; w = c; h = d; r = e;
+    }
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.lineTo(x + w - r, y);
+    g.arcTo(x + w, y, x + w, y + r, r);
+    g.lineTo(x + w, y + h - r);
+    g.arcTo(x + w, y + h, x + w - r, y + h, r);
+    g.lineTo(x + r, y + h);
+    g.arcTo(x, y + h, x, y + h - r, r);
+    g.lineTo(x, y + r);
+    g.arcTo(x, y, x + r, y, r);
+    g.closePath();
 }
 
 function drawSky() {
@@ -6323,31 +6485,83 @@ function drawWorldMap() {
     if (worldMapSelectedLevel >= 0) drawWorldMapLevelPanel();
 }
 
+// Draws a polished gold-rim chip with an icon on the left and a value on
+// the right, anchored from its right edge at (rightX, midY). Returns the
+// chip's left x (for chaining the next chip to its left).
+function drawHudChip(rightX, midY, iconSprite, iconFallbackChar, value) {
+    const valueStr = String(value);
+    ctx.font = `bold 20px "Lilita One", sans-serif`;
+    const textW = Math.ceil(ctx.measureText(valueStr).width);
+    const padL = 38;        // room for icon
+    const padR = 14;
+    const h    = 36;
+    const w    = padL + textW + padR;
+    const x    = rightX - w;
+    const y    = midY - h / 2;
+
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    roundRect(x, y + 3, w, h, 18);
+    ctx.fill();
+    // Chip body
+    ctx.fillStyle = 'rgba(8,22,40,0.85)';
+    roundRect(x, y, w, h, 18);
+    ctx.fill();
+    // Gold rim
+    ctx.strokeStyle = 'rgba(255,193,7,0.75)';
+    ctx.lineWidth = 2;
+    roundRect(x, y, w, h, 18);
+    ctx.stroke();
+
+    // Icon — sprite when loaded, otherwise the fallback glyph
+    const ix = x + 4, iy = y + (h - 28) / 2, isz = 28;
+    if (iconSprite && iconSprite.complete && iconSprite.naturalWidth > 0) {
+        ctx.drawImage(iconSprite, ix, iy, isz, isz);
+    } else if (iconFallbackChar) {
+        ctx.font = '22px "Lilita One", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(iconFallbackChar, ix + isz / 2, iy + isz / 2 + 1);
+    }
+
+    // Value text
+    ctx.font = `bold 20px "Lilita One", sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillText(valueStr, x + padL + 1, y + h / 2 + 1);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(valueStr, x + padL, y + h / 2);
+
+    return x;  // left edge for chaining
+}
+
 function drawWorldMapHUD() {
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.68)';
+
+    // Header strip — keeps the same dark bar so the chip rim contrast
+    // works regardless of which biome's terrain sits behind it.
+    ctx.fillStyle = 'rgba(0,0,0,0.62)';
     ctx.fillRect(0, 0, W, 52);
     ctx.fillStyle = 'rgba(210,165,78,0.45)';
     ctx.fillRect(0, 50, W, 2);
 
+    // Left-side wordmark (small heading, not the hero logo)
     const MF = "'Bangers', cursive";
     ctx.textBaseline = 'middle';
-
-    // Title
     ctx.fillStyle = '#FFD700';
     ctx.font = `30px ${MF}`;
     ctx.textAlign = 'left';
     ctx.fillText('FRONTLINE EXTRACTION', 12, 26);
 
-    // Stars
-    ctx.fillStyle = '#fff';
-    ctx.font = `24px ${MF}`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`⭐ ${totalStars()}`, W / 2, 26);
-
-    // Gold + Lives
-    ctx.textAlign = 'right';
-    ctx.fillText(`💰 ${Math.floor(money)}   ❤️ ${save.lives}`, W - 12, 26);
+    // Right-side chip row — chain right-to-left so adding a chip later
+    // (e.g. battle-pass / gems) doesn't shift the existing ones.
+    let rx = W - 12;
+    rx = drawHudChip(rx, 26, SPRITES.hud_coin,   '$', Math.floor(money)) - 8;
+    rx = drawHudChip(rx, 26, SPRITES.star_badge, '★', totalStars())       - 8;
+    // Heart chip — no sprite, fallback glyph is fine
+    drawHudChip(rx, 26, null, '♥', save.lives);
 
     ctx.restore();
 }
@@ -6358,50 +6572,150 @@ function drawWorldMapLevelPanel() {
     const lv = region.levels[worldMapSelectedLevel];
     if (!lv) return;
 
-    const ph = 120;
-    const py = H - ph;
-    ctx.save();
-    ctx.fillStyle = 'rgba(10,30,10,0.92)';
-    ctx.fillRect(0, py, W, ph);
-    ctx.strokeStyle = 'rgba(100,220,100,0.4)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke();
+    // Panel sits in the bottom-left, ~half the canvas width, with a small
+    // margin all around. Matches the reference's "mission preview" card.
+    const pad = 14;
+    const ph  = 130;
+    const pw  = Math.min(W * 0.56, 740);
+    const px  = pad;
+    const py  = H - ph - pad;
 
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 18px "Lilita One", sans-serif';
+    ctx.save();
+
+    // Drop shadow (fake-bloom translucent rect offset down)
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    roundRect(px, py + 5, pw, ph, 16);
+    ctx.fill();
+
+    // Card body — dark navy with a sky-blue rim
+    ctx.fillStyle = 'rgba(10,28,50,0.95)';
+    roundRect(px, py, pw, ph, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(120,180,255,0.55)';
+    ctx.lineWidth = 2;
+    roundRect(px, py, pw, ph, 16);
+    ctx.stroke();
+
+    // === Left text column ===
+    const textX = px + 18;
+    const textY = py + 14;
+
+    // Level name with offset shadow
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(lv.name, 14, py + 10);
+    ctx.font = 'bold 24px "Lilita One", sans-serif';
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(lv.name, textX + 1, textY + 1);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(lv.name, textX, textY);
 
-    ctx.font = '14px sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.fillText(lv.briefText || '', 14, py + 34);
-
-    const stars = save.stars[lv.id] || 0;
-    const maxS  = lv.woundedCount ? 3 : 2;
-    for (let s = 0; s < maxS; s++) {
-        drawStar5(14 + s * 22 + 9, py + 70, 9, s < stars);
+    // Brief text — wrap to fit the panel width minus the deploy-button
+    // gutter on the right
+    ctx.font = '14px "Fredoka", sans-serif';
+    ctx.fillStyle = 'rgba(220,235,255,0.82)';
+    const briefW = pw - 200;     // reserve right-side gutter for the button
+    const lines = wrapText(lv.briefText || '', briefW, ctx);
+    for (let i = 0; i < lines.length && i < 2; i++) {
+        ctx.fillText(lines[i], textX, textY + 36 + i * 18);
     }
 
-    // Launch button
-    const bw = 130, bh = 42;
-    const bx = W - bw - 14;
-    const by = py + (ph - bh) / 2;
+    // === Star strip — earned vs available ===
+    const stars = save.stars[lv.id] || 0;
+    const maxS  = lv.woundedCount ? 3 : 2;
+    const starsY = py + ph - 22;
+    for (let s = 0; s < maxS; s++) {
+        drawStar5(textX + 11 + s * 24, starsY, 10, s < stars);
+    }
+
+    // === DEPLOY button — bottom-right of the panel ===
     const canPlay = save.lives > 0;
-    ctx.fillStyle = canPlay ? 'rgba(50,180,80,0.95)' : 'rgba(100,100,100,0.7)';
-    roundRect(ctx, bx, by, bw, bh, 10);
+    const bw = 170, bh = 50;
+    const bx = px + pw - bw - 14;
+    const by = py + (ph - bh) / 2;
+
+    // Drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    roundRect(bx, by + 4, bw, bh, 14);
     ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 17px "Lilita One", sans-serif';
+    // Body — green when playable, grey when blocked
+    if (canPlay) {
+        const grad = ctx.createLinearGradient(0, by, 0, by + bh);
+        grad.addColorStop(0, '#58c970');
+        grad.addColorStop(1, '#1f8a3a');
+        ctx.fillStyle = grad;
+    } else {
+        ctx.fillStyle = 'rgba(110,110,110,0.85)';
+    }
+    roundRect(bx, by, bw, bh, 14);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.6;
+    roundRect(bx + 2, by + 2, bw - 4, bh - 4, 12);
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.font = 'bold 22px "Lilita One", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(canPlay ? 'DEPLOY ▶' : 'NO LIVES', bx + bw / 2, by + bh / 2);
+    const label = canPlay ? 'DEPLOY ▶' : 'NO LIVES';
+    ctx.fillText(label, bx + bw / 2 + 1, by + bh / 2 + 1);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, bx + bw / 2,     by + bh / 2);
 
-    hudHitRects.push({ x: bx, y: by, w: bw, h: bh, action: () => { startSelectedLevel(); } });
+    if (canPlay) {
+        hudHitRects.push({ x: bx, y: by, w: bw, h: bh,
+            action: () => { startSelectedLevel(); } });
+    }
+
     ctx.restore();
 }
 
 // ---- LEVEL BRIEF ----
+
+// Pick the brief illustration that best matches the level's flavour.
+// Tank-heavy or boss levels get the tank art; AA-heavy levels get the
+// AA emplacement; otherwise it's an infantry squad.
+function chooseBriefIllustration(lv) {
+    if (lv.boss) return SPRITES.brief_tank;
+    const types = lv.types || [];
+    if (types.includes('tank')) return SPRITES.brief_tank;
+    if ((lv.aaCount || 0) >= 2)  return SPRITES.brief_aa;
+    return SPRITES.brief_infantry;
+}
+
+// Small gold-star insignia drawn at (cx, cy) with radius r. Uses the
+// star_badge sprite when loaded; falls back to a 5-point canvas star.
+function drawStarInsignia(cx, cy, r) {
+    const img = SPRITES.star_badge;
+    if (img && img.complete && img.naturalWidth > 0) {
+        const d = r * 2;
+        ctx.drawImage(img, cx - r, cy - r, d, d);
+        return;
+    }
+    drawStar5(cx, cy, r, true);
+}
+
+// Green star bullet for objective lists. Filled green when the objective
+// is potentially achievable, soft grey when unavailable on this level.
+function drawObjectiveBullet(cx, cy, r, active) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+        const a = (Math.PI / 5) * i - Math.PI / 2;
+        const rad = (i % 2 === 0) ? r : r * 0.45;
+        const x = Math.cos(a) * rad;
+        const y = Math.sin(a) * rad;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle   = active ? '#69f0ae' : 'rgba(255,255,255,0.18)';
+    ctx.strokeStyle = active ? '#1b5e20' : 'rgba(255,255,255,0.32)';
+    ctx.lineWidth = 1.4;
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+}
 
 function drawLevelBrief() {
     const region = LEVELS_DATA.regions[campaignRegionIdx];
@@ -6410,72 +6724,158 @@ function drawLevelBrief() {
     if (!lv) return;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.78)';
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
     ctx.fillRect(0, 0, W, H);
 
-    const cw = Math.min(W * 0.88, 500);
-    const ch = 240;
+    // Wider card now — two-column layout: left (text), right (illustration)
+    const cw = Math.min(W * 0.86, 720);
+    const ch = 340;
     const cx = (W - cw) / 2;
     const cy = (H - ch) / 2;
 
-    ctx.fillStyle = 'rgba(10,30,50,0.97)';
-    roundRect(ctx, cx, cy, cw, ch, 18);
+    // Fake drop-shadow as a translucent offset rect (iOS-safe)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    roundRect(ctx, cx, cy + 6, cw, ch, 20);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(80,160,255,0.5)';
+
+    // Card body — dark navy with a sky-blue rim
+    ctx.fillStyle = 'rgba(10, 28, 50, 0.97)';
+    roundRect(ctx, cx, cy, cw, ch, 20);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(120, 180, 255, 0.55)';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.font = `bold ${Math.round(cw * 0.055)}px "Lilita One", sans-serif`;
+    // Header banner — slimmer rounded rect across the top of the card,
+    // with a star insignia at each end and "MISSION BRIEFING" centred.
+    const bannerH = 44;
+    const bannerY = cy - bannerH / 2;
+    const bannerW = cw * 0.66;
+    const bannerX = cx + (cw - bannerW) / 2;
+    ctx.fillStyle = 'rgba(15, 50, 100, 0.98)';
+    roundRect(ctx, bannerX, bannerY, bannerW, bannerH, 12);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.65)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Star insignia at both ends of the banner
+    drawStarInsignia(bannerX + 20, bannerY + bannerH / 2, 13);
+    drawStarInsignia(bannerX + bannerW - 20, bannerY + bannerH / 2, 13);
+    // Title text
+    ctx.font = `bold 22px "Lilita One", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    // Offset-fillText shadow replaces shadowBlur (iOS Safari).
-    ctx.fillStyle = 'rgba(0,0,0,0.8)';
-    ctx.fillText('MISSION BRIEFING', W / 2 + 2, cy + 34 + 2);
-    ctx.fillStyle = '#aad4ff';
-    ctx.fillText('MISSION BRIEFING', W / 2, cy + 34);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillText('MISSION BRIEFING', bannerX + bannerW / 2 + 2, bannerY + bannerH / 2 + 2);
+    ctx.fillStyle = '#ffd54f';
+    ctx.fillText('MISSION BRIEFING', bannerX + bannerW / 2,     bannerY + bannerH / 2);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = `bold ${Math.round(cw * 0.07)}px "Lilita One", sans-serif`;
-    ctx.fillText(lv.name, W / 2, cy + 76);
+    // === LEFT COLUMN — title, brief text, objectives ===
+    const padL = cx + 28;
+    const padR = cx + cw - 28;
+    const leftW = cw * 0.55;          // text column width
+    const textTop = cy + 40;          // below the banner overhang
 
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = `${Math.round(cw * 0.042)}px sans-serif`;
-    ctx.fillText(lv.briefText || '', W / 2, cy + 118);
-
-    const objectives = ['Destroy enemy base'];
-    if (lv.woundedCount) objectives.push(`Rescue ${lv.woundedCount} wounded`);
-    objectives.push('Zero casualty run (discipline star)');
-    ctx.fillStyle = '#aef7ae';
-    ctx.font = `${Math.round(cw * 0.038)}px sans-serif`;
+    // Level name
     ctx.textAlign = 'left';
-    for (let i = 0; i < objectives.length; i++) {
-        ctx.fillText(`• ${objectives[i]}`, cx + 18, cy + 150 + i * 20);
+    ctx.font = `bold 30px "Lilita One", sans-serif`;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillText(lv.name, padL + 1, textTop + 1);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(lv.name, padL, textTop);
+
+    // Brief text — soft-wrap into 2 lines if needed (most fit in one)
+    ctx.font = `15px "Fredoka", sans-serif`;
+    ctx.fillStyle = 'rgba(220, 235, 255, 0.85)';
+    const briefLines = wrapText(lv.briefText || '', leftW, ctx);
+    for (let i = 0; i < briefLines.length; i++) {
+        ctx.fillText(briefLines[i], padL, textTop + 30 + i * 19);
     }
 
-    // Deploy button
-    const bw = 140, bh = 44;
-    const bx = (W - bw) / 2;
-    const by = cy + ch - bh - 14;
-    ctx.fillStyle = 'rgba(50,200,80,0.95)';
-    roundRect(ctx, bx, by, bw, bh, 12);
+    // Objectives — green star bullets
+    const objY = textTop + 30 + briefLines.length * 19 + 18;
+    const objectives = [
+        { text: 'Destroy enemy base',   active: true },
+        { text: `Rescue ${lv.woundedCount || 0} wounded`,
+          active: !!lv.woundedCount },
+        { text: 'Zero casualty run (discipline star)', active: true },
+    ];
+    ctx.font = `15px "Fredoka", sans-serif`;
+    for (let i = 0; i < objectives.length; i++) {
+        const oy = objY + i * 24;
+        drawObjectiveBullet(padL + 8, oy, 7, objectives[i].active);
+        ctx.fillStyle = objectives[i].active ? '#cfeaff' : 'rgba(255,255,255,0.4)';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(objectives[i].text, padL + 22, oy);
+    }
+
+    // === RIGHT COLUMN — mission illustration framed in a window ===
+    const illoSize = 170;
+    const illoX = padR - illoSize;
+    const illoY = cy + 60;
+    // Frame backdrop
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.12)';
+    roundRect(ctx, illoX - 6, illoY - 6, illoSize + 12, illoSize + 12, 14);
     ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.55)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Illustration
+    const illoImg = chooseBriefIllustration(lv);
+    if (illoImg && illoImg.complete && illoImg.naturalWidth > 0) {
+        // Fit-contain into the frame
+        const aspect = illoImg.naturalWidth / illoImg.naturalHeight;
+        let drawW = illoSize, drawH = illoSize;
+        if (aspect > 1) drawH = illoSize / aspect;
+        else            drawW = illoSize * aspect;
+        ctx.drawImage(illoImg,
+            illoX + (illoSize - drawW) / 2,
+            illoY + (illoSize - drawH) / 2,
+            drawW, drawH);
+    }
+
+    // === BOTTOM BUTTONS ===
+    // BACK (left, blue)
+    const backW = 110, backH = 44;
+    const backX = cx + 22, backY = cy + ch - backH - 22;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    roundRect(ctx, backX, backY + 3, backW, backH, 12); ctx.fill();
+    const backGrad = ctx.createLinearGradient(0, backY, 0, backY + backH);
+    backGrad.addColorStop(0, '#5aa9ff');
+    backGrad.addColorStop(1, '#1c5fbf');
+    ctx.fillStyle = backGrad;
+    roundRect(ctx, backX, backY, backW, backH, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1.4;
+    roundRect(ctx, backX + 2, backY + 2, backW - 4, backH - 4, 10); ctx.stroke();
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 19px "Lilita One", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('DEPLOY ▶', bx + bw / 2, by + bh / 2);
-    hudHitRects.push({ x: bx, y: by, w: bw, h: bh, action: () => { launchCurrentLevel(); } });
+    ctx.fillText('◀ BACK', backX + backW / 2, backY + backH / 2);
+    hudHitRects.push({ x: backX, y: backY, w: backW, h: backH,
+        action: () => { gameState = 'worldmap'; } });
 
-    // Back button
-    ctx.fillStyle = 'rgba(80,80,80,0.8)';
-    const backW = 80, backH = 36;
-    const backX = cx + 14, backY = cy + ch - backH - 14;
-    roundRect(ctx, backX, backY, backW, backH, 10);
-    ctx.fill();
+    // DEPLOY (right, green) — slightly larger as the primary action
+    const depW = 170, depH = 50;
+    const depX = cx + cw - depW - 22, depY = cy + ch - depH - 19;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    roundRect(ctx, depX, depY + 4, depW, depH, 14); ctx.fill();
+    const depGrad = ctx.createLinearGradient(0, depY, 0, depY + depH);
+    depGrad.addColorStop(0, '#58c970');
+    depGrad.addColorStop(1, '#1f8a3a');
+    ctx.fillStyle = depGrad;
+    roundRect(ctx, depX, depY, depW, depH, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.6;
+    roundRect(ctx, depX + 2, depY + 2, depW - 4, depH - 4, 12); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.font = 'bold 22px "Lilita One", sans-serif';
+    ctx.fillText('DEPLOY ▶', depX + depW / 2 + 1, depY + depH / 2 + 1);
     ctx.fillStyle = '#fff';
-    ctx.font = '15px sans-serif';
-    ctx.fillText('◀ Back', backX + backW / 2, backY + backH / 2);
-    hudHitRects.push({ x: backX, y: backY, w: backW, h: backH, action: () => { gameState = 'worldmap'; } });
+    ctx.fillText('DEPLOY ▶', depX + depW / 2,     depY + depH / 2);
+    hudHitRects.push({ x: depX, y: depY, w: depW, h: depH,
+        action: () => { launchCurrentLevel(); } });
 
     ctx.restore();
 }
@@ -7037,6 +7437,31 @@ function setupDebugPanel() {
     });
 }
 
+// Refresh the top-right HUD chips (stars / gold / lives) on the
+// DOM-based start screen. Cheap enough to fire on a slow interval —
+// only writes to the DOM when the start screen is actually visible.
+function refreshStartHud() {
+    const screen = document.getElementById('start-screen');
+    if (!screen || screen.style.display === 'none') return;
+    const s = document.getElementById('start-stars');
+    const g = document.getElementById('start-gold');
+    const h = document.getElementById('start-lives');
+    if (s) s.textContent = totalStars();
+    if (g) g.textContent = Math.floor(save.gold || money || 0);
+    if (h) h.textContent = save.lives || 0;
+}
+
+// Settings cog on the start screen — stub for now. Cycles a placeholder
+// toast so the affordance reads as alive; replace with a real settings
+// modal in a later pass.
+function setupStartCog() {
+    const cog = document.getElementById('start-settings');
+    if (!cog) return;
+    cog.addEventListener('click', () => {
+        showToast('Settings — coming soon');
+    });
+}
+
 // Boot: load any balance.json overrides BEFORE the first initGame() so
 // the world spins up with the correct (possibly tuned) values. Sprite
 // preload + game loop can fire in parallel — they don't depend on
@@ -7049,10 +7474,13 @@ function setupDebugPanel() {
     campaignRegionIdx = save.currentRegionIdx || 0;
     campaignLevelIdx  = save.currentLevelIdx  || 0;
     setupDebugPanel();
+    setupStartCog();
     loadSprites();
     buildWorldMapCanvas();
     initGame();
     gameState = 'menu';
+    refreshStartHud();
+    setInterval(refreshStartHud, 500);
     gameLoop();
 })();
 
