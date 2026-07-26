@@ -298,32 +298,42 @@ function priority(t) {
   if (ts.nextReview && ts.nextReview < iso(today())) p += 1;          // overdue
   return p;
 }
+// A topic is "introduced" once it's been studied or rated — only then can it
+// be retrieved/practised. You can't recall what you haven't yet learned.
+function introduced(id) { const ts = STATE.topics[id]; return !!(ts && (ts.lastReviewed || ts.confidence !== null)); }
 function buildPlan(dateKey) {
   if (STATE.plan[dateKey]) return STATE.plan[dateKey];
   const d = new Date(dateKey);
   const isWeekend = [0,6].includes(d.getDay());
-  const cap = isWeekend ? STATE.settings.capWeekend : STATE.settings.capWeekday;
   const phase = phaseFor(dateKey);
+  // Day-mode overrides: rest = no plan; light = half capacity.
+  const mode = (STATE.dayMode && STATE.dayMode[dateKey]) || 'normal';
+  let cap = isWeekend ? STATE.settings.capWeekend : STATE.settings.capWeekday;
+  if (mode === 'rest') { const plan = { date:dateKey, cap:0, phase:phase.label, items:[], mins:0, mode }; STATE.plan[dateKey] = plan; save(); return plan; }
+  if (mode === 'light') cap = Math.round(cap / 2);
+  // Cap brand-new topics per day so learning stays consolidated, not crammed.
+  const newBudget = { learn:3, consolidate:2, peak:1, exams:0 }[phase.key];
   // Rank topics, then interleave across the three subjects (round-robin).
   const ranked = allTopics().map(t => ({ t, p: priority(t) + Math.random()*0.5 })).sort((a,b) => b.p - a.p).map(x => x.t);
   const bySub = { pol:[], his:[], bus:[] };
   ranked.forEach(t => bySub[t.subject].push(t));
   const order = [];
   for (let i = 0; i < 12; i++) ['pol','his','bus'].forEach(s => { if (bySub[s][i]) order.push(bySub[s][i]); });
-  // Assign an activity type per slot from the phase mix, fill to capacity.
-  const items = []; let used = 0; let i = 0;
-  const pick = () => { const r = Math.random(); const m = phase.mix;
-    if (r < m.learn) return 'learn'; if (r < m.learn + m.practice) return (Math.random() < 0.35 ? 'essay' : 'practice'); return 'review'; };
+  // For introduced topics, choose retrieval vs practice/essay from the phase mix.
+  const pickIntro = () => { const m = phase.mix; const pract = m.practice / (m.practice + m.review || 1);
+    if (Math.random() < pract) return (Math.random() < 0.35 ? 'essay' : 'practice'); return 'review'; };
+  const items = []; let used = 0; let i = 0; let newUsed = 0;
   while (used < cap && i < order.length) {
-    const t = order[i++]; const ts = topicState(t.id);
-    let type = pick();
-    if (ts.confidence === null && phase.key !== 'peak') type = 'learn'; // never practised → learn first
+    const t = order[i++];
+    let type;
+    if (!introduced(t.id)) { if (newUsed >= newBudget) continue; type = 'learn'; newUsed++; }
+    else { type = pickIntro(); }
     const act = ACTIVITIES[type];
     if (used + act.mins > cap + 8) break;
     items.push({ topicId:t.id, title:t.title, subject:t.subjectName, cls:t.cls, type, label:act.label, mins:act.mins, done:false });
     used += act.mins;
   }
-  const plan = { date:dateKey, cap, phase:phase.label, items, mins:used };
+  const plan = { date:dateKey, cap, phase:phase.label, items, mins:used, mode };
   STATE.plan[dateKey] = plan; save();
   return plan;
 }
@@ -348,11 +358,18 @@ function renderToday() {
   setHeader('Today', `<span class="phase-chip">${plan.phase}</span>`);
   const doneCount = plan.items.filter(i => i.done).length;
   const pct = plan.items.length ? Math.round(doneCount / plan.items.length * 100) : 0;
+  const mode = plan.mode || 'normal';
   let h = `<div class="wrap">`;
   h += `<div class="card"><div class="spread"><div><h2>${doneCount}/${plan.items.length} done · ${plan.mins} min planned</h2>
         <div class="muted">Short, interleaved blocks across your three subjects. Tick as you go.</div></div></div>
-        <div class="progressbar" style="margin-top:10px"><span style="width:${pct}%"></span></div></div>`;
-  if (!plan.items.length) { h += `<div class="empty">No topics due — enjoy a lighter day, or set some confidence ratings in Subjects.</div>`; }
+        <div class="progressbar" style="margin-top:10px"><span style="width:${pct}%"></span></div>
+        <div class="row" style="margin-top:12px;gap:6px">
+          <button class="btn sm ${mode==='normal'?'':'sec'}" data-mode="normal">Normal</button>
+          <button class="btn sm ${mode==='light'?'':'sec'}" data-mode="light">Lighter day</button>
+          <button class="btn sm ${mode==='rest'?'':'sec'}" data-mode="rest">Rest day</button>
+        </div></div>`;
+  if (mode === 'rest') { h += `<div class="empty">🌱 Rest day — recovery is part of the plan. Reviews will pick up tomorrow.</div>`; }
+  else if (!plan.items.length) { h += `<div class="empty">Nothing queued yet — set some confidence ratings in <b>Subjects</b> and topics will start flowing in.</div>`; }
   h += `<div class="card">`;
   plan.items.forEach((it, idx) => {
     h += `<div class="task ${it.done?'done':''}" data-i="${idx}">
@@ -370,8 +387,14 @@ function renderToday() {
   app.innerHTML = h;
   app.querySelectorAll('.task').forEach(el => el.querySelector('.tbox').onclick = () => {
     const i = +el.dataset.i; const it = plan.items[i]; it.done = !it.done;
-    if (it.done && (it.type === 'review' || it.type === 'practice' || it.type === 'essay')) markReviewed(it.topicId, true);
+    // Completing any block (including a first-pass "learn") advances the topic's
+    // spaced-review schedule and marks it introduced.
+    if (it.done) markReviewed(it.topicId, true);
     save(); renderToday();
+  });
+  app.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+    STATE.dayMode = STATE.dayMode || {}; STATE.dayMode[key] = b.dataset.mode;
+    delete STATE.plan[key]; save(); renderToday();
   });
   document.getElementById('regen').onclick = () => { delete STATE.plan[key]; save(); renderToday(); };
 }
