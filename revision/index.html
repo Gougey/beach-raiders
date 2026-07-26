@@ -151,28 +151,38 @@ const CONTENT = {
     {
       id: 'his', name: 'History', board: 'AQA (7042)', cls: 'his',
       papers: [
-        { id: 'c1', name: 'Component 1 — 1C The Tudors 1485–1603 (confirm)' },
-        { id: 'c2', name: 'Component 2 — 2N Russia 1917–1953' },
-        { id: 'nea', name: 'Component 3 — NEA (Civil Rights)' },
+        { id: 'c1', name: 'Component 1 — 1H Tsarist & Communist Russia 1855–1964 (breadth: interpretations + essays)' },
+        { id: 'c2', name: 'Component 2 — 2B The Wars of the Roses 1450–1499 (depth: sources + essays)' },
+        { id: 'nea', name: 'Component 3 — NEA: African-American Civil Rights 1863–1965' },
       ],
       topics: [
-        { id:'his-hvii-power', paper:'c1', title:'Henry VII: consolidation of power & rebellions', ao:'AO1' },
-        { id:'his-hvii-govt', paper:'c1', title:'Henry VII: government, economy, foreign policy', ao:'AO1' },
-        { id:'his-hviii', paper:'c1', title:'Henry VIII 1509–1547 (Wolsey, break with Rome, Cromwell)', ao:'AO1' },
-        { id:'his-edward', paper:'c1', title:'Edward VI & mid-Tudor crisis', ao:'AO1' },
-        { id:'his-mary', paper:'c1', title:'Mary I', ao:'AO1' },
-        { id:'his-elizabeth', paper:'c1', title:'Elizabeth I 1558–1603', ao:'AO1' },
-        { id:'his-interp', paper:'c1', title:'Interpretations technique (30-mark extracts)', ao:'AO3' },
-        { id:'his-1917', paper:'c2', title:'Feb & Oct 1917 revolutions', ao:'AO1' },
-        { id:'his-consolidation', paper:'c2', title:'Bolshevik consolidation & Civil War', ao:'AO1' },
-        { id:'his-warcommunism', paper:'c2', title:'War Communism, Red Terror & NEP', ao:'AO1' },
-        { id:'his-powerstruggle', paper:'c2', title:"Lenin's death & the power struggle", ao:'AO1' },
-        { id:'his-collectivisation', paper:'c2', title:'Collectivisation & the Five-Year Plans', ao:'AO1' },
-        { id:'his-terror', paper:'c2', title:'The Terror & the purges', ao:'AO1' },
-        { id:'his-ww2', paper:'c2', title:'The Great Patriotic War (WWII)', ao:'AO1' },
-        { id:'his-highstalinism', paper:'c2', title:'High Stalinism to 1953', ao:'AO1' },
-        { id:'his-source', paper:'c2', title:'Primary-source value technique (30-mark)', ao:'AO2' },
-        { id:'his-nea', paper:'nea', title:'Civil Rights NEA (see Practice → NEA tracker)', ao:'AO1·AO2·AO3' },
+        // Component 1 — 1H Russia 1855–1964. Part One: Autocracy, Reform & Revolution 1855–1917.
+        { id:'his-ru-alex2', paper:'c1', title:'Alexander II: reform & reaction (emancipation, reforms)', ao:'AO1·AO3' },
+        { id:'his-ru-alex3', paper:'c1', title:'Alexander III: autocracy, reaction & Russification', ao:'AO1·AO3' },
+        { id:'his-ru-nic2', paper:'c1', title:'Nicholas II: autocracy & industrialisation (Witte)', ao:'AO1·AO3' },
+        { id:'his-ru-1905', paper:'c1', title:'1905 Revolution & aftermath (Dumas, Stolypin)', ao:'AO1·AO3' },
+        { id:'his-ru-1917', paper:'c1', title:'WWI & the fall of the Romanovs (Feb 1917)', ao:'AO1·AO3' },
+        // Part Two: The Soviet Union 1917–1964.
+        { id:'his-ru-oct', paper:'c1', title:'October 1917 & Bolshevik consolidation', ao:'AO1·AO3' },
+        { id:'his-ru-civilwar', paper:'c1', title:'Civil War, War Communism & NEP', ao:'AO1·AO3' },
+        { id:'his-ru-stalinrise', paper:'c1', title:"Stalin's rise to power", ao:'AO1·AO3' },
+        { id:'his-ru-stalineco', paper:'c1', title:'Collectivisation & the Five-Year Plans', ao:'AO1·AO3' },
+        { id:'his-ru-terror', paper:'c1', title:'The Terror, purges & Stalinist society', ao:'AO1·AO3' },
+        { id:'his-ru-ww2', paper:'c1', title:'The Great Patriotic War (1941–45)', ao:'AO1·AO3' },
+        { id:'his-ru-khrushchev', paper:'c1', title:'Khrushchev & de-Stalinisation to 1964', ao:'AO1·AO3' },
+        { id:'his-ru-interp', paper:'c1', title:'Interpretations technique (30-mark extracts, AO3)', ao:'AO3' },
+        // Component 2 — 2B The Wars of the Roses 1450–1499.
+        { id:'his-wr-hvi', paper:'c2', title:"Henry VI's rule & weaknesses (1450–55)", ao:'AO1·AO2' },
+        { id:'his-wr-outbreak', paper:'c2', title:'Outbreak of civil war: St Albans to 1461', ao:'AO1·AO2' },
+        { id:'his-wr-edward4a', paper:'c2', title:"Edward IV's first reign & Warwick (1461–70)", ao:'AO1·AO2' },
+        { id:'his-wr-readeption', paper:'c2', title:'Warwick & the readeption of Henry VI (1469–71)', ao:'AO1·AO2' },
+        { id:'his-wr-edward4b', paper:'c2', title:"Edward IV's second reign (1471–83)", ao:'AO1·AO2' },
+        { id:'his-wr-richard3', paper:'c2', title:'Richard III & the usurpation (1483–85)', ao:'AO1·AO2' },
+        { id:'his-wr-bosworth', paper:'c2', title:'Bosworth & Henry VII securing the throne', ao:'AO1·AO2' },
+        { id:'his-wr-pretenders', paper:'c2', title:'Pretenders: Simnel & Warbeck to 1499', ao:'AO1·AO2' },
+        { id:'his-wr-source', paper:'c2', title:'Primary-source value technique (30-mark, AO2)', ao:'AO2' },
+        // Component 3 — NEA (kept as id his-nea; excluded from the daily engine, tracked in Practice).
+        { id:'his-nea', paper:'nea', title:'Civil Rights NEA 1863–1965 (see Practice → NEA tracker)', ao:'AO1·AO2·AO3' },
       ],
     },
     {
@@ -440,11 +450,11 @@ function renderSubjects() {
 /* --- Practice log + NEA tracker --- */
 const LOST_CAUSES = ['Content gap','Misread question','Timing','Weak structure','Avoidable slip'];
 const NEA_STEPS = [
-  'Frame the question (≈100-year span, distinct from Comp 1 & 2)',
-  'Gather ≥3 primary sources to evaluate',
-  'Read differing historian interpretations',
-  'Plan the line of argument & judgement',
-  'First draft (3,500–4,500 words)',
+  'Frame the question — African-American Civil Rights, spanning ~1863–1965',
+  'Gather ≥3 primary sources to evaluate (AO2)',
+  'Read differing historian interpretations (AO3)',
+  'Plan the line of argument & substantiated judgement (AO1)',
+  'First draft (3,500–4,000 words)',
   'Redraft with feedback',
   'Final proofread, footnotes & bibliography',
 ];
@@ -625,7 +635,7 @@ function renderSettings() {
     <div class="card"><h2>Data</h2><div class="muted">Everything lives on this device. Back it up here.</div>
       <div class="split2" style="margin-top:10px"><button class="btn sec" id="stExport">Export backup</button><button class="btn sec" id="stImport">Import backup</button></div>
       <button class="tiny-link" id="stReset" style="margin-top:14px;color:var(--red)">Reset all data</button></div>
-    <div class="card"><h2>About the plan</h2><div class="muted">Built from the AQA/Edexcel specs and evidence-based revision science. History assumes Component 1 = <b>1C The Tudors</b> — confirm this. Business Paper 3 pre-release industry for 2027 needs confirming when published. See <b>REVISION_PLANNER_PLAN.md</b> in the repo.</div></div>
+    <div class="card"><h2>About the plan</h2><div class="muted">Built from the AQA/Edexcel specs and evidence-based revision science. History = <b>1H Russia 1855–1964</b> (breadth) + <b>2B Wars of the Roses 1450–1499</b> (depth) + <b>Civil Rights</b> NEA. Business Paper 3 pre-release industry for 2027 needs confirming when published. See <b>REVISION_PLANNER_PLAN.md</b> in the repo.</div></div>
   </div>`;
   app.innerHTML = h;
   const bind = (id, fn) => document.getElementById(id).onchange = fn;

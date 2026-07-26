@@ -36,11 +36,11 @@ So the app is **not** a notes/flashcard toy. It is a **planner + practice engine
 - ⚠ VERIFY: exact AO split of the *extract* question; Paper 3 essay‑choice structure.
 
 ### 2.2 AQA History (7042) — Comp1 40% · Comp2 40% · NEA 20%; overall **AO1 60 / AO2 20 / AO3 20**
-- **⚠ IMPORTANT — which Component 1?** The true *Wars of the Roses* option is **2B (a Component 2 depth study)** — which **cannot** be taken alongside **Russia 2N (also Component 2)**. So the student almost certainly sits **Component 1 = 1C "The Tudors: England, 1485–1603"**, which opens with Henry VII ending the Wars of the Roses at Bosworth (1485). **Please confirm which he actually sits — it changes Component 1 entirely.** (Plan below assumes 1C Tudors.)
-- **Component 1 — 1C Tudors** (2h30, 80 marks): Section A = one 30‑mark **interpretations** question on 3 historian extracts (**AO3**); Section B = two of three **25‑mark essays** (**AO1**), each spanning ≥20 years. Part One 1485–1547 (Henry VII, Henry VIII), Part Two 1547–1603 (Edward, Mary, Elizabeth).
-- **Component 2 — 2N Russia 1917–1953** (2h30, 80 marks): Section A = one 30‑mark **primary‑source value** question on 3 sources (**AO2**); Section B = two of three **25‑mark essays** (**AO1**). Part One 1917–1929 (revolutions, Civil War, War Communism, NEP, Lenin's death); Part Two ~1929–1953 (collectivisation, Five‑Year Plans, Terror/purges, WWII, High Stalinism).
-- **Component 3 — NEA / Civil Rights** (40 marks, tests AO1+AO2+AO3): **3,500–4,500 words**, spanning **~100 years**, evaluating **≥3 primary sources** and **differing historical interpretations**, own investigation, internally marked + AQA moderated.
-- **Top bands (Level 5):** essays = fully analytical, balanced, well‑substantiated judgement; interpretations = understand all 3 extracts + strong context; sources = content **and** provenance evaluated for **value**.
+> ✅ **Confirmed from his course sheet (July 2026):** Russia is the **breadth** paper and the Wars of the Roses is the **depth** paper — that's why both fit together (an earlier assumption of 1C Tudors was wrong and has been corrected in the app).
+- **Component 1 — 1H Tsarist & Communist Russia, 1855–1964** (breadth; 2h30, 80 marks): Section A = one 30‑mark **interpretations** question on 3 historian extracts (**AO3**); Section B = two of three **25‑mark essays** (**AO1**), each spanning ≥20 years across the ~110‑year period. Part One 1855–1917 (Alexander II reforms → Alexander III → Nicholas II → 1905 → WWI & fall of the Romanovs); Part Two 1917–1964 (October 1917, Civil War & NEP, Stalin's rise, collectivisation & Five‑Year Plans, the Terror, the Great Patriotic War, Khrushchev & de‑Stalinisation).
+- **Component 2 — 2B The Wars of the Roses, 1450–1499** (depth; 2h30, 80 marks): Section A = one 30‑mark **primary‑source value** question on 3 sources (**AO2**); Section B = two of three **25‑mark essays** (**AO1**). Part One Henry VI's failure & the outbreak of war 1450–1461; Part Two Yorkist rule, Edward IV, Richard III, Bosworth & the pretenders (Simnel, Warbeck) to 1499.
+- **Component 3 — NEA: African‑American Civil Rights, 1863–1965** (40 marks, tests AO1+AO2+AO3): **3,500–4,000 words**, spanning ~100 years, evaluating **≥3 primary sources** and **differing historical interpretations**, own investigation, internally marked + AQA moderated.
+- **Top bands (Level 5):** essays = fully analytical, balanced, well‑substantiated judgement; interpretations (Comp 1) = understand all 3 extracts + strong context; sources (Comp 2) = content **and** provenance evaluated for **value**.
 
 ### 2.3 Edexcel Business (9BS0) — 3 papers, each 2h, **100 marks, 33.3%**
 | Paper | Title | Themes |
@@ -145,7 +145,7 @@ I'd suggest we build **Phase 0–2 first** (a genuinely useful daily planner) so
 
 ## 8. Open decisions (need your call before/at build)
 
-1. **History Component 1** — confirm **1C The Tudors (1485–1603)** vs an actual Wars‑of‑the‑Roses depth option. Changes the whole History breadth map. *(Default: 1C Tudors.)*
+1. **History** — ✅ confirmed from his course sheet: **1H Russia 1855–1964** (breadth) + **2B Wars of the Roses 1450–1499** (depth) + **Civil Rights** NEA. App maps updated to match.
 2. **Essay marking backend** — **(a) bring‑your‑own Anthropic API key** stored on his device (recommended: private, no server, ~pennies per essay) **vs (b)** a small hosted proxy we run **vs (c)** ship without marking in v1 and add later.
 3. **Where to host** — the game is a static PWA; we can deploy `revision/` the same way (e.g. GitHub Pages / any static host) so he installs it on his phone. Confirm the host.
 4. **Question bank seeding** — I'll seed spec‑derived questions, but real past‑paper questions/mark schemes give the best practice. Can he/you supply his past‑paper PDFs to load in?
