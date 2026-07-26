@@ -146,7 +146,8 @@ const CONTENT = {
         { id:'pol-liberalism', paper:'p3', title:'Liberalism (+ thinkers)', ao:'AO1·AO2·AO3' },
         { id:'pol-conservatism', paper:'p3', title:'Conservatism (+ thinkers)', ao:'AO1·AO2·AO3' },
         { id:'pol-socialism', paper:'p3', title:'Socialism (+ thinkers)', ao:'AO1·AO2·AO3' },
-        { id:'pol-noncore', paper:'p3', title:'Non-core ideology (confirm which)', ao:'AO1·AO2·AO3' },
+        { id:'pol-noncore', paper:'p3', title:'Feminism (non-core ideology)', ao:'AO1·AO2·AO3',
+          unconfirmed:'School taught Feminism in Year 12, but may pick a different option for Year 13 — confirm, then edit this entry if it changes. AQA offers Nationalism, Feminism, Multiculturalism, Anarchism or Ecologism.' },
       ],
     },
     {
@@ -202,28 +203,85 @@ const CONTENT = {
         { id:'bus-t3-strategy', paper:'p2', title:'T3.1–3.3 Objectives, growth, decision-making techniques', ao:'AO1·AO2·AO3·AO4' },
         { id:'bus-t3-competitive', paper:'p2', title:'T3.4–3.6 Influences, competitiveness, managing change', ao:'AO1·AO2·AO3·AO4' },
         { id:'bus-quant', paper:'p2', title:'Quantitative skills (ratios, investment appraisal, break-even, decision trees)', ao:'AO2·AO3·AO4' },
-        { id:'bus-prerelease', paper:'p3', title:'Paper 3 pre-release context research (confirm 2027 industry)', ao:'AO1·AO2·AO3·AO4' },
+        { id:'bus-prerelease', paper:'p3', title:'Paper 3 pre-release context research', ao:'AO1·AO2·AO3·AO4',
+          unconfirmed:'Edexcel publish the Paper 3 pre-release context in the autumn of the exam year — nothing to revise here until the 2027 context is released.' },
       ],
     },
   ],
-  // Mark-scheme rubrics used by the essay marker. Descriptors are top-band anchors.
+  /* Mark-scheme rubrics used by the essay marker.
+     `bands` are the exam boards' own published level descriptors, kept in their
+     wording rather than paraphrased — the precise phrasing ("well-substantiated
+     judgement", "developed chains of reasoning") is what examiners are actually
+     looking for, and softening it into plainer English is how a marker ends up
+     rewarding the wrong thing.  Feeding the whole ladder rather than a single
+     top-band anchor is what lets the marker place a best-fit level properly and
+     say what separates one band from the next.
+     Sources: AQA 7152/7042 mark schemes (June 2023 / November 2021) and Pearson
+     Edexcel 9BS0 mark schemes (Summer 2023 Paper 1, Summer 2024 Paper 2).      */
   rubrics: {
-    'pol-25-essay': { name:'Politics — 25-mark essay', max:25, ao:'AO1 5 / AO2 10 / AO3 10',
-      top:'Level 5 (21–25): balanced, confidently developed analysis; sustained evaluation throughout; precise current examples; a substantiated judgement signposted early and consistent with the argument.' },
-    'pol-25-extract': { name:'Politics — 25-mark extract/source', max:25, ao:'AO1 5 / AO2 10 / AO3 10',
-      top:'Level 5 (21–25): engages directly with the extract’s arguments, evaluates its perspectives, balanced and developed, well-substantiated judgement.' },
-    'pol-9': { name:'Politics — 9-mark explain & analyse', max:9, ao:'AO1 6 / AO2 3',
-      top:'Three developed, accurate, analytical points — knowledge applied and explained, no evaluation required.' },
-    'his-25-essay': { name:'History — 25-mark essay', max:25, ao:'AO1',
-      top:'Level 5 (21–25): fully analytical, well-organised, well-selected precise support, balanced argument, well-substantiated judgement addressing the full demands of the question.' },
-    'his-30-interp': { name:'History — 30-mark interpretations (3 extracts)', max:30, ao:'AO3',
-      top:'Level 5 (25–30): very good understanding of all three interpretations combined with strong contextual knowledge to analyse and evaluate them.' },
-    'his-30-source': { name:'History — 30-mark primary sources (value)', max:30, ao:'AO2',
-      top:'Level 5 (25–30): all three sources evaluated for content AND provenance, strong context, balanced judgement on their value for the stated purpose.' },
-    'bus-12': { name:'Business — 12-mark evaluation', max:12, ao:'AO1/AO2/AO3/AO4',
-      top:'Top level: applied knowledge, balanced developed analysis, supported judgement justified with fresh evaluative reasoning (MOPS: Market/Objectives/Product/Situation).' },
-    'bus-20': { name:'Business — 20-mark evaluation', max:20, ao:'AO1/AO2/AO3/AO4',
-      top:'Level 4 (17–20): sustained application to the specific business, balanced fully-developed analysis (fewer, deeper chains), judgement adding new reasoning via MOPS and short- vs long-term.' },
+    'pol-25-essay': { name:'Politics — 25-mark essay', max:25, ao:'AO1 5 / AO2 10 / AO3 10', style:'levels', bands:[
+      { l:5, r:'21–25', d:'Detailed and accurate knowledge and understanding of relevant political concepts, institutions and processes are used to support analysis of the issue under discussion (AO1). Analysis is balanced and confidently developed (AO2). Synoptic links are well explained, are focussed on the question and fully supported with relevant and developed examples (AO2). Evaluation leads to well substantiated conclusions that are consistent with the preceding discussion (AO3). Relevant perspectives are successfully evaluated in the process of constructing arguments (AO3). The answer is well organised, coherent with a sustained analytical focus on the question (AO2).' },
+      { l:4, r:'16–20', d:'Accurate knowledge and understanding … used to support analysis, though further detail may be required in places (AO1). Analysis is balanced and developed, though some elements could be expanded and/or developed further (AO2). Synoptic links are relevant to the question as set, and supported with examples (AO2). Evaluation leads to conclusions that show some substantiation and are consistent with the preceding discussion (AO3). Relevant perspectives are evaluated, although in some places there could be further development (AO3).' },
+      { l:3, r:'11–15', d:'Generally sound knowledge and understanding … used to support points made, though inaccuracies will be present (AO1). Analytical points are made and developed in places, showing some balance, though some points are descriptive rather than analytical (AO2). Synoptic links will be made, though explanation will lack depth (AO2). Evaluation leads to conclusions that are consistent with the preceding discussion, but that lack substantiation (AO3).' },
+      { l:2, r:'6–10', d:'Some knowledge and understanding … though these contain inaccuracies and irrelevant material (AO1). Analysis takes the form of description in most places, with some attempt at balance, though many points are unsupported assertions (AO2). Synoptic links tend to be limited and undeveloped (AO2). Some attempt to draw conclusions is made, but these lack depth and there is no clear development from the preceding discussion (AO3).' },
+      { l:1, r:'1–5', d:'Limited knowledge and understanding, with inaccuracies and irrelevant material present throughout (AO1). Analysis takes the form of description and assertion, with little or no attempt at balance (AO2). Little or no evaluation; conclusions are absent or unsupported (AO3).' },
+    ] },
+    'pol-25-extract': { name:'Politics — 25-mark extract-based essay', max:25, ao:'AO1 5 / AO2 10 / AO3 10', style:'levels', bands:[
+      { l:5, r:'21–25', d:'Detailed and accurate knowledge and understanding of relevant political concepts, institutions and processes are used to support analysis of the issue under discussion (AO1). Analysis of the extract is balanced and confidently developed (AO2). Comparisons are well explained, are focussed on the question and fully supported with relevant and developed examples (AO2). Evaluation of the above leads to well substantiated conclusions that are consistent with the preceding discussion (AO3). Relevant perspectives and/or the status of the extract are successfully evaluated in the process of constructing arguments (AO3). The answer is well organised, coherent and has a sustained analytical focus on the question (AO2).' },
+      { l:4, r:'16–20', d:'Accurate knowledge and understanding … though further detail may be required in places (AO1). Analysis of the extract is balanced and developed, though some elements could be expanded further (AO2). Comparisons are relevant to the question as set, and supported with examples (AO2). Evaluation leads to conclusions that show some substantiation (AO3). Relevant perspectives and/or the status of the extract are evaluated, although in places there could be further development (AO3).' },
+      { l:3, r:'11–15', d:'Generally sound knowledge and understanding … though inaccuracies will be present (AO1). Analytical points relating to the extract are made and developed in places, showing some balance, though some points are descriptive rather than analytical (AO2). Comparisons are made and may be supported by examples (AO2). Evaluation leads to conclusions that are consistent with the preceding discussion, but that lack substantiation (AO3).' },
+      { l:2, r:'6–10', d:'Some knowledge and understanding … though these contain inaccuracies and irrelevant material (AO1). Analysis of the extract takes the form of description in most places, with some attempt at balance, though many points are unsupported assertions (AO2). Comparisons tend to be limited and unsupported by examples (AO2). Some attempt to draw conclusions is made, but these lack depth and clear development (AO3).' },
+      { l:1, r:'1–5', d:'Limited knowledge and understanding, with inaccuracies and irrelevant material throughout (AO1). Engagement with the extract is descriptive or assertive, with little or no comparison (AO2). Little or no evaluation of perspectives or the status of the extract (AO3).' },
+    ] },
+    'pol-9': { name:'Politics — 9-mark explain & analyse', max:9, ao:'AO1 6 / AO2 3', style:'levels', bands:[
+      { l:3, r:'7–9', d:'Detailed knowledge of relevant political concepts, institutions and processes is demonstrated and appropriate political vocabulary is used (AO1). Thorough explanations and appropriate selection of accurate supporting examples demonstrate detailed understanding (AO1). Analysis of three clear points is structured, clearly focused on the question and confidently developed into a coherent answer (AO2).' },
+      { l:2, r:'4–6', d:'Generally sound knowledge … and generally appropriate political vocabulary (AO1). Some development of explanations and generally appropriate selection of supporting examples, though further detail may be required in places and some inaccuracies may be present (AO1). Analysis is developed in most places, though some points may be descriptive or in need of further development (AO2). Students who only make two relevant points will be limited to this level.' },
+      { l:1, r:'1–3', d:'Limited knowledge … and little or no appropriate political vocabulary (AO1). Limited development of explanations and selection of supporting examples, with further detail required and inaccuracies present throughout (AO1). Analysis takes the form of description for the most part; coherence and structure are limited (AO2). Students who only make one relevant point will be limited to this level.' },
+    ] },
+    'his-25-essay': { name:'History — 25-mark essay', max:25, ao:'AO1', style:'levels', bands:[
+      { l:5, r:'21–25', d:'Answers will display a very good understanding of the full demands of the question. They will be well-organised and effectively delivered. The supporting information will be well-selected, specific and precise. It will show a very good understanding of key features, issues and concepts. The answer will be fully analytical with a balanced argument and well-substantiated judgement.' },
+      { l:4, r:'16–20', d:'Answers will display a good understanding of the demands of the question. It will be well-organised and effectively communicated. There will be a range of clear and specific supporting information showing a good understanding of key features and issues, together with some conceptual awareness. The answer will be analytical in style with a range of direct comment relating to the question. The answer will be well-balanced with some judgement, which may, however, be only partially substantiated.' },
+      { l:3, r:'11–15', d:'Answers will show an understanding of the question and will supply a range of largely accurate information, which will show an awareness of some of the key issues and features, but may, however, be unspecific or lack precision of detail. The answer will be effectively organised and show adequate communication skills. There will be a good deal of comment in relation to the question and the answer will display some balance, but a number of statements may be inadequately supported and generalist.' },
+      { l:2, r:'6–10', d:'The answer is descriptive or partial, showing some awareness of the question but a failure to grasp its full demands. There will be some attempt to convey material in an organised way, although communication skills may be limited. There will be some appropriate information showing understanding of some key features and/or issues, but the answer may be very limited in scope and/or contain inaccuracy and irrelevance. There will be some, but limited, comment in relation to the question and statements will, for the most part, be unsupported and generalist.' },
+      { l:1, r:'1–5', d:'The question has not been properly understood and the response shows limited organisational and communication skills. The information conveyed is irrelevant or extremely limited. There may be some unsupported, vague or generalist comment.' },
+    ] },
+    'his-30-interp': { name:'History — 30-mark interpretations (3 extracts)', max:30, ao:'AO3', style:'levels', bands:[
+      { l:5, r:'25–30', d:'Shows a very good understanding of the interpretations put forward in all three extracts and combines this with a strong awareness of the historical context to analyse and evaluate the interpretations given in the extracts. Evaluation of the arguments will be well-supported and convincing. The response demonstrates a very good understanding of context.' },
+      { l:4, r:'19–24', d:'Shows a good understanding of the interpretations given in all three extracts and combines this with knowledge of the historical context to analyse and evaluate them. The evaluation of the arguments will be mostly well-supported and convincing, but may have minor limitations of depth and breadth. The response demonstrates a good understanding of context.' },
+      { l:3, r:'13–18', d:'Provides some supported comment on the interpretations given in all three extracts and comments on the strength of these arguments in relation to their historical context. There is some analysis and evaluation but there may be an imbalance in the degree and depth of comments offered on the strength of the arguments. The response demonstrates an understanding of context.' },
+      { l:2, r:'7–12', d:'Provides some accurate comment on the interpretations given in at least two of the extracts, with reference to the historical context. The answer may contain some analysis, but there is little, if any, evaluation. Some of the comments on the strength of the arguments may contain some generalisation, inaccuracy or irrelevance. The response demonstrates some understanding of context.' },
+      { l:1, r:'1–6', d:'Either shows an accurate understanding of the interpretation given in one extract only, or addresses two/three extracts but in a generalist way, showing limited accurate understanding of the arguments they contain. Any comments on the strength of the arguments are likely to be generalist and contain some inaccuracy and/or irrelevance. The response demonstrates limited understanding of context.' },
+    ] },
+    'his-30-source': { name:'History — 30-mark primary sources (value)', max:30, ao:'AO2', style:'levels', bands:[
+      { l:5, r:'25–30', d:'Shows a very good understanding of all three sources in relation to both content and provenance and combines this with a strong awareness of the historical context to present a balanced argument on their value for the particular purpose given in the question. The answer will convey a substantiated judgement. The response demonstrates a very good understanding of context.' },
+      { l:4, r:'19–24', d:'Shows a good understanding of all three sources in relation to both content and provenance and combines this with an awareness of the historical context to provide a balanced argument on their value for the particular purpose given in the question. Judgements may, however, be partial or limited in substantiation. The response demonstrates a good understanding of context.' },
+      { l:3, r:'13–18', d:'Shows some understanding of all three sources in relation to both content and provenance together with some awareness of the historical context. There may, however, be some imbalance in the degree of breadth and depth of comment offered on all three sources and the analysis may not be fully convincing. The answer will make some attempt to consider the value of the sources for the particular purpose given in the question. The response demonstrates an understanding of context.' },
+      { l:2, r:'7–12', d:'The answer will be partial. It may, for example, provide some comment on the value of the sources for the particular purpose given in the question but only address one or two of the sources, or focus exclusively on content (or provenance), or it may consider all three sources but fail to address the value of the sources for the particular purpose given in the question. The response demonstrates some understanding of context.' },
+      { l:1, r:'1–6', d:'The answer will offer some comment on the value of at least one source in relation to the purpose given in the question but the response will be limited and may be partially inaccurate. Comments are likely to be unsupported, vague or generalist. The response demonstrates limited understanding of context.' },
+    ] },
+    /* Edexcel 9BS0 uses four levels on every extended-response tariff; only the
+       mark boundaries move.  4-mark questions are points-based, not levels.     */
+    'bus-4': { name:'Business — 4-mark knowledge & application', max:4, ao:'AO1 / AO2 (+ AO3 where calculation is involved)', style:'points', bands:[
+      { l:'—', r:'1–4', d:'Marked by points, not levels. Typically: up to 1 mark for knowledge/understanding of the concept, up to 2 marks for application to the business or correct working of the calculation, and 1 mark for a developed analytical point drawn from it. A fully correct calculation shown without explanation can still earn the application and implied-knowledge marks.' },
+    ] },
+    'bus-10': { name:'Business — 10-mark assess', max:10, ao:'AO1/AO2/AO3/AO4', style:'levels', bands:[
+      { l:4, r:'7–10', d:'Accurate and thorough knowledge and understanding, supported throughout by relevant and effective use of the business behaviour/context. Uses well-developed and logical, coherent chains of reasoning, showing a range of causes and/or effects. Arguments are fully developed. Quantitative and/or qualitative information is used well to support judgements, with a full awareness of the validity and significance of competing arguments, leading to balanced comparisons and an effective conclusion.' },
+      { l:3, r:'5–6', d:'Accurate and thorough knowledge and understanding, supported throughout by use of the business behaviour/context. Uses developed chains of reasoning so that causes and/or effects are complete. Quantitative and/or qualitative information is introduced in an attempt to support judgements, with a partial awareness of the validity and/or significance of competing arguments.' },
+      { l:2, r:'3–4', d:'Elements of knowledge and understanding which are applied to the business example. Arguments and chains of reasoning are presented, but connections between causes and/or effects are incomplete. A comparison or judgement may be attempted, but will not successfully show an awareness of the key features of business behaviour or the business situation.' },
+      { l:1, r:'1–2', d:'Isolated elements of knowledge and understanding — recall based. Weak or no relevant application of business examples. An argument may be attempted, but will be generic and fail to connect causes and/or effects.' },
+    ] },
+    'bus-12': { name:'Business — 12-mark assess', max:12, ao:'AO1/AO2/AO3/AO4', style:'levels', bands:[
+      { l:4, r:'9–12', d:'Accurate and thorough knowledge and understanding. A coherent and logical chain of reasoning, showing causes and/or effects. Arguments are fully developed and supported throughout by relevant and effective use of the business behaviour/context. An assessment is presented using quantitative and/or qualitative information, showing an awareness of the significance of competing arguments.' },
+      { l:3, r:'5–8', d:'Accurate and thorough knowledge and understanding. Analytical perspectives are presented, with developed chains of reasoning showing causes and/or effects. An attempt at an assessment is presented using quantitative and/or qualitative information, supported throughout by use of the business behaviour/context, though unlikely to show the significance of competing arguments.' },
+      { l:2, r:'3–4', d:'Elements of knowledge and understanding which are applied to the business example. Chains of reasoning are presented, but may be assertions or incomplete. A generic or superficial assessment is presented.' },
+      { l:1, r:'1–2', d:'Isolated elements of knowledge and understanding — recall based. Weak or no relevant application to business examples. Generic assertions may be presented.' },
+    ] },
+    'bus-20': { name:'Business — 20-mark evaluate', max:20, ao:'AO1/AO2/AO3/AO4', style:'levels', bands:[
+      { l:4, r:'15–20', d:'Accurate and thorough knowledge and understanding, supported throughout by relevant and effective use of the business behaviour/context. Uses well-developed and logical, coherent chains of reasoning, showing a range of causes and/or effects. Arguments are fully developed. Quantitative and/or qualitative information is used well to support judgements. A full awareness of the validity and significance of competing arguments/factors, leading to balanced comparisons, judgements and an effective conclusion that proposes a solution and/or recommendation(s).' },
+      { l:3, r:'9–14', d:'Accurate and thorough knowledge and understanding, supported throughout by use of the business behaviour/context. Uses developed chains of reasoning so that causes and/or effects are complete, showing an understanding of the question. Arguments are developed. Quantitative and/or qualitative information is introduced in an attempt to support judgements, with a partial awareness of the validity and/or significance of competing arguments, and may lead to a conclusion.' },
+      { l:2, r:'5–8', d:'Elements of knowledge and understanding which are applied to the business example. Arguments and chains of reasoning are presented, but connections between causes and/or effects are incomplete. Attempts to address the question. A comparison or judgement may be attempted, but it will not successfully show an awareness of the key features of business behaviour or the business situation.' },
+      { l:1, r:'1–4', d:'Isolated elements of knowledge and understanding. Weak or no relevant application of business examples. An argument may be attempted, but will be generic and fail to connect causes and/or consequences/effects.' },
+    ] },
   },
 };
 
@@ -296,14 +354,35 @@ function load() {
     if (s && s.settings) { s.settings = Object.assign({}, defaultSettings, s.settings);
       s.settings.exams = Object.assign({}, defaultSettings.exams, s.settings.exams);
       s.notes = s.notes || []; s.cards = s.cards || [];   // notes-check + retrieval cards
+      // Migration → taught/untaught.  Saved states predate the flag, so pre-tick
+      // anything already rated or reviewed and send the user through the
+      // checklist once to confirm, rather than guessing the rest of the course.
+      if (s.onboarded === undefined) {
+        Object.values(s.topics || {}).forEach(ts => {
+          if (ts.taught === undefined) ts.taught = !!(ts.lastReviewed || ts.confidence !== null);
+        });
+        s.onboarded = false;
+      }
       return s; }
   } catch (e) {}
-  return { settings: structuredClone(defaultSettings), topics: {}, practice: [], essays: [], plan: {}, nea: {}, notes: [], cards: [] };
+  return { settings: structuredClone(defaultSettings), topics: {}, practice: [], essays: [], plan: {}, nea: {}, notes: [], cards: [], onboarded: false };
 }
 function save() { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); }
 function topicState(id) {
-  if (!STATE.topics[id]) STATE.topics[id] = { confidence: null, lastReviewed: null, intervalIdx: 0, nextReview: null };
+  if (!STATE.topics[id]) STATE.topics[id] = { confidence: null, lastReviewed: null, intervalIdx: 0, nextReview: null, taught: false };
   return STATE.topics[id];
+}
+// Has school actually covered this yet?  Henry is part-way through the course,
+// so roughly half the spec is untaught at any given time.  Untaught topics are
+// kept out of the planner and the question bank entirely — being scheduled onto
+// material nobody has taught you, and then marked down for not knowing it, is
+// the fastest way to make a revision app feel punishing rather than useful.
+function isTaught(id) { const ts = STATE.topics[id]; return !!(ts && ts.taught); }
+function setTaught(id, on) {
+  const ts = topicState(id);
+  ts.taught = !!on;
+  if (!on) { ts.confidence = null; ts.nextReview = null; }   // untaught topics carry no rating
+  save();
 }
 
 /* ---------- 3. DATES & SPACING ---------- */
@@ -360,6 +439,21 @@ function allTopics() {
   CONTENT.subjects.forEach(s => s.topics.forEach(t => { if (t.id !== 'his-nea') out.push({ ...t, subject:s.id, subjectName:s.name, cls:s.cls }); }));
   return out;
 }
+// Everything the planner is allowed to touch: taught topics only.
+function taughtTopics() { return allTopics().filter(t => isTaught(t.id)); }
+// A question is drawable once its topics have been taught.  Questions tagged
+// with specific topics use those; the rest fall back to "anything taught on
+// that paper", which is the best we can do for a question with no topic tags.
+// Extract/interpretation/source questions carry their own stimulus material —
+// the AO is about engaging with it, so the question is meaningless without it.
+function extractsToText(q) {
+  if (!q || !q.extracts || !q.extracts.length) return '';
+  return q.extracts.map(x => `${x.label}\n${x.text}${x.attrib ? `\n(${x.attrib})` : ''}`).join('\n\n');
+}
+function questionAvailable(q) {
+  if (q.topics && q.topics.length) return q.topics.some(isTaught);
+  return allTopics().some(t => t.subject === q.subject && t.paper === q.paper && isTaught(t.id));
+}
 function priority(t) {
   const ts = topicState(t.id);
   let p = 0;
@@ -385,7 +479,7 @@ function buildPlan(dateKey) {
   // Cap brand-new topics per day so learning stays consolidated, not crammed.
   const newBudget = { learn:3, consolidate:2, peak:1, exams:0 }[phase.key];
   const now = iso(today());
-  const topics = allTopics();
+  const topics = taughtTopics();
   // Three pools: due reviews (retention — protected first), brand-new topics,
   // and already-known-but-not-due (extra practice to fill any spare time).
   const dueRev = topics.filter(t => { const ts = topicState(t.id); return introduced(t.id) && ts.nextReview && ts.nextReview <= now; });
@@ -426,8 +520,52 @@ function setHeader(title, phaseHtml) {
   document.getElementById('hdrPhase').innerHTML = phaseHtml || '';
 }
 function render() {
+  if (!STATE.onboarded) { document.querySelectorAll('nav button').forEach(b => b.classList.remove('on')); return renderOnboarding(); }
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === TAB));
   ({ today:renderToday, subjects:renderSubjects, notes:renderNotes, practice:renderPractice, essays:renderEssays, progress:renderProgress, settings:renderSettings }[TAB])();
+}
+
+/* --- First run: what has school actually covered? ---------------------------
+   The planner is only as good as this list.  Everything left unticked stays out
+   of the daily plan and the question bank until it's taught, so the app never
+   schedules Henry onto material he hasn't met — and never marks him down for it.
+   Editable later from Subjects, so a wrong guess here costs nothing.          */
+function renderOnboarding() {
+  setHeader('Getting set up', '');
+  let h = `<div class="wrap">
+    <div class="card"><h2>What have you covered so far?</h2>
+      <p class="muted">Tick every topic school has already taught. Leave the rest — they'll stay out of your plan until you mark them covered, so you won't get scheduled onto Year 13 content before you've met it.</p>
+      <p class="faint">You can change any of this later in Subjects.</p>
+    </div>`;
+  CONTENT.subjects.forEach(s => {
+    const n = s.topics.filter(t => isTaught(t.id)).length;
+    h += `<div class="card"><div class="spread"><h2><span class="pill ${s.cls}">${s.name}</span> <span class="faint">${s.board}</span></h2>
+      <button class="tiny-link" data-all="${s.id}">${n===s.topics.length?'Clear all':'Select all'}</button></div>`;
+    s.papers.forEach(p => {
+      const ts = s.topics.filter(t => t.paper === p.id);
+      if (!ts.length) return;
+      h += `<div style="margin-top:10px" class="faint">${p.name}</div>`;
+      ts.forEach(t => {
+        h += `<div class="topic" style="padding:6px 0"><label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+          <input type="checkbox" data-ob="${t.id}" ${isTaught(t.id)?'checked':''} style="margin-top:3px">
+          <span class="t-title" style="font-size:14px;font-weight:400">${t.title}</span></label></div>`;
+      });
+    });
+    h += `</div>`;
+  });
+  h += `<button class="btn" id="obDone" style="width:100%;margin-bottom:24px">Done — build my plan</button></div>`;
+  app.innerHTML = h;
+  app.querySelectorAll('[data-ob]').forEach(cb => cb.onchange = () => setTaught(cb.dataset.ob, cb.checked));
+  app.querySelectorAll('[data-all]').forEach(b => b.onclick = () => {
+    const s = CONTENT.subjects.find(x => x.id === b.dataset.all);
+    const turnOn = s.topics.filter(t => isTaught(t.id)).length !== s.topics.length;
+    s.topics.forEach(t => setTaught(t.id, turnOn));
+    renderOnboarding();
+  });
+  document.getElementById('obDone').onclick = () => {
+    if (!taughtTopics().length && !confirm('Nothing ticked — the planner will have nothing to work with. Continue anyway?')) return;
+    STATE.onboarded = true; STATE.plan = {}; save(); TAB = 'today'; window.scrollTo(0,0); render();
+  };
 }
 
 /* --- Today --- */
@@ -452,7 +590,7 @@ function renderToday() {
   if (due.length) h += `<div class="card" style="border-color:var(--accent)"><div class="spread"><div><h2>🔁 ${due.length} recall card${due.length>1?'s':''} due</h2>
     <div class="muted">Quick self-test from your own notes.</div></div><button class="btn" id="tdCards">Review</button></div></div>`;
   if (mode === 'rest') { h += `<div class="empty">🌱 Rest day — recovery is part of the plan. Reviews will pick up tomorrow.</div>`; }
-  else if (!plan.items.length) { h += `<div class="empty">Nothing queued yet — set some confidence ratings in <b>Subjects</b> and topics will start flowing in.</div>`; }
+  else if (!plan.items.length) { h += `<div class="empty">Nothing queued yet — mark the topics school has covered in <b>Subjects</b> and they'll start flowing in.</div>`; }
   h += `<div class="card">`;
   plan.items.forEach((it, idx) => {
     h += `<div class="task ${it.done?'done':''}" data-i="${idx}">
@@ -492,32 +630,46 @@ function renderToday() {
 /* --- Subjects --- */
 function renderSubjects() {
   setHeader('Subjects', '');
-  let h = `<div class="wrap"><p class="muted" style="margin-bottom:12px">Rate how confident you feel on each topic — Red / Amber / Green. Ratings drive what the daily planner surfaces first.</p>`;
+  let h = `<div class="wrap"><p class="muted" style="margin-bottom:12px">Rate how confident you feel on each topic — Red / Amber / Green. Ratings drive what the daily planner surfaces first. Topics school hasn't covered yet stay greyed out and out of the plan — tap <b>Covered</b> when you get to them.</p>`;
   CONTENT.subjects.forEach(s => {
-    const rated = s.topics.filter(t => topicState(t.id).confidence !== null);
-    const greens = s.topics.filter(t => topicState(t.id).confidence === 2).length;
-    const pct = Math.round(greens / s.topics.length * 100);
+    const taught = s.topics.filter(t => isTaught(t.id));
+    const greens = taught.filter(t => topicState(t.id).confidence === 2).length;
+    const pct = taught.length ? Math.round(greens / taught.length * 100) : 0;
     h += `<div class="card"><div class="spread"><div><h2><span class="pill ${s.cls}">${s.name}</span> <span class="faint">${s.board}</span></h2></div>
-          <div class="faint">${greens}/${s.topics.length} green</div></div>
-          <div class="progressbar" style="margin:8px 0 4px"><span style="width:${pct}%"></span></div>`;
+          <div class="faint">${greens}/${taught.length} green</div></div>
+          <div class="progressbar" style="margin:8px 0 4px"><span style="width:${pct}%"></span></div>
+          <div class="faint">${taught.length} of ${s.topics.length} topics covered so far</div>`;
     s.papers.forEach(p => {
       const ts = s.topics.filter(t => t.paper === p.id);
       if (!ts.length) return;
       h += `<div style="margin-top:10px" class="faint">${p.name}</div>`;
       ts.forEach(t => {
         const c = topicState(t.id).confidence;
-        h += `<div class="topic"><div style="margin-bottom:6px" class="t-title" style="font-size:14px">${t.title} <span class="faint">· ${t.ao}</span></div>
-          <div class="rag" data-topic="${t.id}">
+        const on = isTaught(t.id);
+        h += `<div class="topic" style="${on?'':'opacity:.5'}">
+          <div class="spread" style="margin-bottom:6px">
+            <div class="t-title" style="font-size:14px">${t.title} <span class="faint">· ${t.ao}</span></div>
+            <button class="tiny-link" data-taught="${t.id}">${on?'Covered ✓':'Not taught yet'}</button>
+          </div>
+          ${t.unconfirmed?`<div class="faint" style="margin-bottom:6px">⚠️ ${t.unconfirmed}</div>`:''}
+          ${on?`<div class="rag" data-topic="${t.id}">
             <button data-c="0" class="${c===0?'on0':''}">Red</button>
             <button data-c="1" class="${c===1?'on1':''}">Amber</button>
             <button data-c="2" class="${c===2?'on2':''}">Green</button>
-          </div></div>`;
+          </div>`:''}
+        </div>`;
       });
     });
     h += `</div>`;
   });
   h += `</div>`;
   app.innerHTML = h;
+  app.querySelectorAll('[data-taught]').forEach(b => b.onclick = () => {
+    const id = b.dataset.taught;
+    setTaught(id, !isTaught(id));
+    STATE.plan = {};   // today's plan was built from the old topic set — rebuild it
+    save(); renderSubjects();
+  });
   app.querySelectorAll('.rag').forEach(rag => rag.querySelectorAll('button').forEach(b => b.onclick = () => {
     const ts = topicState(rag.dataset.topic);
     const c = +b.dataset.c;
@@ -700,7 +852,12 @@ function renderPractice() {
     const canMark = !!r;
     h += `<div style="margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg2)">
       <div class="faint" style="margin-bottom:6px"><span class="pill ${sub.cls}">${sub.name}</span> ${r?r.name:currentQ.type} · target ${currentQ.mins} min</div>
+      ${(currentQ.extracts||[]).map(x=>`<div style="margin-bottom:10px;padding:10px;border-left:3px solid var(--line);background:var(--bg)">
+        <div class="faint" style="margin-bottom:4px"><b>${x.label}</b></div>
+        <div class="muted" style="font-size:14px;line-height:1.55;white-space:pre-wrap">${x.text}</div>
+        ${x.attrib?`<div class="faint" style="margin-top:6px;font-style:italic">${x.attrib}</div>`:''}</div>`).join('')}
       <div class="t-title" style="font-size:15px;line-height:1.5">${currentQ.text}</div>
+      ${currentQ.source?`<div class="faint" style="margin-top:6px">${currentQ.source}</div>`:''}
       <div class="row" style="gap:8px;margin-top:12px">
         ${canMark?`<button class="btn sm" id="qbMark">Write &amp; mark this ✍️</button>`:''}
         <button class="btn sm sec" id="qbLog">Log a mark</button>
@@ -738,15 +895,18 @@ function renderPractice() {
   // question bank
   document.getElementById('qbDraw').onclick = () => {
     const sub = document.getElementById('qbSub').value;
-    const pool = QUESTIONS.filter(q => sub === 'all' || q.subject === sub);
-    if (!pool.length) return;
+    const pool = QUESTIONS.filter(q => (sub === 'all' || q.subject === sub) && questionAvailable(q));
+    if (!pool.length) {
+      alert('No questions available yet for that selection — mark the relevant topics as covered in Subjects first.');
+      return;
+    }
     let next = pool[Math.floor(Math.random()*pool.length)];
     if (pool.length > 1 && currentQ) { let guard = 0; while (next.id === currentQ.id && guard++ < 8) next = pool[Math.floor(Math.random()*pool.length)]; }
     currentQ = next; renderPractice();
   };
   if (currentQ) {
     const mark = document.getElementById('qbMark');
-    if (mark) mark.onclick = () => { pendingEssay = { type: currentQ.type, text: currentQ.text }; TAB = 'essays'; window.scrollTo(0,0); render(); };
+    if (mark) mark.onclick = () => { pendingEssay = { type: currentQ.type, text: currentQ.text, extracts: extractsToText(currentQ) }; TAB = 'essays'; window.scrollTo(0,0); render(); };
     document.getElementById('qbLog').onclick = () => {
       const r = CONTENT.rubrics[currentQ.type];
       document.getElementById('pfSub').value = currentQ.subject;
@@ -777,6 +937,8 @@ function renderEssays() {
     <div class="card" style="margin-top:12px">
       <label>Question type</label><select id="esType">${opts}</select>
       <label>The exam question (paste it)</label><textarea id="esQ" style="min-height:70px" placeholder="e.g. 'Analyse and evaluate the view that…'"></textarea>
+      <label>Extracts / sources <span class="faint">— only for extract, interpretation and source questions</span></label>
+      <textarea id="esX" style="min-height:70px" placeholder="Paste the extracts or sources here. Without them, an interpretations or source-value answer can't be marked properly — the AO is about engaging with them."></textarea>
       <label>Your answer</label><textarea id="esA" placeholder="Paste your essay here…"></textarea>
       <button class="btn" id="esGo" style="margin-top:12px">Mark my answer</button>
       <div id="esKeyWarn"></div>
@@ -794,6 +956,7 @@ function renderEssays() {
   if (pendingEssay) {
     document.getElementById('esType').value = pendingEssay.type;
     document.getElementById('esQ').value = pendingEssay.text;
+    document.getElementById('esX').value = pendingEssay.extracts || '';
     pendingEssay = null;
     document.getElementById('esA').focus();
   }
@@ -827,6 +990,7 @@ async function callLLM(messages, maxTokens = 1200) {
 async function markEssay() {
   const type = document.getElementById('esType').value;
   const q = document.getElementById('esQ').value.trim();
+  const extracts = document.getElementById('esX').value.trim();
   const a = document.getElementById('esA').value.trim();
   const out = document.getElementById('esOut');
   const s = STATE.settings;
@@ -834,23 +998,35 @@ async function markEssay() {
   if (!s.proxyUrl && !s.apiKey) { alert('Set up marking under More → Marking service (a proxy URL, or a personal API key).'); return; }
   const r = CONTENT.rubrics[type];
   out.innerHTML = `<div class="card"><div class="muted">Marking… this can take 15–30 seconds.</div></div>`;
+  const isPoints = r.style === 'points';
+  const ladder = (r.bands || []).map(b => isPoints ? `(${b.r} marks) ${b.d}` : `Level ${b.l} (${b.r} marks): ${b.d}`).join('\n\n');
+  const method = isPoints
+    ? `This tariff is marked by POINTS, not levels. Award each creditable point against the breakdown below and total them.`
+    : `Mark using the official levels-of-response approach: read holistically, start at the lowest level and work up until the descriptor no longer fits, then place the answer by best fit. Choose the mark within that level by how far it reaches towards the level above — an answer that is predominantly Level 3 with some Level 4 material sits at the top of Level 3, not in Level 4.`;
   const prompt =
-`You are an experienced ${r.name.split('—')[0].trim()} A-level examiner. Mark the student answer using the official levels-of-response approach: read holistically, place the level by best-fit working up from the bottom, then choose a mark within that level's range.
+`You are an experienced ${r.name.split('—')[0].trim()} A-level examiner. ${method}
 
 QUESTION TYPE: ${r.name} (max ${r.max} marks). Assessment objectives: ${r.ao}.
-TOP-BAND DESCRIPTOR: ${r.top}
-Treat any indicative content as illustrative, NOT a checklist — do not penalise valid alternative content or reward keyword-stuffing.
 
+MARK SCHEME — ${isPoints ? 'points breakdown' : 'full level descriptors, verbatim from the exam board'}:
+${ladder}
+
+Treat any indicative content as illustrative, NOT a checklist — do not penalise valid alternative content or reward keyword-stuffing.
+${extracts ? `\nEXTRACTS / SOURCES THE ANSWER MUST ENGAGE WITH:\n${extracts}\n` : ''}
 EXAM QUESTION: ${q || '(not supplied — infer from the answer)'}
 
 STUDENT ANSWER:
 """${a}"""
 
 Respond in this exact structure with markdown headings:
-### Level & mark
-State the level and a specific mark out of ${r.max}, with one sentence of justification.
+### ${isPoints ? 'Mark' : 'Level & mark'}
+State ${isPoints ? 'a specific mark' : 'the level and a specific mark'} out of ${r.max}, with one sentence of justification quoting the phrase from the ${isPoints ? 'breakdown' : 'descriptor'} that decided it.
 ### AO-by-AO feedback
 For each assessment objective in "${r.ao}", say what was and wasn't evidenced.
+### ${isPoints ? 'The marks you didn\'t get' : 'What the next band up needs'}
+${isPoints
+  ? 'Name each mark not awarded and what specifically would have earned it.'
+  : 'Name the level above and state exactly what is missing from this answer to reach it, in the mark scheme\'s own terms. If already at the top band, say what would make it a secure rather than borderline top-band answer.'}
 ### Three things to improve
 Three concrete, actionable fixes tied to the mark scheme (e.g. "your judgement isn't substantiated — add a criterion for why X outweighs Y").
 ### One-line summary
