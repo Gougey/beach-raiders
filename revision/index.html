@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.json">
+<title>Revision Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #0f172a; --bg2: #1e293b; --card: #1e293b; --card2: #273449;
+  --line: #334155; --ink: #e2e8f0; --ink-dim: #94a3b8; --ink-faint: #64748b;
+  --accent: #38bdf8; --accent2: #0ea5e9;
+  --red: #f87171; --amber: #fbbf24; --green: #34d399;
+  --pol: #a78bfa; --his: #fb923c; --bus: #22d3ee;
+  --head: 'Fraunces', Georgia, serif; --body: 'Inter', system-ui, sans-serif;
+}
+html, body { background: var(--bg); color: var(--ink); font-family: var(--body); }
+body { max-width: 720px; margin: 0 auto; padding-bottom: 84px; min-height: 100vh; }
+h1, h2, h3 { font-family: var(--head); font-weight: 700; letter-spacing: -0.01em; }
+a { color: var(--accent); }
+.wrap { padding: 16px; }
+header { padding: 18px 16px 10px; }
+header .date { color: var(--ink-dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+header h1 { font-size: 26px; margin-top: 2px; }
+.phase-chip { display:inline-block; margin-top:8px; font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; background:var(--card2); color:var(--accent); border:1px solid var(--line); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.card h2 { font-size: 17px; margin-bottom: 4px; }
+.muted { color: var(--ink-dim); font-size: 13px; line-height: 1.5; }
+.faint { color: var(--ink-faint); font-size: 12px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.spread { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.btn { font-family: var(--body); font-weight: 600; font-size: 14px; border: none; border-radius: 10px; padding: 11px 14px; background: var(--accent); color: #06263a; cursor: pointer; }
+.btn.sec { background: var(--card2); color: var(--ink); border: 1px solid var(--line); }
+.btn.sm { padding: 7px 11px; font-size: 13px; }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; }
+input, select, textarea { font-family: var(--body); font-size: 15px; color: var(--ink); background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+textarea { min-height: 160px; resize: vertical; line-height: 1.5; }
+label { display:block; font-size:13px; font-weight:600; color: var(--ink-dim); margin: 10px 0 5px; }
+.pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.pill.pol { background: rgba(167,139,250,.16); color: var(--pol); }
+.pill.his { background: rgba(251,146,60,.16); color: var(--his); }
+.pill.bus { background: rgba(34,211,238,.16); color: var(--bus); }
+/* today plan items */
+.task { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--line); }
+.task:last-child { border-bottom: none; }
+.task .box { flex:0 0 22px; width:22px; height:22px; border:2px solid var(--line); border-radius:6px; margin-top:2px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; color: var(--bg); }
+.task.done .box { background: var(--green); border-color: var(--green); }
+.task.done .t-title { text-decoration: line-through; color: var(--ink-faint); }
+.t-title { font-weight:600; font-size:15px; }
+.t-meta { font-size:12px; color: var(--ink-dim); margin-top:2px; }
+.t-dur { flex:0 0 auto; font-size:12px; font-weight:700; color: var(--ink-dim); background: var(--bg2); border-radius:8px; padding:3px 8px; }
+/* rag confidence */
+.rag { display:flex; gap:5px; }
+.rag button { flex:1; height:30px; border-radius:7px; border:1px solid var(--line); background:var(--bg2); color:var(--ink-faint); font-weight:700; font-size:12px; cursor:pointer; }
+.rag button.on0 { background:var(--red); color:#3b0a0a; border-color:var(--red); }
+.rag button.on1 { background:var(--amber); color:#3b2a06; border-color:var(--amber); }
+.rag button.on2 { background:var(--green); color:#052e1c; border-color:var(--green); }
+.topic { padding:11px 0; border-bottom:1px solid var(--line); }
+.topic:last-child { border-bottom:none; }
+.progressbar { height:8px; border-radius:999px; background:var(--bg2); overflow:hidden; }
+.progressbar > span { display:block; height:100%; background:linear-gradient(90deg,var(--accent2),var(--green)); }
+.count { text-align:center; }
+.count .n { font-family:var(--head); font-size:30px; font-weight:700; }
+.count .l { font-size:12px; color:var(--ink-dim); }
+.count-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.tag { display:inline-block; font-size:12px; font-weight:600; padding:6px 10px; border-radius:999px; border:1px solid var(--line); background:var(--bg2); color:var(--ink-dim); cursor:pointer; margin:0 6px 6px 0; }
+.tag.on { background:var(--accent); color:#06263a; border-color:var(--accent); }
+.banner { font-size:12px; line-height:1.5; padding:10px 12px; border-radius:10px; background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.35); color:#fcd34d; }
+.marking-out { white-space:pre-wrap; font-size:14px; line-height:1.6; }
+.marking-out h3 { font-size:16px; margin:14px 0 4px; color:var(--accent); }
+/* bottom nav */
+nav { position:fixed; bottom:0; left:0; right:0; max-width:720px; margin:0 auto; background:rgba(15,23,42,.92); backdrop-filter:blur(10px); border-top:1px solid var(--line); display:flex; padding:6px 4px calc(6px + env(safe-area-inset-bottom)); }
+nav button { flex:1; background:none; border:none; color:var(--ink-faint); font-family:var(--body); font-size:10px; font-weight:600; padding:6px 2px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; }
+nav button.on { color:var(--accent); }
+nav .ic { font-size:19px; line-height:1; }
+.hidden { display:none; }
+.empty { text-align:center; color:var(--ink-faint); font-size:14px; padding:24px 12px; }
+.split2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+hr.sep { border:none; border-top:1px solid var(--line); margin:12px 0; }
+.tiny-link { background:none; border:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; padding:0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="date" id="hdrDate">—</div>
+  <h1 id="hdrTitle">Today</h1>
+  <div id="hdrPhase"></div>
+</header>
+
+<main id="app"><div class="wrap"><p class="muted">Loading…</p></div></main>
+
+<nav>
+  <button data-tab="today" class="on"><span class="ic">☀️</span>Today</button>
+  <button data-tab="subjects"><span class="ic">🗂️</span>Subjects</button>
+  <button data-tab="practice"><span class="ic">✍️</span>Practice</button>
+  <button data-tab="essays"><span class="ic">📝</span>Essays</button>
+  <button data-tab="progress"><span class="ic">📊</span>Progress</button>
+  <button data-tab="settings"><span class="ic">⚙️</span>More</button>
+</nav>
+
+<script>
+/* ============================================================================
+   REVISION PLANNER  —  offline PWA, vanilla JS, all state on-device.
+   Content maps are embedded (see CONTENT) so the app works fully offline and
+   the spec data stays editable in one place. Items flagged VERIFY in the plan
+   doc should be checked against a current past paper before relying on them.
+   ============================================================================ */
+
+/* ---------- 1. STATIC CONTENT: the three spec maps ---------- */
+const CONTENT = {
+  subjects: [
+    {
+      id: 'pol', name: 'Politics', board: 'AQA (7152)', cls: 'pol',
+      papers: [
+        { id: 'p1', name: 'Paper 1 — UK Government & Politics' },
+        { id: 'p2', name: 'Paper 2 — USA & Comparative' },
+        { id: 'p3', name: 'Paper 3 — Political Ideas' },
+      ],
+      topics: [
+        { id:'pol-constitution', paper:'p1', title:'The UK Constitution', ao:'AO1·AO2·AO3' },
+        { id:'pol-parliament', paper:'p1', title:'Parliament', ao:'AO1·AO2·AO3' },
+        { id:'pol-pm-exec', paper:'p1', title:'PM & the Executive', ao:'AO1·AO2·AO3' },
+        { id:'pol-branches', paper:'p1', title:'Relations between branches (judiciary, devolution)', ao:'AO1·AO2·AO3' },
+        { id:'pol-democracy', paper:'p1', title:'Democracy & Participation', ao:'AO1·AO2·AO3' },
+        { id:'pol-parties', paper:'p1', title:'Political Parties', ao:'AO1·AO2·AO3' },
+        { id:'pol-electoral', paper:'p1', title:'Electoral Systems', ao:'AO1·AO2·AO3' },
+        { id:'pol-voting', paper:'p1', title:'Voting Behaviour & the Media', ao:'AO1·AO2·AO3' },
+        { id:'pol-pressure', paper:'p1', title:'Pressure Groups', ao:'AO1·AO2·AO3' },
+        { id:'pol-us-constitution', paper:'p2', title:'US Constitution & Federalism', ao:'AO1·AO2·AO3' },
+        { id:'pol-congress', paper:'p2', title:'Congress', ao:'AO1·AO2·AO3' },
+        { id:'pol-presidency', paper:'p2', title:'The Presidency', ao:'AO1·AO2·AO3' },
+        { id:'pol-scotus', paper:'p2', title:'Supreme Court & Civil Rights (US)', ao:'AO1·AO2·AO3' },
+        { id:'pol-us-democracy', paper:'p2', title:'US Democracy & Participation', ao:'AO1·AO2·AO3' },
+        { id:'pol-comparative', paper:'p2', title:'Comparative theory (rational/cultural/structural)', ao:'AO2·AO3' },
+        { id:'pol-liberalism', paper:'p3', title:'Liberalism (+ thinkers)', ao:'AO1·AO2·AO3' },
+        { id:'pol-conservatism', paper:'p3', title:'Conservatism (+ thinkers)', ao:'AO1·AO2·AO3' },
+        { id:'pol-socialism', paper:'p3', title:'Socialism (+ thinkers)', ao:'AO1·AO2·AO3' },
+        { id:'pol-noncore', paper:'p3', title:'Non-core ideology (confirm which)', ao:'AO1·AO2·AO3' },
+      ],
+    },
+    {
+      id: 'his', name: 'History', board: 'AQA (7042)', cls: 'his',
+      papers: [
+        { id: 'c1', name: 'Component 1 — 1C The Tudors 1485–1603 (confirm)' },
+        { id: 'c2', name: 'Component 2 — 2N Russia 1917–1953' },
+        { id: 'nea', name: 'Component 3 — NEA (Civil Rights)' },
+      ],
+      topics: [
+        { id:'his-hvii-power', paper:'c1', title:'Henry VII: consolidation of power & rebellions', ao:'AO1' },
+        { id:'his-hvii-govt', paper:'c1', title:'Henry VII: government, economy, foreign policy', ao:'AO1' },
+        { id:'his-hviii', paper:'c1', title:'Henry VIII 1509–1547 (Wolsey, break with Rome, Cromwell)', ao:'AO1' },
+        { id:'his-edward', paper:'c1', title:'Edward VI & mid-Tudor crisis', ao:'AO1' },
+        { id:'his-mary', paper:'c1', title:'Mary I', ao:'AO1' },
+        { id:'his-elizabeth', paper:'c1', title:'Elizabeth I 1558–1603', ao:'AO1' },
+        { id:'his-interp', paper:'c1', title:'Interpretations technique (30-mark extracts)', ao:'AO3' },
+        { id:'his-1917', paper:'c2', title:'Feb & Oct 1917 revolutions', ao:'AO1' },
+        { id:'his-consolidation', paper:'c2', title:'Bolshevik consolidation & Civil War', ao:'AO1' },
+        { id:'his-warcommunism', paper:'c2', title:'War Communism, Red Terror & NEP', ao:'AO1' },
+        { id:'his-powerstruggle', paper:'c2', title:"Lenin's death & the power struggle", ao:'AO1' },
+        { id:'his-collectivisation', paper:'c2', title:'Collectivisation & the Five-Year Plans', ao:'AO1' },
+        { id:'his-terror', paper:'c2', title:'The Terror & the purges', ao:'AO1' },
+        { id:'his-ww2', paper:'c2', title:'The Great Patriotic War (WWII)', ao:'AO1' },
+        { id:'his-highstalinism', paper:'c2', title:'High Stalinism to 1953', ao:'AO1' },
+        { id:'his-source', paper:'c2', title:'Primary-source value technique (30-mark)', ao:'AO2' },
+        { id:'his-nea', paper:'nea', title:'Civil Rights NEA (see Practice → NEA tracker)', ao:'AO1·AO2·AO3' },
+      ],
+    },
+    {
+      id: 'bus', name: 'Business', board: 'Edexcel (9BS0)', cls: 'bus',
+      papers: [
+        { id: 'p1', name: 'Paper 1 — Marketing, people & global (Themes 1 & 4)' },
+        { id: 'p2', name: 'Paper 2 — Activities, decisions & strategy (Themes 2 & 3)' },
+        { id: 'p3', name: 'Paper 3 — Investigating business (synoptic + pre-release)' },
+      ],
+      topics: [
+        { id:'bus-t1-needs', paper:'p1', title:'T1.1–1.3 Meeting needs, the market, marketing mix', ao:'AO1·AO2·AO3·AO4' },
+        { id:'bus-t1-people', paper:'p1', title:'T1.4–1.5 Managing people; entrepreneurs & leaders', ao:'AO1·AO2·AO3·AO4' },
+        { id:'bus-t4-global', paper:'p1', title:'T4 Global business (globalisation, MNCs, global marketing)', ao:'AO1·AO2·AO3·AO4' },
+        { id:'bus-t2-finance', paper:'p2', title:'T2.1–2.3 Raising finance, planning, managing finance', ao:'AO1·AO2·AO3·AO4' },
+        { id:'bus-t2-ops', paper:'p2', title:'T2.4–2.5 Resource management & external influences', ao:'AO1·AO2·AO3·AO4' },
+        { id:'bus-t3-strategy', paper:'p2', title:'T3.1–3.3 Objectives, growth, decision-making techniques', ao:'AO1·AO2·AO3·AO4' },
+        { id:'bus-t3-competitive', paper:'p2', title:'T3.4–3.6 Influences, competitiveness, managing change', ao:'AO1·AO2·AO3·AO4' },
+        { id:'bus-quant', paper:'p2', title:'Quantitative skills (ratios, investment appraisal, break-even, decision trees)', ao:'AO2·AO3·AO4' },
+        { id:'bus-prerelease', paper:'p3', title:'Paper 3 pre-release context research (confirm 2027 industry)', ao:'AO1·AO2·AO3·AO4' },
+      ],
+    },
+  ],
+  // Mark-scheme rubrics used by the essay marker. Descriptors are top-band anchors.
+  rubrics: {
+    'pol-25-essay': { name:'Politics — 25-mark essay', max:25, ao:'AO1 5 / AO2 10 / AO3 10',
+      top:'Level 5 (21–25): balanced, confidently developed analysis; sustained evaluation throughout; precise current examples; a substantiated judgement signposted early and consistent with the argument.' },
+    'pol-25-extract': { name:'Politics — 25-mark extract/source', max:25, ao:'AO1 5 / AO2 10 / AO3 10',
+      top:'Level 5 (21–25): engages directly with the extract’s arguments, evaluates its perspectives, balanced and developed, well-substantiated judgement.' },
+    'pol-9': { name:'Politics — 9-mark explain & analyse', max:9, ao:'AO1 6 / AO2 3',
+      top:'Three developed, accurate, analytical points — knowledge applied and explained, no evaluation required.' },
+    'his-25-essay': { name:'History — 25-mark essay', max:25, ao:'AO1',
+      top:'Level 5 (21–25): fully analytical, well-organised, well-selected precise support, balanced argument, well-substantiated judgement addressing the full demands of the question.' },
+    'his-30-interp': { name:'History — 30-mark interpretations (3 extracts)', max:30, ao:'AO3',
+      top:'Level 5 (25–30): very good understanding of all three interpretations combined with strong contextual knowledge to analyse and evaluate them.' },
+    'his-30-source': { name:'History — 30-mark primary sources (value)', max:30, ao:'AO2',
+      top:'Level 5 (25–30): all three sources evaluated for content AND provenance, strong context, balanced judgement on their value for the stated purpose.' },
+    'bus-12': { name:'Business — 12-mark evaluation', max:12, ao:'AO1/AO2/AO3/AO4',
+      top:'Top level: applied knowledge, balanced developed analysis, supported judgement justified with fresh evaluative reasoning (MOPS: Market/Objectives/Product/Situation).' },
+    'bus-20': { name:'Business — 20-mark evaluation', max:20, ao:'AO1/AO2/AO3/AO4',
+      top:'Level 4 (17–20): sustained application to the specific business, balanced fully-developed analysis (fewer, deeper chains), judgement adding new reasoning via MOPS and short- vs long-term.' },
+  },
+};
+
+/* ---------- 2. STATE (localStorage) ---------- */
+const LS_KEY = 'revision-planner-state-v1';
+const defaultSettings = {
+  capWeekday: 180,   // minutes on a school day
+  capWeekend: 300,   // minutes on weekend / holiday
+  model: 'claude-sonnet-5',
+  apiKey: '',
+  exams: {
+    mockOct: '2026-10-13',
+    mockFeb: '2027-02-23',
+    finals:  '2027-05-18',  // approximate start of the exam window — EDIT when timetable is published
+  },
+};
+let STATE = load();
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_KEY));
+    if (s && s.settings) { s.settings = Object.assign({}, defaultSettings, s.settings);
+      s.settings.exams = Object.assign({}, defaultSettings.exams, s.settings.exams); return s; }
+  } catch (e) {}
+  return { settings: structuredClone(defaultSettings), topics: {}, practice: [], essays: [], plan: {}, nea: {} };
+}
+function save() { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); }
+function topicState(id) {
+  if (!STATE.topics[id]) STATE.topics[id] = { confidence: null, lastReviewed: null, intervalIdx: 0, nextReview: null };
+  return STATE.topics[id];
+}
+
+/* ---------- 3. DATES & SPACING ---------- */
+const INTERVALS = [1, 3, 7, 14, 30, 60]; // days; doubles beyond the last
+const DAY = 86400000;
+function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function iso(d) { return new Date(d).toISOString().slice(0,10); }
+function daysBetween(a, b) { return Math.round((new Date(b) - new Date(a)) / DAY); }
+function fmtDate(d) { return new Date(d).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' }); }
+function intervalFor(ts) {
+  // Low confidence shortens the interval; high confidence lengthens it.
+  let idx = ts.intervalIdx || 0;
+  let base = idx < INTERVALS.length ? INTERVALS[idx] : INTERVALS[INTERVALS.length-1] * Math.pow(2, idx - INTERVALS.length + 1);
+  if (ts.confidence === 0) base = Math.max(1, Math.round(base * 0.4));
+  else if (ts.confidence === 1) base = Math.max(1, Math.round(base * 0.7));
+  return base;
+}
+function markReviewed(id, wentWell) {
+  const ts = topicState(id);
+  ts.lastReviewed = iso(today());
+  ts.intervalIdx = wentWell ? (ts.intervalIdx || 0) + 1 : Math.max(0, (ts.intervalIdx || 0) - 1);
+  ts.nextReview = iso(new Date(+today() + intervalFor(ts) * DAY));
+  save();
+}
+
+/* ---------- 4. MILESTONE PHASE ---------- */
+function phaseFor(date) {
+  const e = STATE.settings.exams;
+  const t = +new Date(date);
+  if (t < +new Date(e.mockOct)) return { key:'learn', label:'Foundation phase → Oct mocks', mix:{ learn:0.6, practice:0.25, review:0.15 } };
+  if (t < +new Date(e.mockFeb)) return { key:'consolidate', label:'Consolidation → Feb mocks', mix:{ learn:0.3, practice:0.4, review:0.3 } };
+  if (t < +new Date(e.finals))  return { key:'peak', label:'Peak phase → summer exams', mix:{ learn:0.1, practice:0.55, review:0.35 } };
+  return { key:'exams', label:'Exam period — final reviews', mix:{ learn:0, practice:0.5, review:0.5 } };
+}
+
+/* ---------- 5. DAILY PLAN BUILDER ---------- */
+const ACTIVITIES = {
+  learn:    { label:'Learn / first-pass notes + brain-dump', mins:35 },
+  review:   { label:'Retrieval quiz (from memory)', mins:12 },
+  practice: { label:'Past-paper question', mins:22 },
+  essay:    { label:'Timed essay + self-mark', mins:40 },
+};
+function allTopics() {
+  const out = [];
+  CONTENT.subjects.forEach(s => s.topics.forEach(t => { if (t.id !== 'his-nea') out.push({ ...t, subject:s.id, subjectName:s.name, cls:s.cls }); }));
+  return out;
+}
+function priority(t) {
+  const ts = topicState(t.id);
+  let p = 0;
+  if (ts.confidence === 0) p += 5; else if (ts.confidence === 1) p += 3; else if (ts.confidence === null) p += 2;
+  if (!ts.lastReviewed) p += 2;
+  if (ts.nextReview && ts.nextReview <= iso(today())) p += 3;         // due
+  if (ts.nextReview && ts.nextReview < iso(today())) p += 1;          // overdue
+  return p;
+}
+function buildPlan(dateKey) {
+  if (STATE.plan[dateKey]) return STATE.plan[dateKey];
+  const d = new Date(dateKey);
+  const isWeekend = [0,6].includes(d.getDay());
+  const cap = isWeekend ? STATE.settings.capWeekend : STATE.settings.capWeekday;
+  const phase = phaseFor(dateKey);
+  // Rank topics, then interleave across the three subjects (round-robin).
+  const ranked = allTopics().map(t => ({ t, p: priority(t) + Math.random()*0.5 })).sort((a,b) => b.p - a.p).map(x => x.t);
+  const bySub = { pol:[], his:[], bus:[] };
+  ranked.forEach(t => bySub[t.subject].push(t));
+  const order = [];
+  for (let i = 0; i < 12; i++) ['pol','his','bus'].forEach(s => { if (bySub[s][i]) order.push(bySub[s][i]); });
+  // Assign an activity type per slot from the phase mix, fill to capacity.
+  const items = []; let used = 0; let i = 0;
+  const pick = () => { const r = Math.random(); const m = phase.mix;
+    if (r < m.learn) return 'learn'; if (r < m.learn + m.practice) return (Math.random() < 0.35 ? 'essay' : 'practice'); return 'review'; };
+  while (used < cap && i < order.length) {
+    const t = order[i++]; const ts = topicState(t.id);
+    let type = pick();
+    if (ts.confidence === null && phase.key !== 'peak') type = 'learn'; // never practised → learn first
+    const act = ACTIVITIES[type];
+    if (used + act.mins > cap + 8) break;
+    items.push({ topicId:t.id, title:t.title, subject:t.subjectName, cls:t.cls, type, label:act.label, mins:act.mins, done:false });
+    used += act.mins;
+  }
+  const plan = { date:dateKey, cap, phase:phase.label, items, mins:used };
+  STATE.plan[dateKey] = plan; save();
+  return plan;
+}
+
+/* ---------- 6. RENDER ---------- */
+const app = document.getElementById('app');
+let TAB = 'today';
+function setHeader(title, phaseHtml) {
+  document.getElementById('hdrDate').textContent = fmtDate(today()).toUpperCase();
+  document.getElementById('hdrTitle').textContent = title;
+  document.getElementById('hdrPhase').innerHTML = phaseHtml || '';
+}
+function render() {
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === TAB));
+  ({ today:renderToday, subjects:renderSubjects, practice:renderPractice, essays:renderEssays, progress:renderProgress, settings:renderSettings }[TAB])();
+}
+
+/* --- Today --- */
+function renderToday() {
+  const key = iso(today());
+  const plan = buildPlan(key);
+  setHeader('Today', `<span class="phase-chip">${plan.phase}</span>`);
+  const doneCount = plan.items.filter(i => i.done).length;
+  const pct = plan.items.length ? Math.round(doneCount / plan.items.length * 100) : 0;
+  let h = `<div class="wrap">`;
+  h += `<div class="card"><div class="spread"><div><h2>${doneCount}/${plan.items.length} done · ${plan.mins} min planned</h2>
+        <div class="muted">Short, interleaved blocks across your three subjects. Tick as you go.</div></div></div>
+        <div class="progressbar" style="margin-top:10px"><span style="width:${pct}%"></span></div></div>`;
+  if (!plan.items.length) { h += `<div class="empty">No topics due — enjoy a lighter day, or set some confidence ratings in Subjects.</div>`; }
+  h += `<div class="card">`;
+  plan.items.forEach((it, idx) => {
+    h += `<div class="task ${it.done?'done':''}" data-i="${idx}">
+      <div class="box tbox">${it.done?'✓':''}</div>
+      <div style="flex:1">
+        <div class="t-title">${it.label}</div>
+        <div class="t-meta"><span class="pill ${it.cls}">${it.subject}</span> &nbsp;${it.title}</div>
+      </div>
+      <div class="t-dur">${it.mins}m</div>
+    </div>`;
+  });
+  h += `</div>`;
+  h += `<button class="tiny-link" id="regen">↻ Regenerate today's plan</button>`;
+  h += `</div>`;
+  app.innerHTML = h;
+  app.querySelectorAll('.task').forEach(el => el.querySelector('.tbox').onclick = () => {
+    const i = +el.dataset.i; const it = plan.items[i]; it.done = !it.done;
+    if (it.done && (it.type === 'review' || it.type === 'practice' || it.type === 'essay')) markReviewed(it.topicId, true);
+    save(); renderToday();
+  });
+  document.getElementById('regen').onclick = () => { delete STATE.plan[key]; save(); renderToday(); };
+}
+
+/* --- Subjects --- */
+function renderSubjects() {
+  setHeader('Subjects', '');
+  let h = `<div class="wrap"><p class="muted" style="margin-bottom:12px">Rate how confident you feel on each topic — Red / Amber / Green. Ratings drive what the daily planner surfaces first.</p>`;
+  CONTENT.subjects.forEach(s => {
+    const rated = s.topics.filter(t => topicState(t.id).confidence !== null);
+    const greens = s.topics.filter(t => topicState(t.id).confidence === 2).length;
+    const pct = Math.round(greens / s.topics.length * 100);
+    h += `<div class="card"><div class="spread"><div><h2><span class="pill ${s.cls}">${s.name}</span> <span class="faint">${s.board}</span></h2></div>
+          <div class="faint">${greens}/${s.topics.length} green</div></div>
+          <div class="progressbar" style="margin:8px 0 4px"><span style="width:${pct}%"></span></div>`;
+    s.papers.forEach(p => {
+      const ts = s.topics.filter(t => t.paper === p.id);
+      if (!ts.length) return;
+      h += `<div style="margin-top:10px" class="faint">${p.name}</div>`;
+      ts.forEach(t => {
+        const c = topicState(t.id).confidence;
+        h += `<div class="topic"><div style="margin-bottom:6px" class="t-title" style="font-size:14px">${t.title} <span class="faint">· ${t.ao}</span></div>
+          <div class="rag" data-topic="${t.id}">
+            <button data-c="0" class="${c===0?'on0':''}">Red</button>
+            <button data-c="1" class="${c===1?'on1':''}">Amber</button>
+            <button data-c="2" class="${c===2?'on2':''}">Green</button>
+          </div></div>`;
+      });
+    });
+    h += `</div>`;
+  });
+  h += `</div>`;
+  app.innerHTML = h;
+  app.querySelectorAll('.rag').forEach(rag => rag.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const ts = topicState(rag.dataset.topic);
+    const c = +b.dataset.c;
+    ts.confidence = ts.confidence === c ? null : c;
+    if (ts.nextReview == null) { ts.nextReview = iso(new Date(+today() + intervalFor(ts)*DAY)); }
+    save(); renderSubjects();
+  }));
+}
+
+/* --- Practice log + NEA tracker --- */
+const LOST_CAUSES = ['Content gap','Misread question','Timing','Weak structure','Avoidable slip'];
+const NEA_STEPS = [
+  'Frame the question (≈100-year span, distinct from Comp 1 & 2)',
+  'Gather ≥3 primary sources to evaluate',
+  'Read differing historian interpretations',
+  'Plan the line of argument & judgement',
+  'First draft (3,500–4,500 words)',
+  'Redraft with feedback',
+  'Final proofread, footnotes & bibliography',
+];
+function renderPractice() {
+  setHeader('Practice', '');
+  let h = `<div class="wrap">`;
+  // Log form
+  h += `<div class="card"><h2>Log a past-paper attempt</h2>
+    <label>Subject</label><select id="pfSub">${CONTENT.subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
+    <div class="split2"><div><label>Marks scored</label><input id="pfGot" type="number" inputmode="numeric" placeholder="e.g. 17"></div>
+      <div><label>Out of</label><input id="pfMax" type="number" inputmode="numeric" placeholder="e.g. 25"></div></div>
+    <div class="split2"><div><label>Timed?</label><select id="pfTimed"><option value="no">Untimed</option><option value="yes">Timed</option><option value="full">Full paper</option></select></div>
+      <div><label>Question type</label><input id="pfType" placeholder="e.g. 25-mark essay"></div></div>
+    <label>Where did marks go? (tap all that apply)</label>
+    <div id="pfCauses">${LOST_CAUSES.map(c=>`<span class="tag" data-c="${c}">${c}</span>`).join('')}</div>
+    <button class="btn" id="pfSave" style="margin-top:12px">Save attempt</button></div>`;
+  // Recent log
+  h += `<div class="card"><h2>Recent attempts</h2>`;
+  if (!STATE.practice.length) h += `<div class="empty">No attempts logged yet.</div>`;
+  else STATE.practice.slice().reverse().slice(0,12).forEach(p => {
+    const s = CONTENT.subjects.find(x=>x.id===p.sub);
+    const pct = p.max ? Math.round(p.got/p.max*100) : 0;
+    h += `<div class="topic"><div class="spread"><div><span class="pill ${s?.cls||''}">${s?.name||p.sub}</span> <b>${p.got}/${p.max}</b> <span class="faint">(${pct}%) · ${p.type||''} · ${p.timed}</span></div>
+          <div class="faint">${p.date}</div></div>${p.causes?.length?`<div class="faint" style="margin-top:4px">Lost: ${p.causes.join(', ')}</div>`:''}</div>`;
+  });
+  h += `</div>`;
+  // NEA tracker
+  h += `<div class="card"><h2>📜 History NEA — Civil Rights tracker</h2><div class="muted" style="margin-bottom:8px">Coursework worth 20%. Tick milestones as you complete them.</div>`;
+  NEA_STEPS.forEach((step,i) => {
+    const done = STATE.nea[i];
+    h += `<div class="task ${done?'done':''}" data-nea="${i}"><div class="box nbox">${done?'✓':''}</div><div style="flex:1"><div class="t-title" style="font-size:14px">${step}</div></div></div>`;
+  });
+  h += `</div></div>`;
+  app.innerHTML = h;
+  // causes toggles
+  const chosen = new Set();
+  app.querySelectorAll('#pfCauses .tag').forEach(t => t.onclick = () => { t.classList.toggle('on'); chosen.has(t.dataset.c)?chosen.delete(t.dataset.c):chosen.add(t.dataset.c); });
+  document.getElementById('pfSave').onclick = () => {
+    const got = +document.getElementById('pfGot').value, max = +document.getElementById('pfMax').value;
+    if (!max) { alert('Enter the total marks.'); return; }
+    STATE.practice.push({ date: iso(today()), sub: document.getElementById('pfSub').value, got, max,
+      timed: document.getElementById('pfTimed').value, type: document.getElementById('pfType').value, causes:[...chosen] });
+    save(); renderPractice();
+  };
+  app.querySelectorAll('[data-nea]').forEach(el => el.querySelector('.nbox').onclick = () => { const i = el.dataset.nea; STATE.nea[i] = !STATE.nea[i]; save(); renderPractice(); });
+}
+
+/* --- Essays: LLM marking --- */
+function renderEssays() {
+  setHeader('Essay marking', '');
+  const opts = Object.entries(CONTENT.rubrics).map(([k,r])=>`<option value="${k}">${r.name}</option>`).join('');
+  let h = `<div class="wrap">
+    <div class="banner">⚠️ This is an <b>unofficial approximation</b> to help you improve — not a predicted or official grade. Always cross-check with your teacher and the real mark scheme.</div>
+    <div class="card" style="margin-top:12px">
+      <label>Question type</label><select id="esType">${opts}</select>
+      <label>The exam question (paste it)</label><textarea id="esQ" style="min-height:70px" placeholder="e.g. 'Analyse and evaluate the view that…'"></textarea>
+      <label>Your answer</label><textarea id="esA" placeholder="Paste your essay here…"></textarea>
+      <button class="btn" id="esGo" style="margin-top:12px">Mark my answer</button>
+      <div id="esKeyWarn"></div>
+    </div>
+    <div id="esOut"></div>`;
+  h += `<div class="card"><h2>Past feedback</h2>`;
+  if (!STATE.essays.length) h += `<div class="empty">Marked essays will be saved here so you can track improvement.</div>`;
+  else STATE.essays.slice().reverse().slice(0,8).forEach(e => {
+    h += `<div class="topic"><div class="spread"><div><b>${CONTENT.rubrics[e.type]?.name||e.type}</b></div><div class="faint">${e.date}</div></div>
+          <div class="muted" style="margin-top:4px">${e.summary||''}</div></div>`;
+  });
+  h += `</div></div>`;
+  app.innerHTML = h;
+  if (!STATE.settings.apiKey) document.getElementById('esKeyWarn').innerHTML =
+    `<div class="faint" style="margin-top:8px">No API key set. Add one under <b>More → Essay marking</b> to enable feedback.</div>`;
+  document.getElementById('esGo').onclick = markEssay;
+}
+async function markEssay() {
+  const type = document.getElementById('esType').value;
+  const q = document.getElementById('esQ').value.trim();
+  const a = document.getElementById('esA').value.trim();
+  const out = document.getElementById('esOut');
+  if (!a) { alert('Paste your answer first.'); return; }
+  if (!STATE.settings.apiKey) { alert('Add your Anthropic API key under More → Essay marking.'); return; }
+  const r = CONTENT.rubrics[type];
+  out.innerHTML = `<div class="card"><div class="muted">Marking… this can take 15–30 seconds.</div></div>`;
+  const prompt =
+`You are an experienced ${r.name.split('—')[0].trim()} A-level examiner. Mark the student answer using the official levels-of-response approach: read holistically, place the level by best-fit working up from the bottom, then choose a mark within that level's range.
+
+QUESTION TYPE: ${r.name} (max ${r.max} marks). Assessment objectives: ${r.ao}.
+TOP-BAND DESCRIPTOR: ${r.top}
+Treat any indicative content as illustrative, NOT a checklist — do not penalise valid alternative content or reward keyword-stuffing.
+
+EXAM QUESTION: ${q || '(not supplied — infer from the answer)'}
+
+STUDENT ANSWER:
+"""${a}"""
+
+Respond in this exact structure with markdown headings:
+### Level & mark
+State the level and a specific mark out of ${r.max}, with one sentence of justification.
+### AO-by-AO feedback
+For each assessment objective in "${r.ao}", say what was and wasn't evidenced.
+### Three things to improve
+Three concrete, actionable fixes tied to the mark scheme (e.g. "your judgement isn't substantiated — add a criterion for why X outweighs Y").
+### One-line summary
+A single sentence the student can remember.
+
+End by reminding them this is an approximation, not an official mark.`;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'content-type':'application/json', 'x-api-key': STATE.settings.apiKey,
+        'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+      body: JSON.stringify({ model: STATE.settings.model, max_tokens: 1200, messages:[{ role:'user', content: prompt }] }),
+    });
+    if (!res.ok) { const t = await res.text(); throw new Error(`API ${res.status}: ${t.slice(0,300)}`); }
+    const data = await res.json();
+    const text = (data.content || []).map(c => c.text || '').join('\n');
+    out.innerHTML = `<div class="card marking-out">${mdLite(text)}</div>`;
+    const sumMatch = text.split(/one-?line summary/i)[1] || '';
+    STATE.essays.push({ date: iso(today()), type, summary: sumMatch.replace(/^[:\s#*-]+/,'').split('\n')[0].slice(0,160) });
+    save();
+  } catch (e) {
+    out.innerHTML = `<div class="card"><div class="banner">Couldn't get feedback: ${e.message}</div>
+      <div class="faint" style="margin-top:8px">Check your API key and network. Note: calling Anthropic directly from a browser needs a key that permits it.</div></div>`;
+  }
+}
+function mdLite(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.*)$/gm,'<h3>$1</h3>').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+}
+
+/* --- Progress --- */
+function renderProgress() {
+  setHeader('Progress', '');
+  const e = STATE.settings.exams; const t0 = today();
+  const cd = (d) => Math.max(0, daysBetween(t0, d));
+  let h = `<div class="wrap"><div class="card"><h2>Countdown</h2><div class="count-grid" style="margin-top:10px">
+    <div class="count"><div class="n">${cd(e.mockOct)}</div><div class="l">days to Oct mocks</div></div>
+    <div class="count"><div class="n">${cd(e.mockFeb)}</div><div class="l">days to Feb mocks</div></div>
+    <div class="count"><div class="n">${cd(e.finals)}</div><div class="l">days to finals</div></div>
+  </div></div>`;
+  // confidence overview
+  CONTENT.subjects.forEach(s => {
+    const cs = s.topics.map(t => topicState(t.id).confidence);
+    const g = cs.filter(c=>c===2).length, a = cs.filter(c=>c===1).length, r = cs.filter(c=>c===0).length, n = cs.filter(c=>c===null).length;
+    const pct = Math.round(g/s.topics.length*100);
+    h += `<div class="card"><div class="spread"><h2><span class="pill ${s.cls}">${s.name}</span></h2><div class="faint">${pct}% green</div></div>
+      <div class="progressbar" style="margin:8px 0"><span style="width:${pct}%"></span></div>
+      <div class="faint">🟢 ${g} secure · 🟡 ${a} shaky · 🔴 ${r} weak · ⚪ ${n} not rated</div>`;
+    // weakest topics
+    const weak = s.topics.filter(t=>[0,1].includes(topicState(t.id).confidence)).slice(0,3);
+    if (weak.length) h += `<div class="faint" style="margin-top:6px">Focus next: ${weak.map(w=>w.title).join(' · ')}</div>`;
+    h += `</div>`;
+  });
+  // practice trend
+  h += `<div class="card"><h2>Practice</h2>`;
+  if (!STATE.practice.length) h += `<div class="empty">Log past-paper attempts to see your average.</div>`;
+  else { const avg = Math.round(STATE.practice.reduce((s,p)=>s+(p.got/p.max),0)/STATE.practice.length*100);
+    h += `<div class="muted">${STATE.practice.length} attempts logged · average <b>${avg}%</b></div>`; }
+  h += `</div></div>`;
+  app.innerHTML = h;
+}
+
+/* --- Settings --- */
+function renderSettings() {
+  setHeader('More', '');
+  const s = STATE.settings;
+  let h = `<div class="wrap">
+    <div class="card"><h2>Daily capacity</h2><div class="muted">How many minutes can he realistically focus? (Evidence says ~3–4h school days, more in holidays — quality over quantity.)</div>
+      <div class="split2"><div><label>School day (min)</label><input id="stWd" type="number" value="${s.capWeekday}"></div>
+        <div><label>Weekend/holiday (min)</label><input id="stWe" type="number" value="${s.capWeekend}"></div></div></div>
+    <div class="card"><h2>Exam dates</h2><div class="muted">Edit when the real timetable is published. Finals date is an estimate.</div>
+      <label>October mocks</label><input id="stOct" type="date" value="${s.exams.mockOct}">
+      <label>February mocks</label><input id="stFeb" type="date" value="${s.exams.mockFeb}">
+      <label>Summer finals (start)</label><input id="stFin" type="date" value="${s.exams.finals}"></div>
+    <div class="card"><h2>Essay marking</h2>
+      <div class="banner">Your key is stored only on this device (localStorage) and sent directly to Anthropic. Never commit it.</div>
+      <label>Anthropic API key</label><input id="stKey" type="password" placeholder="sk-ant-…" value="${s.apiKey}">
+      <label>Model</label><input id="stModel" value="${s.model}"></div>
+    <div class="card"><h2>Data</h2><div class="muted">Everything lives on this device. Back it up here.</div>
+      <div class="split2" style="margin-top:10px"><button class="btn sec" id="stExport">Export backup</button><button class="btn sec" id="stImport">Import backup</button></div>
+      <button class="tiny-link" id="stReset" style="margin-top:14px;color:var(--red)">Reset all data</button></div>
+    <div class="card"><h2>About the plan</h2><div class="muted">Built from the AQA/Edexcel specs and evidence-based revision science. History assumes Component 1 = <b>1C The Tudors</b> — confirm this. Business Paper 3 pre-release industry for 2027 needs confirming when published. See <b>REVISION_PLANNER_PLAN.md</b> in the repo.</div></div>
+  </div>`;
+  app.innerHTML = h;
+  const bind = (id, fn) => document.getElementById(id).onchange = fn;
+  bind('stWd', e => { s.capWeekday = +e.target.value; save(); });
+  bind('stWe', e => { s.capWeekend = +e.target.value; save(); });
+  bind('stOct', e => { s.exams.mockOct = e.target.value; save(); });
+  bind('stFeb', e => { s.exams.mockFeb = e.target.value; save(); });
+  bind('stFin', e => { s.exams.finals = e.target.value; save(); });
+  bind('stKey', e => { s.apiKey = e.target.value.trim(); save(); });
+  bind('stModel', e => { s.model = e.target.value.trim(); save(); });
+  document.getElementById('stExport').onclick = () => {
+    const blob = new Blob([JSON.stringify(STATE,null,2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = 'revision-backup.json'; a.click(); URL.revokeObjectURL(url);
+  };
+  document.getElementById('stImport').onclick = () => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
+    inp.onchange = () => { const f = inp.files[0]; const rd = new FileReader();
+      rd.onload = () => { try { STATE = JSON.parse(rd.result); save(); alert('Restored.'); render(); } catch(e){ alert('Bad file.'); } }; rd.readAsText(f); };
+    inp.click();
+  };
+  document.getElementById('stReset').onclick = () => { if (confirm('Erase all data on this device?')) { localStorage.removeItem(LS_KEY); STATE = load(); render(); } };
+}
+
+/* ---------- 7. NAV + BOOT ---------- */
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => { TAB = b.dataset.tab; window.scrollTo(0,0); render(); });
+render();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
