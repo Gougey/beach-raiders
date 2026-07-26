@@ -279,7 +279,9 @@ const defaultSettings = {
   capWeekday: 60,    // minutes on a school day (his realistic baseline)
   capWeekend: 60,    // minutes on weekend / holiday — raise this in Settings when ready
   model: 'claude-sonnet-5',
-  apiKey: '',
+  proxyUrl: '',      // preferred: hosted marking proxy (no key on device)
+  proxyToken: '',    // optional shared token for the proxy
+  apiKey: '',        // fallback: personal on-device Anthropic key
   exams: {
     mockOct: '2026-10-13',
     mockFeb: '2027-02-23',
@@ -624,8 +626,8 @@ function renderEssays() {
     pendingEssay = null;
     document.getElementById('esA').focus();
   }
-  if (!STATE.settings.apiKey) document.getElementById('esKeyWarn').innerHTML =
-    `<div class="faint" style="margin-top:8px">No API key set. Add one under <b>More → Essay marking</b> to enable feedback.</div>`;
+  if (!STATE.settings.proxyUrl && !STATE.settings.apiKey) document.getElementById('esKeyWarn').innerHTML =
+    `<div class="faint" style="margin-top:8px">Marking isn't set up yet — add a proxy URL (or a personal key) under <b>More → Marking service</b>.</div>`;
   document.getElementById('esGo').onclick = markEssay;
 }
 async function markEssay() {
@@ -633,8 +635,9 @@ async function markEssay() {
   const q = document.getElementById('esQ').value.trim();
   const a = document.getElementById('esA').value.trim();
   const out = document.getElementById('esOut');
+  const s = STATE.settings;
   if (!a) { alert('Paste your answer first.'); return; }
-  if (!STATE.settings.apiKey) { alert('Add your Anthropic API key under More → Essay marking.'); return; }
+  if (!s.proxyUrl && !s.apiKey) { alert('Set up marking under More → Marking service (a proxy URL, or a personal API key).'); return; }
   const r = CONTENT.rubrics[type];
   out.innerHTML = `<div class="card"><div class="muted">Marking… this can take 15–30 seconds.</div></div>`;
   const prompt =
@@ -660,14 +663,24 @@ Three concrete, actionable fixes tied to the mark scheme (e.g. "your judgement i
 A single sentence the student can remember.
 
 End by reminding them this is an approximation, not an official mark.`;
+  const payload = { model: s.model, max_tokens: 1200, messages:[{ role:'user', content: prompt }] };
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{ 'content-type':'application/json', 'x-api-key': STATE.settings.apiKey,
-        'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-      body: JSON.stringify({ model: STATE.settings.model, max_tokens: 1200, messages:[{ role:'user', content: prompt }] }),
-    });
-    if (!res.ok) { const t = await res.text(); throw new Error(`API ${res.status}: ${t.slice(0,300)}`); }
+    let res;
+    if (s.proxyUrl) {
+      // Preferred: hosted proxy holds the key. Nothing sensitive leaves the device.
+      const headers = { 'content-type':'application/json' };
+      if (s.proxyToken) headers['x-access-token'] = s.proxyToken;
+      res = await fetch(s.proxyUrl, { method:'POST', headers, body: JSON.stringify(payload) });
+    } else {
+      // Fallback: personal on-device key called directly.
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST',
+        headers:{ 'content-type':'application/json', 'x-api-key': s.apiKey,
+          'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+        body: JSON.stringify(payload),
+      });
+    }
+    if (!res.ok) { const t = await res.text(); throw new Error(`${res.status}: ${t.slice(0,300)}`); }
     const data = await res.json();
     const text = (data.content || []).map(c => c.text || '').join('\n');
     out.innerHTML = `<div class="card marking-out">${mdLite(text)}</div>`;
@@ -676,7 +689,7 @@ End by reminding them this is an approximation, not an official mark.`;
     save();
   } catch (e) {
     out.innerHTML = `<div class="card"><div class="banner">Couldn't get feedback: ${e.message}</div>
-      <div class="faint" style="margin-top:8px">Check your API key and network. Note: calling Anthropic directly from a browser needs a key that permits it.</div></div>`;
+      <div class="faint" style="margin-top:8px">${s.proxyUrl ? 'Check the proxy URL/token (More → Marking service) and the Worker logs in Cloudflare.' : 'Check your API key and network.'}</div></div>`;
   }
 }
 function mdLite(t) {
@@ -728,10 +741,15 @@ function renderSettings() {
       <label>October mocks</label><input id="stOct" type="date" value="${s.exams.mockOct}">
       <label>February mocks</label><input id="stFeb" type="date" value="${s.exams.mockFeb}">
       <label>Summer finals (start)</label><input id="stFin" type="date" value="${s.exams.finals}"></div>
-    <div class="card"><h2>Essay marking</h2>
-      <div class="banner">Your key is stored only on this device (localStorage) and sent directly to Anthropic. Never commit it.</div>
-      <label>Anthropic API key</label><input id="stKey" type="password" placeholder="sk-ant-…" value="${s.apiKey}">
-      <label>Model</label><input id="stModel" value="${s.model}"></div>
+    <div class="card"><h2>Marking service</h2>
+      <div class="muted" style="margin-bottom:6px"><b>Recommended:</b> a hosted proxy so nobody enters an API key on this device. Set it up once (≈3 min, free) — see <b>revision/proxy/README.md</b> in the repo.</div>
+      <label>Proxy URL</label><input id="stProxy" placeholder="https://…​.workers.dev" value="${s.proxyUrl}">
+      <label>Proxy access token (optional)</label><input id="stProxyTok" type="password" placeholder="the ACCESS_TOKEN you set" value="${s.proxyToken}">
+      <hr class="sep">
+      <div class="faint">Or, as a fallback, a personal Anthropic key stored only on this device:</div>
+      <label>Anthropic API key (fallback)</label><input id="stKey" type="password" placeholder="sk-ant-…" value="${s.apiKey}">
+      <label>Model</label><input id="stModel" value="${s.model}">
+      <div class="faint" style="margin-top:6px">${s.proxyUrl ? '✅ Using the proxy — no key needed on this device.' : (s.apiKey ? 'Using the on-device key.' : 'Not set up yet.')}</div></div>
     <div class="card"><h2>Data</h2><div class="muted">Everything lives on this device. Back it up here.</div>
       <div class="split2" style="margin-top:10px"><button class="btn sec" id="stExport">Export backup</button><button class="btn sec" id="stImport">Import backup</button></div>
       <button class="tiny-link" id="stReset" style="margin-top:14px;color:var(--red)">Reset all data</button></div>
@@ -744,6 +762,8 @@ function renderSettings() {
   bind('stOct', e => { s.exams.mockOct = e.target.value; save(); });
   bind('stFeb', e => { s.exams.mockFeb = e.target.value; save(); });
   bind('stFin', e => { s.exams.finals = e.target.value; save(); });
+  bind('stProxy', e => { s.proxyUrl = e.target.value.trim(); save(); });
+  bind('stProxyTok', e => { s.proxyToken = e.target.value.trim(); save(); });
   bind('stKey', e => { s.apiKey = e.target.value.trim(); save(); });
   bind('stModel', e => { s.model = e.target.value.trim(); save(); });
   document.getElementById('stExport').onclick = () => {

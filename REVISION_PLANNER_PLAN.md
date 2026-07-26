@@ -146,7 +146,7 @@ I'd suggest we build **Phase 0–2 first** (a genuinely useful daily planner) so
 ## 8. Open decisions (need your call before/at build)
 
 1. **History** — ✅ confirmed from his course sheet: **1H Russia 1855–1964** (breadth) + **2B Wars of the Roses 1450–1499** (depth) + **Civil Rights** NEA. App maps updated to match.
-2. **Essay marking backend** — **(a) bring‑your‑own Anthropic API key** stored on his device (recommended: private, no server, ~pennies per essay) **vs (b)** a small hosted proxy we run **vs (c)** ship without marking in v1 and add later.
+2. **Essay marking backend** — ✅ **built as a hosted proxy** (Cloudflare Worker in `revision/proxy/`): the Anthropic key lives as a server‑side secret, the app calls the proxy, and the student enters nothing. A personal on‑device key remains as a fallback. One‑time setup in `revision/proxy/README.md`.
 3. **Where to host** — the game is a static PWA; we can deploy `revision/` the same way (e.g. GitHub Pages / any static host) so he installs it on his phone. Confirm the host.
 4. **Question bank seeding** — I'll seed spec‑derived questions, but real past‑paper questions/mark schemes give the best practice. Can he/you supply his past‑paper PDFs to load in?
 
