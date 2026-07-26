@@ -115,7 +115,9 @@ revision/                     # new folder in this repo (keeps the game untouche
 
 **F. Progress & milestone view** — countdowns to Oct mocks / Feb mocks / May–June finals; per‑paper readiness; weakest topics surfaced; mocks logged as checkpoints that **re‑weight** the plan.
 
-**G. NEA tracker** — the Civil Rights coursework as its own checklist (question framing, ~100‑year span, ≥3 primary sources, historian interpretations, draft/redraft, word count 3,500–4,500) with internal deadlines.
+**G. NEA tracker** — the Civil Rights coursework as its own checklist (question framing, ~100‑year span, ≥3 primary sources, historian interpretations, draft/redraft, word count 3,500–4,000) with internal deadlines.
+
+**H. Notes Check (retention loop)** — at the end of a session he pastes the notes he made; the app checks them for **accuracy** (conservative — flags "check this" when unsure, never invents errors), **missing spec points**, and whether they're the **right type of notes** for how each subject is assessed, then gives a RAG score. Crucially it **auto‑generates 3–5 retrieval questions from his own notes** and folds them into the daily spaced‑review queue as flashcards, and nudges his topic confidence from the score. Surfaced both as an end‑of‑session prompt on Today and as its own tab; uses the same marking service (proxy/key).
 
 ---
 
