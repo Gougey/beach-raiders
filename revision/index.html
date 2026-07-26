@@ -229,8 +229,8 @@ const CONTENT = {
 /* ---------- 2. STATE (localStorage) ---------- */
 const LS_KEY = 'revision-planner-state-v1';
 const defaultSettings = {
-  capWeekday: 180,   // minutes on a school day
-  capWeekend: 300,   // minutes on weekend / holiday
+  capWeekday: 60,    // minutes on a school day (his realistic baseline)
+  capWeekend: 60,    // minutes on weekend / holiday — raise this in Settings when ready
   model: 'claude-sonnet-5',
   apiKey: '',
   exams: {
@@ -289,9 +289,9 @@ function phaseFor(date) {
 
 /* ---------- 5. DAILY PLAN BUILDER ---------- */
 const ACTIVITIES = {
-  learn:    { label:'Learn / first-pass notes + brain-dump', mins:35 },
-  review:   { label:'Retrieval quiz (from memory)', mins:12 },
-  practice: { label:'Past-paper question', mins:22 },
+  learn:    { label:'Learn / first-pass notes + brain-dump', mins:30 },
+  review:   { label:'Retrieval quiz (from memory)', mins:10 },
+  practice: { label:'Past-paper question', mins:20 },
   essay:    { label:'Timed essay + self-mark', mins:40 },
 };
 function allTopics() {
@@ -323,26 +323,30 @@ function buildPlan(dateKey) {
   if (mode === 'light') cap = Math.round(cap / 2);
   // Cap brand-new topics per day so learning stays consolidated, not crammed.
   const newBudget = { learn:3, consolidate:2, peak:1, exams:0 }[phase.key];
-  // Rank topics, then interleave across the three subjects (round-robin).
-  const ranked = allTopics().map(t => ({ t, p: priority(t) + Math.random()*0.5 })).sort((a,b) => b.p - a.p).map(x => x.t);
-  const bySub = { pol:[], his:[], bus:[] };
-  ranked.forEach(t => bySub[t.subject].push(t));
-  const order = [];
-  for (let i = 0; i < 12; i++) ['pol','his','bus'].forEach(s => { if (bySub[s][i]) order.push(bySub[s][i]); });
-  // For introduced topics, choose retrieval vs practice/essay from the phase mix.
+  const now = iso(today());
+  const topics = allTopics();
+  // Three pools: due reviews (retention — protected first), brand-new topics,
+  // and already-known-but-not-due (extra practice to fill any spare time).
+  const dueRev = topics.filter(t => { const ts = topicState(t.id); return introduced(t.id) && ts.nextReview && ts.nextReview <= now; });
+  const fresh  = topics.filter(t => !introduced(t.id));
+  const known  = topics.filter(t => introduced(t.id) && !dueRev.includes(t));
+  const byPriority = arr => arr.map(t => ({ t, p: priority(t) + Math.random()*0.4 })).sort((a,b) => b.p - a.p).map(x => x.t);
+  const interleave = arr => { const bs = { pol:[], his:[], bus:[] }; arr.forEach(t => bs[t.subject].push(t));
+    const o = []; for (let i = 0; i < 30; i++) ['pol','his','bus'].forEach(s => { if (bs[s][i]) o.push(bs[s][i]); }); return o; };
+  const dueQ   = interleave(byPriority(dueRev));
+  const freshQ = interleave(byPriority(fresh)).slice(0, newBudget);
+  const knownQ = interleave(byPriority(known));
+  // For an introduced topic, choose retrieval vs practice/essay from the phase mix.
   const pickIntro = () => { const m = phase.mix; const pract = m.practice / (m.practice + m.review || 1);
     if (Math.random() < pract) return (Math.random() < 0.35 ? 'essay' : 'practice'); return 'review'; };
-  const items = []; let used = 0; let i = 0; let newUsed = 0;
-  while (used < cap && i < order.length) {
-    const t = order[i++];
-    let type;
-    if (!introduced(t.id)) { if (newUsed >= newBudget) continue; type = 'learn'; newUsed++; }
-    else { type = pickIntro(); }
-    const act = ACTIVITIES[type];
-    if (used + act.mins > cap + 8) break;
-    items.push({ topicId:t.id, title:t.title, subject:t.subjectName, cls:t.cls, type, label:act.label, mins:act.mins, done:false });
-    used += act.mins;
-  }
+  const items = []; let used = 0;
+  const add = (t, type) => { const act = ACTIVITIES[type]; if (used + act.mins > cap + 8) return false;
+    items.push({ topicId:t.id, title:t.title, subject:t.subjectName, cls:t.cls, type, label:act.label, mins:act.mins, done:false }); used += act.mins; return true; };
+  // 1) Protect retention: due reviews first.  2) Steady new intake (capped).
+  // 3) Any spare time → extra practice of known material.
+  for (const t of dueQ)   { if (used >= cap) break; add(t, pickIntro()); }
+  for (const t of freshQ) { if (used >= cap) break; add(t, 'learn'); }
+  for (const t of knownQ) { if (used >= cap) break; add(t, pickIntro()); }
   const plan = { date:dateKey, cap, phase:phase.label, items, mins:used, mode };
   STATE.plan[dateKey] = plan; save();
   return plan;
