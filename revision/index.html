@@ -226,6 +226,53 @@ const CONTENT = {
   },
 };
 
+/* Interim question bank — spec-aligned, house-style questions written to the
+   right tariffs. `type` maps to a rubric above (so essay-type questions can be
+   sent straight to the marker). Replace/augment with official past papers when
+   available. Suggested minutes are practice targets, not exam timings. */
+const QUESTIONS = [
+  // --- Politics ---
+  { id:'q-pol-1', subject:'pol', paper:'p1', type:'pol-25-essay', mins:45,
+    text:'Analyse and evaluate the view that the Prime Minister has become too dominant within the UK political system.' },
+  { id:'q-pol-2', subject:'pol', paper:'p1', type:'pol-25-essay', mins:45,
+    text:'Analyse and evaluate the view that first-past-the-post should be replaced for UK general elections.' },
+  { id:'q-pol-3', subject:'pol', paper:'p1', type:'pol-9', mins:12,
+    text:'Explain and analyse three ways in which pressure groups exert influence on government.' },
+  { id:'q-pol-4', subject:'pol', paper:'p2', type:'pol-25-essay', mins:45,
+    text:'Analyse and evaluate the view that the US Supreme Court has become too political.' },
+  { id:'q-pol-5', subject:'pol', paper:'p2', type:'pol-9', mins:12,
+    text:'Explain and analyse three differences between the powers of the US President and the UK Prime Minister.' },
+  { id:'q-pol-6', subject:'pol', paper:'p3', type:'pol-25-essay', mins:45,
+    text:'Analyse and evaluate the view that liberals disagree more than they agree over the role of the state.' },
+  { id:'q-pol-7', subject:'pol', paper:'p3', type:'pol-9', mins:12,
+    text:'Explain and analyse three ways in which conservative thinkers have understood human nature.' },
+  // --- History: Component 1 (Russia 1855–1964, breadth) ---
+  { id:'q-his-1', subject:'his', paper:'c1', type:'his-25-essay', mins:45,
+    text:'‘The emancipation of the serfs in 1861 did more to undermine than to strengthen Tsarist rule.’ Assess the validity of this view.' },
+  { id:'q-his-2', subject:'his', paper:'c1', type:'his-25-essay', mins:45,
+    text:'‘Stalin’s economic policies transformed the Soviet Union in the years 1928–1953.’ Assess the validity of this view.' },
+  { id:'q-his-3', subject:'his', paper:'c1', type:'his-30-interp', mins:40,
+    text:'Using the three extracts, analyse and evaluate the arguments about the reasons for the fall of the Romanovs in 1917. (Supply three historian extracts from a past paper or textbook.)' },
+  // --- History: Component 2 (Wars of the Roses 1450–1499, depth) ---
+  { id:'q-his-4', subject:'his', paper:'c2', type:'his-25-essay', mins:45,
+    text:'‘The weakness of Henry VI was the main reason for the outbreak of civil war in 1455.’ Assess the validity of this view.' },
+  { id:'q-his-5', subject:'his', paper:'c2', type:'his-25-essay', mins:45,
+    text:'To what extent was Warwick “the Kingmaker” responsible for the political instability of the years 1461–1471?' },
+  { id:'q-his-6', subject:'his', paper:'c2', type:'his-30-source', mins:40,
+    text:'With reference to the three sources, assess their value to a historian studying the reasons for Edward IV’s loss of the throne in 1470. (Supply three primary sources from a past paper.)' },
+  // --- Business ---
+  { id:'q-bus-1', subject:'bus', paper:'p1', type:'bus-20', mins:30,
+    text:'Evaluate whether increasing its marketing budget is the best way for a growing business to increase its market share.' },
+  { id:'q-bus-2', subject:'bus', paper:'p1', type:'bus-12', mins:20,
+    text:'Assess the importance of employee motivation to the success of a business.' },
+  { id:'q-bus-3', subject:'bus', paper:'p2', type:'bus-20', mins:30,
+    text:'Evaluate whether a business should pursue rapid growth through acquisition rather than organic growth.' },
+  { id:'q-bus-4', subject:'bus', paper:'p2', type:'bus-12', mins:20,
+    text:'Assess the usefulness of investment appraisal techniques when making a major capital investment decision.' },
+  { id:'q-bus-5', subject:'bus', paper:'p3', type:'bus-20', mins:30,
+    text:'Evaluate whether globalisation has been more of an opportunity than a threat for businesses in the pre-released research industry.' },
+];
+
 /* ---------- 2. STATE (localStorage) ---------- */
 const LS_KEY = 'revision-planner-state-v1';
 const defaultSettings = {
@@ -355,6 +402,8 @@ function buildPlan(dateKey) {
 /* ---------- 6. RENDER ---------- */
 const app = document.getElementById('app');
 let TAB = 'today';
+let currentQ = null;        // question currently drawn from the bank
+let pendingEssay = null;    // { type, text } handed from Practice to the Essay marker
 function setHeader(title, phaseHtml) {
   document.getElementById('hdrDate').textContent = fmtDate(today()).toUpperCase();
   document.getElementById('hdrTitle').textContent = title;
@@ -465,6 +514,26 @@ const NEA_STEPS = [
 function renderPractice() {
   setHeader('Practice', '');
   let h = `<div class="wrap">`;
+  // Question bank
+  h += `<div class="card"><h2>Practice question</h2>
+    <div class="muted" style="margin-bottom:8px">Spec-aligned questions in exam style. Draw one, attempt it (time yourself), then log the marks or send an essay to be marked.</div>
+    <div class="row" style="gap:8px">
+      <select id="qbSub" style="flex:1"><option value="all">All subjects</option>${CONTENT.subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
+      <button class="btn sm" id="qbDraw">Draw</button>
+    </div>`;
+  if (currentQ) {
+    const r = CONTENT.rubrics[currentQ.type];
+    const sub = CONTENT.subjects.find(s => s.id === currentQ.subject);
+    const canMark = !!r;
+    h += `<div style="margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg2)">
+      <div class="faint" style="margin-bottom:6px"><span class="pill ${sub.cls}">${sub.name}</span> ${r?r.name:currentQ.type} · target ${currentQ.mins} min</div>
+      <div class="t-title" style="font-size:15px;line-height:1.5">${currentQ.text}</div>
+      <div class="row" style="gap:8px;margin-top:12px">
+        ${canMark?`<button class="btn sm" id="qbMark">Write &amp; mark this ✍️</button>`:''}
+        <button class="btn sm sec" id="qbLog">Log a mark</button>
+      </div></div>`;
+  }
+  h += `</div>`;
   // Log form
   h += `<div class="card"><h2>Log a past-paper attempt</h2>
     <label>Subject</label><select id="pfSub">${CONTENT.subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
@@ -493,6 +562,26 @@ function renderPractice() {
   });
   h += `</div></div>`;
   app.innerHTML = h;
+  // question bank
+  document.getElementById('qbDraw').onclick = () => {
+    const sub = document.getElementById('qbSub').value;
+    const pool = QUESTIONS.filter(q => sub === 'all' || q.subject === sub);
+    if (!pool.length) return;
+    let next = pool[Math.floor(Math.random()*pool.length)];
+    if (pool.length > 1 && currentQ) { let guard = 0; while (next.id === currentQ.id && guard++ < 8) next = pool[Math.floor(Math.random()*pool.length)]; }
+    currentQ = next; renderPractice();
+  };
+  if (currentQ) {
+    const mark = document.getElementById('qbMark');
+    if (mark) mark.onclick = () => { pendingEssay = { type: currentQ.type, text: currentQ.text }; TAB = 'essays'; window.scrollTo(0,0); render(); };
+    document.getElementById('qbLog').onclick = () => {
+      const r = CONTENT.rubrics[currentQ.type];
+      document.getElementById('pfSub').value = currentQ.subject;
+      if (r) { document.getElementById('pfMax').value = r.max; document.getElementById('pfType').value = r.name.split('—').pop().trim(); }
+      document.getElementById('pfGot').focus();
+      document.getElementById('pfGot').scrollIntoView({ behavior:'smooth', block:'center' });
+    };
+  }
   // causes toggles
   const chosen = new Set();
   app.querySelectorAll('#pfCauses .tag').forEach(t => t.onclick = () => { t.classList.toggle('on'); chosen.has(t.dataset.c)?chosen.delete(t.dataset.c):chosen.add(t.dataset.c); });
@@ -528,6 +617,13 @@ function renderEssays() {
   });
   h += `</div></div>`;
   app.innerHTML = h;
+  // If a question was handed over from the Practice bank, prefill it.
+  if (pendingEssay) {
+    document.getElementById('esType').value = pendingEssay.type;
+    document.getElementById('esQ').value = pendingEssay.text;
+    pendingEssay = null;
+    document.getElementById('esA').focus();
+  }
   if (!STATE.settings.apiKey) document.getElementById('esKeyWarn').innerHTML =
     `<div class="faint" style="margin-top:8px">No API key set. Add one under <b>More → Essay marking</b> to enable feedback.</div>`;
   document.getElementById('esGo').onclick = markEssay;
